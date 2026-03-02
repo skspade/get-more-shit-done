@@ -9,5 +9,8 @@
     "plan_check": true,
     "verifier": true,
     "auto_advance": true
+  },
+  "autopilot": {
+    "circuit_breaker_threshold": 3
   }
 }
