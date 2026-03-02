@@ -771,8 +771,8 @@ run_fix_cycle() {
   # Reset circuit breaker for fix cycle (human-initiated, should not trigger breaker)
   NO_PROGRESS_COUNT=0
 
-  run_step "/gsd:plan-phase $phase --gaps" "fix-plan"
-  run_step "/gsd:execute-phase $phase --gaps-only" "fix-execute"
+  run_step "/gsd:plan-phase $phase --gaps -- Human fix request: $fix_desc" "fix-plan"
+  run_step "/gsd:execute-phase $phase --gaps-only -- Human fix request: $fix_desc" "fix-execute"
   run_step "/gsd:verify-work $phase" "fix-verify"
 
   # Reset circuit breaker after fix cycle
@@ -922,6 +922,8 @@ while true; do
       else
         run_verification_gate "$CURRENT_PHASE"
       fi
+      # Mark phase complete after gate approval (INT-01 fix: closes FLOW-01)
+      gsd_tools phase complete "$CURRENT_PHASE"
       ;;
     complete)
       print_banner "Phase $CURRENT_PHASE COMPLETE ✓"
