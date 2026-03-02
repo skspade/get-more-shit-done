@@ -102,7 +102,7 @@ Plans:
   2. All verification evidence is traceable to actual code behavior, not just SUMMARY claims
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01: Verify Phase 4 failure handling implementation against FAIL-01 through FAIL-04
 
 ## Progress
 
@@ -116,4 +116,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Verification Gates | 0/TBD | Complete    | 2026-03-02 |
 | 4. Failure Handling | 2/2 | Complete    | 2026-03-02 |
 | 5. Fix Autopilot Wiring Bugs | 1/1 | Complete   | 2026-03-02 |
-| 6. Verify Phase 4 Implementation | 0/TBD | Planned | - |
+| 6. Verify Phase 4 Implementation | 0/1 | Planned | - |
