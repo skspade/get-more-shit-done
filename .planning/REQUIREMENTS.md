@@ -34,10 +34,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Failure Handling
 
-- [ ] **FAIL-01**: On execution or verification failure, orchestrator spawns gsd-debugger to diagnose and attempt fix
+- [x] **FAIL-01**: On execution or verification failure, orchestrator spawns gsd-debugger to diagnose and attempt fix
 - [x] **FAIL-02**: Debug-retry loop attempts up to N fixes before escalating (N configurable, default 3)
-- [ ] **FAIL-03**: After debug retries exhausted, orchestrator stops cleanly and surfaces the problem for human review
-- [ ] **FAIL-04**: Failure state is written to STATE.md so the human can understand what went wrong and resume after fixing
+- [x] **FAIL-03**: After debug retries exhausted, orchestrator stops cleanly and surfaces the problem for human review
+- [x] **FAIL-04**: Failure state is written to STATE.md so the human can understand what went wrong and resume after fixing
 
 ### Safety
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VRFY-01 | Phase 3 | Complete |
 | VRFY-02 | Phase 3 | Complete |
 | VRFY-03 | Phase 3 | Complete |
-| FAIL-01 | Phase 6 | Pending |
+| FAIL-01 | Phase 6 | Complete |
 | FAIL-02 | Phase 5, 6 | Complete |
-| FAIL-03 | Phase 6 | Pending |
-| FAIL-04 | Phase 6 | Pending |
+| FAIL-03 | Phase 6 | Complete |
+| FAIL-04 | Phase 6 | Complete |
 | SAFE-01 | Phase 1 | Complete |
 | SAFE-02 | Phase 1 | Complete |
 | SAFE-03 | Phase 1 | Complete |
