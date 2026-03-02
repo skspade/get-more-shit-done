@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: GSD Autopilot
-status: complete
+milestone: v1.1
+milestone_name: Remove Git Tagging
+status: active
 last_updated: "2026-03-02"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** v1.0 complete — planning next milestone
+**Current focus:** v1.1 Remove Git Tagging
 
 ## Current Position
 
-Milestone v1.0 shipped 2026-03-02.
-All 7 phases complete, 12 plans executed, 23/23 requirements satisfied.
-
-Progress: [##########] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-02 — Milestone v1.1 started
 
 ## Accumulated Context
 
@@ -39,4 +39,4 @@ None.
 
 ### Blockers/Concerns
 
-None — all blockers resolved during v1.0.
+None.

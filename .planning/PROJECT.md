@@ -26,7 +26,9 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — next milestone requirements TBD)
+- [ ] Remove git tag creation from complete-milestone workflow
+- [ ] Remove git tag push from complete-milestone workflow
+- [ ] Update documentation references to git tagging
 
 ### Out of Scope
 
@@ -72,5 +74,14 @@ Shipped v1.0 with ~19,626 LOC across shell scripts (autopilot.sh), Node.js tooli
 | Artifact-based state inference | Phase lifecycle step determined by file presence (CONTEXT, PLAN, SUMMARY, VERIFICATION) | Good — stateless, survives context resets |
 | ROADMAP checkbox completion detection | Use ROADMAP checkbox line for completion status instead of section parsing | Good — simpler and more reliable |
 
+## Current Milestone: v1.1 Remove Git Tagging
+
+**Goal:** Strip the automated git tag mechanism from this fork — tags should not be created or pushed during milestone completion.
+
+**Target features:**
+- Remove git tag creation step from complete-milestone workflow
+- Remove git tag push logic
+- Update all documentation referencing automated tagging
+
 ---
-*Last updated: 2026-03-02 after v1.0 milestone*
+*Last updated: 2026-03-02 after v1.1 milestone started*
