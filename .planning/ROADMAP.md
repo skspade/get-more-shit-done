@@ -115,8 +115,10 @@ Plans:
   2. `run_fix_cycle` interpolates `$fix_desc` into the `/gsd:plan-phase --gaps` and `/gsd:execute-phase --gaps-only` prompts — the human's fix description reaches the agents
   3. The E2E flow "execute gaps → verify → human gate approve → next phase" completes without the circuit breaker intervening
 
+**Plans:** 1 plan
+
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md — Fix verify case phase complete and fix_desc prompt interpolation
 
 ## Progress
 
