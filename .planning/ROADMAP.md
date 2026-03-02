@@ -90,7 +90,7 @@ Plans:
   3. The E2E flow "execute → verify → human gate" completes without skipping the verify step
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01: Fix step inference and UAT file pattern matching
 
 ### Phase 6: Verify Phase 4 Implementation
 **Goal**: Run phase-level verification on Phase 4's failure handling implementation to close the 4 unverified requirement gaps
