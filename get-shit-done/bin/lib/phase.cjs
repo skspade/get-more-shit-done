@@ -806,6 +806,10 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     }
   } catch {}
 
+  // Write .completed marker in phase directory (reliable signal for cmdPhaseStatus)
+  const completedMarkerPath = path.join(cwd, phaseInfo.directory, '.completed');
+  fs.writeFileSync(completedMarkerPath, JSON.stringify({ date: today, phase: phaseNum }, null, 2) + '\n');
+
   // Update STATE.md
   if (fs.existsSync(statePath)) {
     let stateContent = fs.readFileSync(statePath, 'utf-8');
@@ -896,25 +900,33 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
   const hasSummaries = summaryCount > 0;
   const allPlansHaveSummaries = planCount > 0 && summaryCount >= planCount;
 
-  // Check if phase is marked complete in ROADMAP.md
-  // The `phase complete` command marks the checkbox line with "(completed YYYY-MM-DD)"
-  // e.g. "- [x] **Phase 1: Name** ... (completed 2026-03-02)"
-  // Strip leading zeros: findPhaseInternal returns "01" but ROADMAP uses "Phase 1:"
-  const unpadded = phaseInfo.phase_number.replace(/^0+/, '') || '0';
+  // Check if phase is marked complete
+  // Primary signal: .completed marker file written by `phase complete` command
+  // Fallback: ROADMAP.md checkbox with "(completed YYYY-MM-DD)"
   let phaseComplete = false;
-  try {
-    const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
-    if (fs.existsSync(roadmapPath)) {
-      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-      // Match the checkbox line for this phase with a completed date marker
-      const completedPattern = new RegExp(
-        `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s].*\\(completed\\s+\\d{4}-\\d{2}-\\d{2}\\)`,
-        'i'
-      );
-      phaseComplete = completedPattern.test(roadmapContent);
+
+  // Check for .completed marker file (reliable, format-independent)
+  const completedMarkerPath = path.join(phaseDir, '.completed');
+  if (fs.existsSync(completedMarkerPath)) {
+    phaseComplete = true;
+  }
+
+  // Fallback: check ROADMAP.md checkbox
+  if (!phaseComplete) {
+    const unpadded = phaseInfo.phase_number.replace(/^0+/, '') || '0';
+    try {
+      const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+      if (fs.existsSync(roadmapPath)) {
+        const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+        const completedPattern = new RegExp(
+          `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s].*\\(completed\\s+\\d{4}-\\d{2}-\\d{2}\\)`,
+          'i'
+        );
+        phaseComplete = completedPattern.test(roadmapContent);
+      }
+    } catch {
+      // If ROADMAP.md can't be read, rely on marker file check above
     }
-  } catch {
-    // If ROADMAP.md can't be read, assume not complete
   }
 
   // Infer current lifecycle step from artifact presence + ROADMAP completion

@@ -403,7 +403,7 @@ run_step_with_retry() {
   while true; do
     # Create temp file for output capture
     local output_file
-    output_file=$(mktemp "/tmp/gsd-autopilot-XXXXXX.log")
+    output_file=$(mktemp "/tmp/gsd-autopilot-XXXXXX")
     TEMP_FILES+=("$output_file")
 
     local step_exit=0
@@ -460,7 +460,7 @@ run_verify_with_debug_retry() {
   while true; do
     # Run verify step with output capture
     local output_file
-    output_file=$(mktemp "/tmp/gsd-autopilot-XXXXXX.log")
+    output_file=$(mktemp "/tmp/gsd-autopilot-XXXXXX")
     TEMP_FILES+=("$output_file")
 
     local verify_exit=0
