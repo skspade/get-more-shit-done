@@ -9,14 +9,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Core Loop
 
-- [ ] **LOOP-01**: Orchestrator reads STATE.md and ROADMAP.md to determine the current phase and its status
-- [ ] **LOOP-02**: Orchestrator drives the next GSD phase forward (discuss → plan → execute → verify) based on current state
-- [ ] **LOOP-03**: Orchestrator loops until all phases in the milestone are verified or a halt condition is reached
-- [ ] **LOOP-04**: User can invoke autopilot on a fresh milestone and it runs from initialization through completion (cold-start)
-- [ ] **LOOP-05**: User can invoke autopilot mid-milestone and it picks up from the current STATE.md position (resume)
-- [ ] **LOOP-06**: Bash outer loop reinvokes Claude Code with a fresh context window for each phase iteration
-- [ ] **LOOP-07**: All confirmation gates are disabled in autopilot mode (mode: yolo, all gates false)
-- [ ] **LOOP-08**: Each phase execution gets a clean 200k-token context window to prevent context rot
+- [x] **LOOP-01**: Orchestrator reads STATE.md and ROADMAP.md to determine the current phase and its status
+- [x] **LOOP-02**: Orchestrator drives the next GSD phase forward (discuss → plan → execute → verify) based on current state
+- [x] **LOOP-03**: Orchestrator loops until all phases in the milestone are verified or a halt condition is reached
+- [x] **LOOP-04**: User can invoke autopilot on a fresh milestone and it runs from initialization through completion (cold-start)
+- [x] **LOOP-05**: User can invoke autopilot mid-milestone and it picks up from the current STATE.md position (resume)
+- [x] **LOOP-06**: Bash outer loop reinvokes Claude Code with a fresh context window for each phase iteration
+- [x] **LOOP-07**: All confirmation gates are disabled in autopilot mode (mode: yolo, all gates false)
+- [x] **LOOP-08**: Each phase execution gets a clean 200k-token context window to prevent context rot
 
 ### Auto-Context
 
@@ -41,9 +41,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Safety
 
-- [ ] **SAFE-01**: Progress circuit breaker detects N consecutive iterations with no state change (configurable, default 3)
-- [ ] **SAFE-02**: Circuit breaker monitors meaningful progress: new commits, phase advancement, or plan completion
-- [ ] **SAFE-03**: When circuit breaker triggers, orchestrator pauses and presents a summary of what it attempted
+- [x] **SAFE-01**: Progress circuit breaker detects N consecutive iterations with no state change (configurable, default 3)
+- [x] **SAFE-02**: Circuit breaker monitors meaningful progress: new commits, phase advancement, or plan completion
+- [x] **SAFE-03**: When circuit breaker triggers, orchestrator pauses and presents a summary of what it attempted
 
 ## v2 Requirements
 
@@ -83,14 +83,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOOP-01 | Phase 1 | Pending |
-| LOOP-02 | Phase 1 | Pending |
-| LOOP-03 | Phase 1 | Pending |
-| LOOP-04 | Phase 1 | Pending |
-| LOOP-05 | Phase 1 | Pending |
-| LOOP-06 | Phase 1 | Pending |
-| LOOP-07 | Phase 1 | Pending |
-| LOOP-08 | Phase 1 | Pending |
+| LOOP-01 | Phase 1 | Complete |
+| LOOP-02 | Phase 1 | Complete |
+| LOOP-03 | Phase 1 | Complete |
+| LOOP-04 | Phase 1 | Complete |
+| LOOP-05 | Phase 1 | Complete |
+| LOOP-06 | Phase 1 | Complete |
+| LOOP-07 | Phase 1 | Complete |
+| LOOP-08 | Phase 1 | Complete |
 | ACTX-01 | Phase 2 | Pending |
 | ACTX-02 | Phase 2 | Pending |
 | ACTX-03 | Phase 2 | Pending |
@@ -103,9 +103,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FAIL-02 | Phase 4 | Pending |
 | FAIL-03 | Phase 4 | Pending |
 | FAIL-04 | Phase 4 | Pending |
-| SAFE-01 | Phase 1 | Pending |
-| SAFE-02 | Phase 1 | Pending |
-| SAFE-03 | Phase 1 | Pending |
+| SAFE-01 | Phase 1 | Complete |
+| SAFE-02 | Phase 1 | Complete |
+| SAFE-03 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total

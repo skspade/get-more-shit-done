@@ -12,7 +12,7 @@ GSD Autopilot extends the existing GSD framework with a single command that driv
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Core Loop Infrastructure** - Bash outer loop that reads state, drives phases with fresh context windows, and circuit-breaks on stalls
+- [x] **Phase 1: Core Loop Infrastructure** - Bash outer loop that reads state, drives phases with fresh context windows, and circuit-breaks on stalls (completed 2026-03-02)
 - [ ] **Phase 2: Auto-Context Generation** - Agent that replaces interactive discuss with autonomous CONTEXT.md generation
 - [ ] **Phase 3: Verification Gates** - Human checkpoint at verification with autonomous decision surfacing and approve/fix/abort controls
 - [ ] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Loop Infrastructure | 0/TBD | Not started | - |
+| 1. Core Loop Infrastructure | 0/TBD | Complete    | 2026-03-02 |
 | 2. Auto-Context Generation | 0/TBD | Not started | - |
 | 3. Verification Gates | 0/TBD | Not started | - |
 | 4. Failure Handling | 0/TBD | Not started | - |
