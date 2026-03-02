@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. It replaces interactive discussion with AI-generated decisions, auto-approves planning and execution, and only pauses for human review at verification checkpoints.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, and debug-retry handles failures automatically.
 
 ## Core Value
 
@@ -12,21 +12,21 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Validated
 
-(None yet — ship to validate)
+- Autonomous phase loop that reads STATE.md and drives the next phase forward — v1.0
+- Auto-context generation replacing interactive discuss (layered decision sourcing with documented reasoning) — v1.0
+- Auto-approval of planning and execution phases (no human gates) — v1.0
+- Human checkpoint at verification — pause for review of what was built — v1.0
+- Cold-start capability: invoke on a new milestone and run from initialization through completion — v1.0
+- Resume capability: invoke mid-milestone and pick up from current STATE.md position — v1.0
+- Debug-first failure handling: spawn gsd-debugger on failures, attempt fixes, retry — v1.0
+- Human escalation after debug retries exhausted (configurable, default 3 attempts) — v1.0
+- Progress circuit breaker: pause after N consecutive iterations with no state change (configurable, default 3) — v1.0
+- Native GSD implementation using workflows, agents, and commands — not an external wrapper — v1.0
+- Bash helpers where native GSD patterns are insufficient (outer loop, state polling) — v1.0
 
 ### Active
 
-- [ ] Autonomous phase loop that reads STATE.md and drives the next phase forward
-- [ ] Auto-context generation replacing interactive discuss (layered: front-load from PROJECT.md, Claude decides remaining ambiguities with documented reasoning)
-- [ ] Auto-approval of planning and execution phases (no human gates)
-- [ ] Human checkpoint at verification — pause for review of what was built
-- [ ] Cold-start capability: invoke on a new milestone and run from initialization through completion
-- [ ] Resume capability: invoke mid-milestone and pick up from current STATE.md position
-- [ ] Debug-first failure handling: spawn gsd-debugger on failures, attempt fixes, retry
-- [ ] Human escalation after debug retries exhausted (configurable, default 3 attempts)
-- [ ] Progress circuit breaker: pause after N consecutive iterations with no state change (configurable, default 3)
-- [ ] Native GSD implementation using workflows, agents, and commands — not an external wrapper
-- [ ] Bash helpers where native GSD patterns are insufficient (outer loop, state polling)
+(None — next milestone requirements TBD)
 
 ### Out of Scope
 
@@ -38,21 +38,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-GSD v1.22.0 already provides most of the building blocks:
-- `auto_advance` config chains phases within a session
-- `mode: "yolo"` auto-approves changes
-- 9 specialized agents handle all substantive work in fresh 200k-token context windows
-- File-based state (`.planning/STATE.md`, plans, summaries) survives context resets
-- The thin orchestrator pattern keeps main context at ~10-15% usage
+Shipped v1.0 with ~19,626 LOC across shell scripts (autopilot.sh), Node.js tooling (gsd-tools.cjs, phase.cjs, config.cjs), and markdown workflows/agents.
 
-The gap is: no single command loops through the full milestone lifecycle. `auto_advance` chains within a session but doesn't survive context window exhaustion. The discuss phase requires human input. There's no debug-retry loop on verification failure.
+**Architecture:**
+- `autopilot.sh` — bash outer loop, ~900 lines, reinvokes `claude -p` per phase step
+- `gsd-auto-context` agent — autonomous CONTEXT.md generation with layered decision sourcing
+- `autopilot.md` workflow — entry point that launches autopilot.sh
+- Verification gate — blocks for human approve/fix/abort at each phase
+- Debug-retry — spawns gsd-debugger on failures, retries up to N times
 
-The implementation extends GSD's existing patterns:
-- New command file (`commands/gsd/autopilot.md`) — thin orchestrator, ~100-200 lines
-- New workflow file (`workflows/autopilot.md`) — phase loop logic, ~300-500 lines
-- New agent (`agents/gsd-auto-context.md`) — generates CONTEXT.md from milestone spec
-- Modified verify workflow — adds pause-for-human gate in autopilot mode
-- Bash helper script — outer loop that reinvokes Claude Code with fresh context per phase
+**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
+**Known tech debt:** 7 cosmetic items (dead import, missing config scaffold key, Phase 6 ROADMAP status — see v1.0 audit)
 
 ## Constraints
 
@@ -66,13 +62,15 @@ The implementation extends GSD's existing patterns:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Native GSD extension over external wrapper | Leverages existing agent/workflow patterns, avoids maintaining separate orchestration layer | — Pending |
-| Fork over upstream contribution | Need freedom to modify core workflows without PR review cycles | — Pending |
-| Always auto-decide discuss phase | The whole point is autonomous execution; human input at discuss defeats the purpose | — Pending |
-| Human checkpoint at verification only | Verification is where you see what was actually built — the one place human judgment adds the most value | — Pending |
-| Debug-first failure handling | gsd-debugger already exists and is purpose-built for diagnosing execution failures | — Pending |
-| Progress circuit breaker over budget cap | Stuck detection is more meaningful than token counting for preventing runaway | — Pending |
-| Layered decision approach for context generation | Front-loading from PROJECT.md eliminates obvious ambiguities; Claude handles the rest with documented reasoning | — Pending |
+| Native GSD extension over external wrapper | Leverages existing agent/workflow patterns, avoids maintaining separate orchestration layer | Good — seamless integration with existing commands |
+| Fork over upstream contribution | Need freedom to modify core workflows without PR review cycles | Good — enabled rapid iteration on autopilot.sh |
+| Always auto-decide discuss phase | The whole point is autonomous execution; human input at discuss defeats the purpose | Good — auto-context produces usable CONTEXT.md |
+| Human checkpoint at verification only | Verification is where you see what was actually built — the one place human judgment adds the most value | Good — right balance of autonomy and oversight |
+| Debug-first failure handling | gsd-debugger already exists and is purpose-built for diagnosing execution failures | Good — reuses existing infrastructure |
+| Progress circuit breaker over budget cap | Stuck detection is more meaningful than token counting for preventing runaway | Good — catches semantic stalls, not arbitrary limits |
+| Layered decision approach for context generation | Front-loading from PROJECT.md eliminates obvious ambiguities; Claude handles the rest with documented reasoning | Good — domain adaptation works across phase types |
+| Artifact-based state inference | Phase lifecycle step determined by file presence (CONTEXT, PLAN, SUMMARY, VERIFICATION) | Good — stateless, survives context resets |
+| ROADMAP checkbox completion detection | Use ROADMAP checkbox line for completion status instead of section parsing | Good — simpler and more reliable |
 
 ---
-*Last updated: 2026-03-01 after initialization*
+*Last updated: 2026-03-02 after v1.0 milestone*
