@@ -96,9 +96,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTX-03 | Phase 2 | Complete |
 | ACTX-04 | Phase 2 | Complete |
 | ACTX-05 | Phase 2 | Complete |
-| VRFY-01 | Phase 3 | Complete |
+| VRFY-01 | Phase 3, 7 | Complete |
 | VRFY-02 | Phase 3 | Complete |
-| VRFY-03 | Phase 3 | Complete |
+| VRFY-03 | Phase 3, 7 | Complete |
 | FAIL-01 | Phase 6 | Complete |
 | FAIL-02 | Phase 5, 6 | Complete |
 | FAIL-03 | Phase 6 | Complete |

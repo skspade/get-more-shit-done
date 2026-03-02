@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly (completed 2026-03-02)
 - [x] **Phase 5: Fix Autopilot Wiring Bugs** - Fix verification gate bypass and UAT/VERIFICATION file mismatch (Gap Closure) (completed 2026-03-02)
 - [ ] **Phase 6: Verify Phase 4 Implementation** - Run phase-level verification on Phase 4 failure handling code (Gap Closure)
+- [ ] **Phase 7: Fix Gap-Path Verify & Fix Cycle** - Add missing phase complete after gate approval, pass fix_desc to agents (Gap Closure)
 
 ## Phase Details
 
@@ -104,10 +105,23 @@ Plans:
 Plans:
 - [ ] 06-01: Verify Phase 4 failure handling implementation against FAIL-01 through FAIL-04
 
+### Phase 7: Fix Gap-Path Verify & Fix Cycle
+**Goal**: Fix the two wiring bugs in the autopilot gap/fix path: add missing phase complete after verification gate approval (INT-01), and pass the human's fix description to agents (INT-02)
+**Depends on**: Phase 6
+**Requirements**: VRFY-01, VRFY-03
+**Gap Closure:** Closes integration gaps INT-01, INT-02 and flow gaps FLOW-01, FLOW-02 from audit
+**Success Criteria** (what must be TRUE):
+  1. After `run_verification_gate` returns 0 (human approved), autopilot.sh calls `gsd_tools phase complete` — the gap path no longer loops infinitely on verify
+  2. `run_fix_cycle` interpolates `$fix_desc` into the `/gsd:plan-phase --gaps` and `/gsd:execute-phase --gaps-only` prompts — the human's fix description reaches the agents
+  3. The E2E flow "execute gaps → verify → human gate approve → next phase" completes without the circuit breaker intervening
+
+Plans:
+- [ ] 07-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -117,3 +131,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 4. Failure Handling | 2/2 | Complete    | 2026-03-02 |
 | 5. Fix Autopilot Wiring Bugs | 1/1 | Complete   | 2026-03-02 |
 | 6. Verify Phase 4 Implementation | 0/1 | Planned | - |
+| 7. Fix Gap-Path Verify & Fix Cycle | 0/TBD | Planned | - |
