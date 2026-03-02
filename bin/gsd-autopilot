@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# gsd-autopilot — CLI entry point for GSD Autopilot
+# Delegates to the installed autopilot.sh script.
+
+set -euo pipefail
+
+AUTOPILOT="$HOME/.claude/get-shit-done/scripts/autopilot.sh"
+
+if [ ! -f "$AUTOPILOT" ]; then
+  echo "Error: GSD is not installed ($AUTOPILOT not found)." >&2
+  echo "Run 'bash bin/replace-vanilla.sh' from the fork repo to install." >&2
+  exit 1
+fi
+
+exec bash "$AUTOPILOT" "$@"

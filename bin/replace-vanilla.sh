@@ -171,8 +171,42 @@ else
   success "FORK marker written"
 fi
 
-# ─── Phase 7: Verify installation ─────────────────────────────────────
-info "Phase 7: Verifying installation..."
+# ─── Phase 7: Install CLI entry point ─────────────────────────────────
+info "Phase 7: Installing gsd-autopilot CLI..."
+
+CLI_WRAPPER="$GSD_DIR/scripts/gsd-autopilot"
+CLI_LINK="$HOME/.local/bin/gsd-autopilot"
+REPO_WRAPPER="bin/gsd-autopilot"
+
+if [ ! -f "$REPO_WRAPPER" ]; then
+  warn "bin/gsd-autopilot not found in repo — skipping CLI install"
+else
+  run_or_dry \
+    "cp $REPO_WRAPPER → $CLI_WRAPPER" \
+    "cp \"$REPO_WRAPPER\" \"$CLI_WRAPPER\" && chmod +x \"$CLI_WRAPPER\""
+
+  run_or_dry \
+    "mkdir -p ~/.local/bin" \
+    "mkdir -p \"$HOME/.local/bin\""
+
+  run_or_dry \
+    "symlink $CLI_LINK → $CLI_WRAPPER" \
+    "ln -sf \"$CLI_WRAPPER\" \"$CLI_LINK\""
+
+  if ! $DRY_RUN; then
+    success "gsd-autopilot CLI installed"
+  fi
+
+  # Check if ~/.local/bin is on PATH
+  if ! echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then
+    warn "~/.local/bin is not on your PATH"
+    echo -e "  ${DIM}Add this to your shell profile (~/.bashrc or ~/.zshrc):${RESET}"
+    echo -e "  ${DIM}  export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
+  fi
+fi
+
+# ─── Phase 8: Verify installation ─────────────────────────────────────
+info "Phase 8: Verifying installation..."
 
 VERIFY_PASS=true
 check_file() {
@@ -198,6 +232,7 @@ check_file "agents/"          "$CLAUDE_DIR/agents"
 check_file "commands/gsd/"    "$CLAUDE_DIR/commands/gsd"
 check_file "hooks/"           "$CLAUDE_DIR/hooks"
 check_file "manifest"         "$CLAUDE_DIR/gsd-file-manifest.json"
+check_file "gsd-autopilot CLI" "$CLI_LINK"
 
 if ! $DRY_RUN && ! $VERIFY_PASS; then
   warn "Some files are missing — installation may be incomplete"
@@ -214,4 +249,5 @@ else
   echo -e "  Commit:  ${CYAN}${COMMIT_HASH}${RESET}"
   echo -e ""
   echo -e "${DIM}Start a new Claude Code session to use the fork.${RESET}"
+  echo -e "${DIM}Run 'gsd-autopilot --help' to launch autopilot from any project.${RESET}"
 fi
