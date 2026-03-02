@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Core Loop Infrastructure** - Bash outer loop that reads state, drives phases with fresh context windows, and circuit-breaks on stalls (completed 2026-03-02)
 - [x] **Phase 2: Auto-Context Generation** - Agent that replaces interactive discuss with autonomous CONTEXT.md generation (completed 2026-03-02)
 - [x] **Phase 3: Verification Gates** - Human checkpoint at verification with autonomous decision surfacing and approve/fix/abort controls (completed 2026-03-02)
-- [ ] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly
+- [x] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly (completed 2026-03-02)
 
 ## Phase Details
 
@@ -87,4 +87,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Core Loop Infrastructure | 0/TBD | Complete    | 2026-03-02 |
 | 2. Auto-Context Generation | 0/TBD | Complete    | 2026-03-02 |
 | 3. Verification Gates | 0/TBD | Complete    | 2026-03-02 |
-| 4. Failure Handling | 0/TBD | Not started | - |
+| 4. Failure Handling | 2/2 | Complete    | 2026-03-02 |
