@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getRoadmapPhaseInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -866,6 +866,89 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   output(result, raw);
 }
 
+function cmdPhaseStatus(cwd, phaseArg, raw) {
+  if (!phaseArg) {
+    error('phase required for phase-status');
+  }
+
+  const phaseInfo = findPhaseInternal(cwd, phaseArg);
+  if (!phaseInfo) {
+    error(`Phase ${phaseArg} not found`);
+  }
+
+  const phaseDir = path.join(cwd, phaseInfo.directory);
+  let files = [];
+  try {
+    files = fs.readdirSync(phaseDir);
+  } catch {
+    error(`Cannot read phase directory: ${phaseInfo.directory}`);
+  }
+
+  const hasContext = files.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+  const hasResearch = files.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+  const planFiles = files.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md');
+  const summaryFiles = files.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
+  const hasVerification = files.some(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+
+  const planCount = planFiles.length;
+  const summaryCount = summaryFiles.length;
+  const hasPlans = planCount > 0;
+  const hasSummaries = summaryCount > 0;
+  const allPlansHaveSummaries = planCount > 0 && summaryCount >= planCount;
+
+  // Check if phase is marked complete in ROADMAP.md
+  // The `phase complete` command marks the checkbox line with "(completed YYYY-MM-DD)"
+  // e.g. "- [x] **Phase 1: Name** ... (completed 2026-03-02)"
+  // Strip leading zeros: findPhaseInternal returns "01" but ROADMAP uses "Phase 1:"
+  const unpadded = phaseInfo.phase_number.replace(/^0+/, '') || '0';
+  let phaseComplete = false;
+  try {
+    const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+    if (fs.existsSync(roadmapPath)) {
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      // Match the checkbox line for this phase with a completed date marker
+      const completedPattern = new RegExp(
+        `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s].*\\(completed\\s+\\d{4}-\\d{2}-\\d{2}\\)`,
+        'i'
+      );
+      phaseComplete = completedPattern.test(roadmapContent);
+    }
+  } catch {
+    // If ROADMAP.md can't be read, assume not complete
+  }
+
+  // Infer current lifecycle step from artifact presence + ROADMAP completion
+  let step;
+  if (phaseComplete) {
+    step = 'complete';
+  } else if (!hasContext) {
+    step = 'discuss';
+  } else if (!hasPlans) {
+    step = 'plan';
+  } else if (!allPlansHaveSummaries) {
+    step = 'execute';
+  } else {
+    step = 'verify';
+  }
+
+  const result = {
+    phase: phaseInfo.phase_number,
+    phase_dir: phaseInfo.directory,
+    step,
+    has_context: hasContext,
+    has_research: hasResearch,
+    has_plans: hasPlans,
+    plan_count: planCount,
+    has_summaries: hasSummaries,
+    summary_count: summaryCount,
+    all_plans_have_summaries: allPlansHaveSummaries,
+    has_verification: hasVerification,
+    phase_complete: phaseComplete,
+  };
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdPhasesList,
   cmdPhaseNextDecimal,
@@ -875,4 +958,5 @@ module.exports = {
   cmdPhaseInsert,
   cmdPhaseRemove,
   cmdPhaseComplete,
+  cmdPhaseStatus,
 };

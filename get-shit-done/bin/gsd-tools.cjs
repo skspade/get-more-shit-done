@@ -36,6 +36,8 @@
  *   phase insert <after> <description> Insert decimal phase after existing
  *   phase remove <phase> [--force]     Remove phase, renumber all subsequent
  *   phase complete <phase>             Mark phase done, update state + roadmap
+ *   phase status <phase>              Get phase lifecycle status for autopilot
+ *   phase-status <phase>              Alias for phase status
  *
  * Roadmap Operations:
  *   roadmap get-phase <phase>          Extract phase section from ROADMAP.md
@@ -437,9 +439,16 @@ async function main() {
         phase.cmdPhaseRemove(cwd, args[2], { force: forceFlag }, raw);
       } else if (subcommand === 'complete') {
         phase.cmdPhaseComplete(cwd, args[2], raw);
+      } else if (subcommand === 'status') {
+        phase.cmdPhaseStatus(cwd, args[2], raw);
       } else {
-        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete');
+        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, status');
       }
+      break;
+    }
+
+    case 'phase-status': {
+      phase.cmdPhaseStatus(cwd, args[1], raw);
       break;
     }
 
