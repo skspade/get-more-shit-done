@@ -40,6 +40,13 @@ const child = spawn(process.execPath, ['-e', `
     }
   } catch (e) {}
 
+  // Skip update check for fork installations
+  const forkFile = ${JSON.stringify(path.join(homeDir, '.claude', 'get-shit-done', 'FORK'))};
+  if (fs.existsSync(forkFile)) {
+    fs.writeFileSync(cacheFile, JSON.stringify({ update_available: false, installed, latest: installed, checked: Math.floor(Date.now() / 1000), fork: true }));
+    process.exit(0);
+  }
+
   let latest = null;
   try {
     latest = execSync('npm view get-shit-done-cc version', { encoding: 'utf8', timeout: 10000, windowsHide: true }).trim();
