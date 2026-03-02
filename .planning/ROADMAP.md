@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Auto-Context Generation** - Agent that replaces interactive discuss with autonomous CONTEXT.md generation (completed 2026-03-02)
 - [x] **Phase 3: Verification Gates** - Human checkpoint at verification with autonomous decision surfacing and approve/fix/abort controls (completed 2026-03-02)
 - [x] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly (completed 2026-03-02)
-- [ ] **Phase 5: Fix Autopilot Wiring Bugs** - Fix verification gate bypass and UAT/VERIFICATION file mismatch (Gap Closure)
+- [x] **Phase 5: Fix Autopilot Wiring Bugs** - Fix verification gate bypass and UAT/VERIFICATION file mismatch (Gap Closure) (completed 2026-03-02)
 - [ ] **Phase 6: Verify Phase 4 Implementation** - Run phase-level verification on Phase 4 failure handling code (Gap Closure)
 
 ## Phase Details
@@ -115,5 +115,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Auto-Context Generation | 0/TBD | Complete    | 2026-03-02 |
 | 3. Verification Gates | 0/TBD | Complete    | 2026-03-02 |
 | 4. Failure Handling | 2/2 | Complete    | 2026-03-02 |
-| 5. Fix Autopilot Wiring Bugs | 0/TBD | Planned | - |
+| 5. Fix Autopilot Wiring Bugs | 1/1 | Complete   | 2026-03-02 |
 | 6. Verify Phase 4 Implementation | 0/TBD | Planned | - |
