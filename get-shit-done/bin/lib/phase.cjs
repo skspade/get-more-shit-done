@@ -929,6 +929,12 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
     }
   }
 
+  // Tertiary signal: artifact-complete (all plans have summaries)
+  // Covers pre-fork projects that lack .completed markers and checkbox formatting
+  if (!phaseComplete && allPlansHaveSummaries) {
+    phaseComplete = true;
+  }
+
   // Infer current lifecycle step from artifact presence + ROADMAP completion
   let step;
   if (phaseComplete) {
