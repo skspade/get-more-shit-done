@@ -3,6 +3,7 @@
 ## Milestones
 
 - **v1.0 GSD Autopilot** — Phases 1-7 (shipped 2026-03-02)
+- **v1.1 Remove Git Tagging** — Phase 8 (in progress)
 
 ## Phases
 
@@ -19,7 +20,32 @@
 
 </details>
 
+### v1.1 Remove Git Tagging (In Progress)
+
+**Milestone Goal:** Strip automated git tag creation and push from complete-milestone workflow and all documentation references.
+
+- [ ] **Phase 8: Remove Git Tagging** - Remove tag creation, tag push, and all documentation references to automated tagging
+
+## Phase Details
+
+### Phase 8: Remove Git Tagging
+**Goal**: The complete-milestone workflow no longer creates or pushes git tags, and no documentation claims it does
+**Depends on**: Phase 7 (v1.0 shipped)
+**Requirements**: WF-01, WF-02, WF-03, DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. Running complete-milestone does not create any git tags
+  2. Running complete-milestone does not prompt to push or push any git tags
+  3. The complete-milestone command spec makes no mention of git tagging
+  4. All user-facing documentation (help, README, user guide) makes no mention of automated git tagging during milestone completion
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -30,3 +56,4 @@
 | 5. Fix Autopilot Wiring Bugs | v1.0 | 1/1 | Complete | 2026-03-02 |
 | 6. Verify Phase 4 Implementation | v1.0 | 1/1 | Complete | 2026-03-02 |
 | 7. Fix Gap-Path Verify & Fix Cycle | v1.0 | 1/1 | Complete | 2026-03-02 |
+| 8. Remove Git Tagging | v1.1 | 0/0 | Not started | - |

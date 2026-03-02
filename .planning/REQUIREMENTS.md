@@ -35,18 +35,18 @@ None — this is a focused removal milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WF-01 | TBD | Pending |
-| WF-02 | TBD | Pending |
-| WF-03 | TBD | Pending |
-| DOC-01 | TBD | Pending |
-| DOC-02 | TBD | Pending |
-| DOC-03 | TBD | Pending |
+| WF-01 | Phase 8 | Pending |
+| WF-02 | Phase 8 | Pending |
+| WF-03 | Phase 8 | Pending |
+| DOC-01 | Phase 8 | Pending |
+| DOC-02 | Phase 8 | Pending |
+| DOC-03 | Phase 8 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 6 total
-- Mapped to phases: 0
-- Unmapped: 6 ⚠️
+- Mapped to phases: 6
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after initial definition*
+*Last updated: 2026-03-02 after roadmap creation*
