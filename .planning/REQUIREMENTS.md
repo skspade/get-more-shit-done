@@ -28,9 +28,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Verification
 
-- [ ] **VRFY-01**: Orchestrator pauses at each phase's verification checkpoint for human review
-- [ ] **VRFY-02**: Verification report surfaces which decisions were made autonomously, not just pass/fail results
-- [ ] **VRFY-03**: Human can approve (continue), request fixes (triggers debug-retry), or abort at verification checkpoint
+- [x] **VRFY-01**: Orchestrator pauses at each phase's verification checkpoint for human review
+- [x] **VRFY-02**: Verification report surfaces which decisions were made autonomously, not just pass/fail results
+- [x] **VRFY-03**: Human can approve (continue), request fixes (triggers debug-retry), or abort at verification checkpoint
 
 ### Failure Handling
 
@@ -96,9 +96,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTX-03 | Phase 2 | Pending |
 | ACTX-04 | Phase 2 | Pending |
 | ACTX-05 | Phase 2 | Pending |
-| VRFY-01 | Phase 3 | Pending |
-| VRFY-02 | Phase 3 | Pending |
-| VRFY-03 | Phase 3 | Pending |
+| VRFY-01 | Phase 3 | Complete |
+| VRFY-02 | Phase 3 | Complete |
+| VRFY-03 | Phase 3 | Complete |
 | FAIL-01 | Phase 4 | Pending |
 | FAIL-02 | Phase 4 | Pending |
 | FAIL-03 | Phase 4 | Pending |
