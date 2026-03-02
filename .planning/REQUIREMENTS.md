@@ -83,35 +83,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOOP-01 | — | Pending |
-| LOOP-02 | — | Pending |
-| LOOP-03 | — | Pending |
-| LOOP-04 | — | Pending |
-| LOOP-05 | — | Pending |
-| LOOP-06 | — | Pending |
-| LOOP-07 | — | Pending |
-| LOOP-08 | — | Pending |
-| ACTX-01 | — | Pending |
-| ACTX-02 | — | Pending |
-| ACTX-03 | — | Pending |
-| ACTX-04 | — | Pending |
-| ACTX-05 | — | Pending |
-| VRFY-01 | — | Pending |
-| VRFY-02 | — | Pending |
-| VRFY-03 | — | Pending |
-| FAIL-01 | — | Pending |
-| FAIL-02 | — | Pending |
-| FAIL-03 | — | Pending |
-| FAIL-04 | — | Pending |
-| SAFE-01 | — | Pending |
-| SAFE-02 | — | Pending |
-| SAFE-03 | — | Pending |
+| LOOP-01 | Phase 1 | Pending |
+| LOOP-02 | Phase 1 | Pending |
+| LOOP-03 | Phase 1 | Pending |
+| LOOP-04 | Phase 1 | Pending |
+| LOOP-05 | Phase 1 | Pending |
+| LOOP-06 | Phase 1 | Pending |
+| LOOP-07 | Phase 1 | Pending |
+| LOOP-08 | Phase 1 | Pending |
+| ACTX-01 | Phase 2 | Pending |
+| ACTX-02 | Phase 2 | Pending |
+| ACTX-03 | Phase 2 | Pending |
+| ACTX-04 | Phase 2 | Pending |
+| ACTX-05 | Phase 2 | Pending |
+| VRFY-01 | Phase 3 | Pending |
+| VRFY-02 | Phase 3 | Pending |
+| VRFY-03 | Phase 3 | Pending |
+| FAIL-01 | Phase 4 | Pending |
+| FAIL-02 | Phase 4 | Pending |
+| FAIL-03 | Phase 4 | Pending |
+| FAIL-04 | Phase 4 | Pending |
+| SAFE-01 | Phase 1 | Pending |
+| SAFE-02 | Phase 1 | Pending |
+| SAFE-03 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after initial definition*
+*Last updated: 2026-03-01 after roadmap creation*
