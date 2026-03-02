@@ -28,6 +28,7 @@ const CODEX_AGENT_SANDBOX = {
   'gsd-debugger': 'workspace-write',
   'gsd-plan-checker': 'read-only',
   'gsd-integration-checker': 'read-only',
+  'gsd-auto-context': 'workspace-write',
 };
 
 // Get version from package.json
