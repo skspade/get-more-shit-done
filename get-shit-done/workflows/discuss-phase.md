@@ -126,7 +126,88 @@ Use /gsd:progress to see available phases.
 ```
 Exit workflow.
 
-**If `phase_found` is true:** Continue to check_existing.
+**If `phase_found` is true:** Continue to auto_context_check.
+</step>
+
+<step name="auto_context_check" priority="after-initialize">
+**If `--auto` flag present in $ARGUMENTS:**
+
+1. Get phase metadata for the agent:
+```bash
+PHASE_INFO=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap get-phase "${PHASE}")
+PHASE_GOAL=$(echo "$PHASE_INFO" | jq -r '.goal // .section')
+PHASE_CRITERIA=$(echo "$PHASE_INFO" | jq -r '.success_criteria // []')
+PHASE_REQ_IDS=$(echo "$PHASE_INFO" | jq -r '.section' | grep -oP 'Requirements: \K.*' || echo "")
+```
+
+2. Check if CONTEXT.md already exists using `has_context` from init:
+   - **If `has_context` is true:** Display `Using existing context: ${context_path}` and skip to git_commit step (context already generated, proceed to auto-advance).
+   - **If `has_context` is false:** Continue to spawn agent.
+
+3. Resolve model profile for gsd-auto-context:
+```bash
+MODEL_PROFILE=$(cat .planning/config.json 2>/dev/null | grep -o '"model_profile"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"' || echo "balanced")
+```
+Look up gsd-auto-context in model profiles table: quality=opus(inherit), balanced=sonnet, budget=haiku.
+
+4. Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► AUTO-CONTEXT: PHASE {X}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Generating context autonomously...
+```
+
+5. Find prior completed phases' CONTEXT.md files for style reference:
+```bash
+PRIOR_CONTEXTS=$(ls .planning/phases/*/??-CONTEXT.md 2>/dev/null | head -5)
+```
+
+6. Spawn gsd-auto-context agent:
+```
+Task(
+  prompt="First, read ~/.claude/agents/gsd-auto-context.md for your role and instructions.
+
+<objective>
+Generate CONTEXT.md for Phase ${phase_number}: ${phase_name} autonomously.
+No human input. Read project artifacts, make decisions, annotate reasoning.
+</objective>
+
+<files_to_read>
+- .planning/PROJECT.md
+- .planning/ROADMAP.md
+- .planning/REQUIREMENTS.md
+${PRIOR_CONTEXTS formatted as bullet list}
+</files_to_read>
+
+<phase_info>
+Phase: ${phase_number}
+Name: ${phase_name}
+Goal: ${PHASE_GOAL}
+Success criteria: ${PHASE_CRITERIA}
+Requirement IDs: ${PHASE_REQ_IDS}
+Phase dir: ${phase_dir}
+Padded phase: ${padded_phase}
+Output file: ${phase_dir}/${padded_phase}-CONTEXT.md
+</phase_info>",
+  subagent_type="general-purpose",
+  model="{resolved_model}",
+  description="Auto-generate context for Phase ${PHASE}"
+)
+```
+
+7. Handle agent return:
+   - **If `## CONTEXT GENERATED`:** Display `✓ Context generated for Phase ${PHASE}`. Proceed to git_commit step.
+   - **If `## CONTEXT BLOCKED`:** Display the blocker message. Exit workflow with error:
+     ```
+     Auto-context generation blocked for Phase ${PHASE}.
+     Reason: {blocker from agent}
+
+     Run /gsd:discuss-phase ${PHASE} interactively to resolve.
+     ```
+
+**If `--auto` flag NOT present:** Continue to check_existing step (existing interactive flow unchanged).
 </step>
 
 <step name="check_existing">
