@@ -16,6 +16,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Auto-Context Generation** - Agent that replaces interactive discuss with autonomous CONTEXT.md generation (completed 2026-03-02)
 - [x] **Phase 3: Verification Gates** - Human checkpoint at verification with autonomous decision surfacing and approve/fix/abort controls (completed 2026-03-02)
 - [x] **Phase 4: Failure Handling** - Debug-retry loop that spawns gsd-debugger on failures, retries with limits, and escalates cleanly (completed 2026-03-02)
+- [ ] **Phase 5: Fix Autopilot Wiring Bugs** - Fix verification gate bypass and UAT/VERIFICATION file mismatch (Gap Closure)
+- [ ] **Phase 6: Verify Phase 4 Implementation** - Run phase-level verification on Phase 4 failure handling code (Gap Closure)
 
 ## Phase Details
 
@@ -77,10 +79,35 @@ Plans:
 Plans:
 - [ ] 04-01: TBD
 
+### Phase 5: Fix Autopilot Wiring Bugs
+**Goal**: Fix the verification gate bypass so the autopilot's verify step is reachable in the happy path, and fix the UAT/VERIFICATION file mismatch so debug-retry correctly detects verification status
+**Depends on**: Phase 4
+**Requirements**: FAIL-02, VRFY-01, VRFY-02, VRFY-03
+**Gap Closure:** Closes gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. After execute-phase completes, `cmdPhaseStatus` returns `step='verify'` (not `step='complete'`), allowing the autopilot verify case and `run_verification_gate` to execute
+  2. `run_verify_with_debug_retry` correctly reads the verification output file written by `verify-work` (matching file pattern)
+  3. The E2E flow "execute → verify → human gate" completes without skipping the verify step
+
+Plans:
+- [ ] 05-01: TBD
+
+### Phase 6: Verify Phase 4 Implementation
+**Goal**: Run phase-level verification on Phase 4's failure handling implementation to close the 4 unverified requirement gaps
+**Depends on**: Phase 5
+**Requirements**: FAIL-01, FAIL-02, FAIL-03, FAIL-04
+**Gap Closure:** Closes gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 4 has a VERIFICATION.md confirming FAIL-01 through FAIL-04 are satisfied
+  2. All verification evidence is traceable to actual code behavior, not just SUMMARY claims
+
+Plans:
+- [ ] 06-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -88,3 +115,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Auto-Context Generation | 0/TBD | Complete    | 2026-03-02 |
 | 3. Verification Gates | 0/TBD | Complete    | 2026-03-02 |
 | 4. Failure Handling | 2/2 | Complete    | 2026-03-02 |
+| 5. Fix Autopilot Wiring Bugs | 0/TBD | Planned | - |
+| 6. Verify Phase 4 Implementation | 0/TBD | Planned | - |

@@ -20,11 +20,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Auto-Context
 
-- [ ] **ACTX-01**: Auto-context agent generates CONTEXT.md replacing interactive discuss phase
-- [ ] **ACTX-02**: Auto-context uses layered approach: front-load decisions from PROJECT.md and ROADMAP.md, Claude decides remaining ambiguities
-- [ ] **ACTX-03**: Generated CONTEXT.md is structurally identical to human-generated version (downstream agents work unchanged)
-- [ ] **ACTX-04**: Every autonomous decision includes explicit reasoning ("Claude's Decision: X because Y")
-- [ ] **ACTX-05**: Auto-context adapts to phase domain — UI phases get layout/interaction decisions, API phases get contract/error decisions, infrastructure phases get minimal context
+- [x] **ACTX-01**: Auto-context agent generates CONTEXT.md replacing interactive discuss phase
+- [x] **ACTX-02**: Auto-context uses layered approach: front-load decisions from PROJECT.md and ROADMAP.md, Claude decides remaining ambiguities
+- [x] **ACTX-03**: Generated CONTEXT.md is structurally identical to human-generated version (downstream agents work unchanged)
+- [x] **ACTX-04**: Every autonomous decision includes explicit reasoning ("Claude's Decision: X because Y")
+- [x] **ACTX-05**: Auto-context adapts to phase domain — UI phases get layout/interaction decisions, API phases get contract/error decisions, infrastructure phases get minimal context
 
 ### Verification
 
@@ -34,10 +34,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Failure Handling
 
-- [x] **FAIL-01**: On execution or verification failure, orchestrator spawns gsd-debugger to diagnose and attempt fix
-- [x] **FAIL-02**: Debug-retry loop attempts up to N fixes before escalating (N configurable, default 3)
-- [x] **FAIL-03**: After debug retries exhausted, orchestrator stops cleanly and surfaces the problem for human review
-- [x] **FAIL-04**: Failure state is written to STATE.md so the human can understand what went wrong and resume after fixing
+- [ ] **FAIL-01**: On execution or verification failure, orchestrator spawns gsd-debugger to diagnose and attempt fix
+- [ ] **FAIL-02**: Debug-retry loop attempts up to N fixes before escalating (N configurable, default 3)
+- [ ] **FAIL-03**: After debug retries exhausted, orchestrator stops cleanly and surfaces the problem for human review
+- [ ] **FAIL-04**: Failure state is written to STATE.md so the human can understand what went wrong and resume after fixing
 
 ### Safety
 
@@ -91,18 +91,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOOP-06 | Phase 1 | Complete |
 | LOOP-07 | Phase 1 | Complete |
 | LOOP-08 | Phase 1 | Complete |
-| ACTX-01 | Phase 2 | Pending |
-| ACTX-02 | Phase 2 | Pending |
-| ACTX-03 | Phase 2 | Pending |
-| ACTX-04 | Phase 2 | Pending |
-| ACTX-05 | Phase 2 | Pending |
+| ACTX-01 | Phase 2 | Complete |
+| ACTX-02 | Phase 2 | Complete |
+| ACTX-03 | Phase 2 | Complete |
+| ACTX-04 | Phase 2 | Complete |
+| ACTX-05 | Phase 2 | Complete |
 | VRFY-01 | Phase 3 | Complete |
 | VRFY-02 | Phase 3 | Complete |
 | VRFY-03 | Phase 3 | Complete |
-| FAIL-01 | Phase 4 | Complete |
-| FAIL-02 | Phase 4 | Complete |
-| FAIL-03 | Phase 4 | Complete |
-| FAIL-04 | Phase 4 | Complete |
+| FAIL-01 | Phase 6 | Pending |
+| FAIL-02 | Phase 5, 6 | Pending |
+| FAIL-03 | Phase 6 | Pending |
+| FAIL-04 | Phase 6 | Pending |
 | SAFE-01 | Phase 1 | Complete |
 | SAFE-02 | Phase 1 | Complete |
 | SAFE-03 | Phase 1 | Complete |
@@ -114,4 +114,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-01*
-*Last updated: 2026-03-01 after roadmap creation*
+*Last updated: 2026-03-02 after gap closure phase creation*
