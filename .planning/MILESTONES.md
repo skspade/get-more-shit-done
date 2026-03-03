@@ -1,5 +1,22 @@
 # Milestones
 
+## v1.3 CLI Utilities (Shipped: 2026-03-03)
+
+**Phases completed:** 6 phases, 9 plans
+**Timeline:** 1 day (2026-03-03)
+**Git range:** 2515a59 → 4e19a98 (49 commits)
+
+**Key accomplishments:**
+- Standalone `gsd` CLI binary with project auto-discovery (walk-up .planning/ finder) and 5-command routing
+- `gsd progress` milestone status dashboard with phase breakdown, plan counts, and progress bar visualization
+- `gsd todos` command with listing, area filtering (`--area`), and single-todo detail view
+- `gsd health` validation of .planning/ directory structure, config integrity, and STATE/ROADMAP consistency
+- `gsd settings` with view mode (dot-notation flattening) and set mode (with validation rules)
+- `gsd help` with overview listing and per-command detailed help (usage, flags, examples)
+- 86 CLI tests across 11 suites, all passing; `--json` and `--plain` output modes on every command
+
+---
+
 ## v1.2 Add Milestone Audit Loop (Shipped: 2026-03-03)
 
 **Phases completed:** 4 phases, 4 plans

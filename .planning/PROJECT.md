@@ -31,17 +31,18 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Automatic gap planning and fix phase execution — v1.2
 - ✓ Autonomous milestone completion (archival, PROJECT.md evolution, commit) on audit pass — v1.2
 - ✓ Configurable tech debt handling and max audit-fix iterations — v1.2
+- ✓ Standalone `gsd` CLI binary with command routing — v1.3
+- ✓ `gsd progress` — milestone status dashboard (phases, plans, progress bar) — v1.3
+- ✓ `gsd todos` — list and display pending todos — v1.3
+- ✓ `gsd health` — validate .planning/ directory structure and state consistency — v1.3
+- ✓ `gsd settings` — view and update config.json interactively — v1.3
+- ✓ `gsd help` — display GSD command reference — v1.3
+- ✓ Rich terminal output (ANSI colors, unicode formatting, tables) — v1.3
+- ✓ `--json` flag for machine-readable output on all commands — v1.3
 
 ### Active
 
-- [ ] Standalone `gsd` CLI binary with command routing
-- [ ] `gsd progress` — milestone status dashboard (phases, plans, progress bar)
-- [ ] `gsd todos` — list and display pending todos
-- [ ] `gsd health` — validate .planning/ directory structure and state consistency
-- [ ] `gsd settings` — view and update config.json interactively
-- [ ] `gsd help` — display GSD command reference
-- [ ] Rich terminal output (ANSI colors, unicode formatting, tables)
-- [ ] `--json` flag for machine-readable output on all commands
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -51,6 +52,9 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Interactive discuss mode — always auto-decide, never prompt during autonomous execution
 - Upstream contribution — this is a fork, not a PR to gsd-build/get-shit-done
 - CHANGELOG link updates — historical links to upstream tags, leave as-is
+- Interactive prompts (inquirer-style) — CLI is read-only for v1.3; interactive editing adds complexity
+- Package manager distribution (npm publish) — focus on local install first
+- Shell completions (bash/zsh) — nice-to-have, deferred
 
 ## Constraints
 
@@ -79,27 +83,19 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | DRY milestone completion function | Single function called from all 4 audit-passed paths | Good — eliminates duplication |
 | Gap closure reuses existing phase lifecycle | Fix phases use identical discuss/plan/execute/verify cycle as normal phases | Good — no special-case code |
 | Version extracted from STATE.md frontmatter | Single source of truth for milestone version | Good — consistent across invocations |
-
-## Current Milestone: v1.3 CLI Utilities
-
-**Goal:** Replace token-expensive LLM-powered status commands with a deterministic CLI that reads .planning/ state and presents it instantly.
-
-**Target features:**
-- Standalone `gsd` CLI with rich terminal output and `--json` flag
-- `gsd progress` — milestone status dashboard
-- `gsd todos` — pending todo list
-- `gsd health` — planning directory validation
-- `gsd settings` — config management
-- `gsd help` — command reference
+| CLI builds on gsd-tools.cjs parsing layer | Reuses existing state parsing rather than duplicating logic | Good — consistent data, no divergence |
+| Inline data gathering over calling existing commands | Avoids output() side-effects from existing functions | Good — clean separation of concerns |
+| gatherXData/handleX pattern for all commands | Consistent handler architecture across progress, todos, health, settings, help | Good — predictable, testable |
+| Read-only CLI except settings set | Minimizes risk; deterministic reads are the primary use case | Good — simple and safe |
 
 ## Context
 
-Shipped v1.2 with full milestone audit loop — autopilot now detects completion, audits requirements, closes gaps iteratively, and completes the milestone autonomously. 3 milestones shipped (v1.0, v1.1, v1.2) across 13 phases.
+Shipped v1.3 with standalone `gsd` CLI providing 5 deterministic commands. 4 milestones shipped (v1.0, v1.1, v1.2, v1.3) across 19 phases, 28 plans.
 
-**Architecture:** Unchanged from v1.0. Three new functions in `autopilot.sh`: `run_milestone_audit`, `run_gap_closure_loop`, `run_milestone_completion`.
+**Architecture:** Core autopilot loop unchanged. New `gsd` CLI binary (`get-shit-done/bin/gsd-cli.cjs`) with `cli.cjs` module providing project discovery, argument parsing, command routing, and output formatting. 86 CLI tests.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
-**Existing CLI infrastructure:** `gsd-tools.cjs` already handles state parsing (`state-snapshot`, `roadmap analyze`, `progress bar`, `validate health`). The new `gsd` CLI builds on this parsing layer.
-**Known tech debt:** `run_gap_closure_loop` return value unchecked at call sites (safe due to exit semantics), `print_escalation_report` message slightly misleading on mid-iteration vs exhaustion (cosmetic)
+**Codebase:** ~20,900 LOC JavaScript/CJS
+**Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics)
 
 ---
-*Last updated: 2026-03-03 after v1.3 milestone start*
+*Last updated: 2026-03-03 after v1.3 milestone*

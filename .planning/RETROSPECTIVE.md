@@ -120,6 +120,51 @@
 
 ---
 
+## Milestone: v1.3 — CLI Utilities
+
+**Shipped:** 2026-03-03
+**Phases:** 6 | **Plans:** 9 | **Commits:** 49
+
+### What Was Built
+- Standalone `gsd` CLI binary with project auto-discovery and 5-command routing
+- `gsd progress` — milestone status dashboard with phase breakdown and progress bar
+- `gsd todos` — todo listing with `--area` filtering and detail view
+- `gsd health` — .planning/ directory validation, config integrity, state consistency checks
+- `gsd settings` — config view (dot-notation) and set (with validation rules)
+- `gsd help` — overview listing and per-command detailed help (usage, flags, examples)
+- 86 CLI tests across 11 suites with `--json` and `--plain` output modes
+
+### What Worked
+- Building on existing gsd-tools.cjs parsing layer: no duplication, consistent data
+- gatherXData/handleX pattern: consistent architecture across all 5 commands, easy to test
+- Parallel phase execution: Phases 15-18 all depended only on Phase 14, enabling fast iteration
+- Audit gap closure (Phase 19): caught 15 documentation gaps (missing frontmatter, missing VERIFICATION.md, missing test) and closed all in a single phase
+- All 6 phases completed in a single day with clean audit on second pass
+
+### What Was Inefficient
+- First audit found 15 documentation-level gaps — SUMMARY frontmatter should have been included during initial phase execution
+- Phase 19 gap closure was entirely documentation/test debt — could have been avoided with stricter execution-time checks
+- Some phases (14, 18) had inconsistent ROADMAP progress table formatting (missing milestone column)
+
+### Patterns Established
+- CLI handler pattern: gatherXData reads state, handleX formats response, formatOutput renders mode-appropriate output
+- Inline data gathering over calling existing commands: avoids output() side-effects from existing functions
+- Read-only CLI design: all commands are pure reads except `settings set`
+- Per-command detailed help: COMMAND_DETAILS registry with usage, description, flags, examples
+
+### Key Lessons
+1. Include requirements-completed frontmatter in SUMMARY.md during execution, not after audit finds it missing
+2. CLI commands benefit from a consistent handler pattern — makes adding new commands mechanical
+3. Documentation gaps are the most common audit finding — a pre-commit check for SUMMARY frontmatter would prevent gap closure phases
+4. Rich terminal output (ANSI) with `--plain` and `--json` alternatives should be the default pattern for any CLI tool
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for plan checker/verifier)
+- Sessions: 9 plan executions across 6 phases
+- Notable: entire milestone completed in ~1.5 hours — deterministic CLI work is very fast with established patterns
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -129,9 +174,11 @@
 | v1.0 | 52 | 7 | First milestone — established artifact-based state, gap closure cycle |
 | v1.1 | 15 | 2 | First removal milestone — confirmed audit-gap-closure cycle works |
 | v1.2 | 29 | 4 | Automated the audit-gap-closure cycle itself — now runs without human intervention |
+| v1.3 | 49 | 6 | First feature milestone post-automation — CLI tooling with consistent handler pattern |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), and v1.2 (1 phase)
-2. ROADMAP checkbox maintenance during execution is a recurring gap — needs process improvement
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in v1.0 Phase 6 and v1.2 Phase 13)
+1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase)
+2. SUMMARY frontmatter completeness is the #1 recurring audit gap — needs execution-time enforcement
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in v1.0 Phase 6, v1.2 Phase 13, v1.3 Phase 19)
+4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
