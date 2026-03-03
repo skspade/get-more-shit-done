@@ -5,6 +5,9 @@ title: Help Command
 status: complete
 started: 2026-03-03
 completed: 2026-03-03
+requirements-completed:
+  - HELP-01
+  - HELP-02
 ---
 
 # Summary: Plan 18-02 — Help Command
