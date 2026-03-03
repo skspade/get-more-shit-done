@@ -195,6 +195,75 @@ print_final_report() {
   echo ""
 }
 
+# ─── Milestone Audit ─────────────────────────────────────────────────────────
+
+run_milestone_audit() {
+  print_banner "MILESTONE AUDIT"
+
+  # Invoke audit-milestone via claude with retry support
+  local audit_prompt="/gsd:audit-milestone"
+  local audit_exit=0
+  run_step_with_retry "$audit_prompt" "milestone-audit" || audit_exit=$?
+
+  if [[ $audit_exit -ne 0 ]]; then
+    echo "ERROR: Milestone audit failed (exit $audit_exit)" >&2
+    return 1
+  fi
+
+  # Locate the most recent audit file
+  local audit_file
+  audit_file=$(ls -t "$PROJECT_DIR/.planning/v"*"-MILESTONE-AUDIT.md" 2>/dev/null | head -1)
+
+  if [[ -z "$audit_file" ]]; then
+    echo "ERROR: No MILESTONE-AUDIT.md file found after audit" >&2
+    return 1
+  fi
+
+  # Parse audit status from frontmatter
+  local audit_status
+  audit_status=$(gsd_tools frontmatter get "$audit_file" --field status --raw 2>/dev/null || echo "")
+
+  if [[ -z "$audit_status" ]]; then
+    echo "ERROR: Could not parse status from $audit_file" >&2
+    return 1
+  fi
+
+  echo "Audit result: $audit_status"
+
+  # Read tech debt config
+  local auto_accept_tech_debt
+  auto_accept_tech_debt=$(get_config "autopilot.auto_accept_tech_debt" "true")
+
+  # Route based on status
+  case "$audit_status" in
+    passed)
+      print_banner "MILESTONE AUDIT PASSED ✓"
+      echo "All requirements satisfied. Ready for milestone completion."
+      return 0
+      ;;
+    gaps_found)
+      print_banner "MILESTONE AUDIT: GAPS FOUND"
+      echo "Audit found gaps that need fixing."
+      return 10
+      ;;
+    tech_debt)
+      if [[ "$auto_accept_tech_debt" == "true" ]]; then
+        print_banner "MILESTONE AUDIT PASSED ✓ (tech debt accepted)"
+        echo "Audit found tech debt only. auto_accept_tech_debt=true — treating as passed."
+        return 0
+      else
+        print_banner "MILESTONE AUDIT: GAPS FOUND (tech debt rejected)"
+        echo "Audit found tech debt. auto_accept_tech_debt=false — treating as gaps."
+        return 10
+      fi
+      ;;
+    *)
+      echo "ERROR: Unknown audit status '$audit_status'" >&2
+      return 1
+      ;;
+  esac
+}
+
 # ─── Step Execution ───────────────────────────────────────────────────────────
 
 construct_debug_prompt() {
