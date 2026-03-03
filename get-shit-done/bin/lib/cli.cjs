@@ -333,7 +333,7 @@ function getTodoDetail(projectRoot, todoId) {
   }
 }
 
-function handleTodos(projectRoot, args, mode) {
+function handleTodos(projectRoot, args) {
   // Parse --area flag from process.argv (parseArgs drops it)
   let area = null;
   const argv = process.argv;
