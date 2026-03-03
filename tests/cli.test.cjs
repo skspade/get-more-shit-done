@@ -279,6 +279,17 @@ describe('gsd-cli binary', () => {
     assert.ok(Array.isArray(parsed.settings));
   });
 
+  test('help progress shows detailed usage', () => {
+    const output = execSync(`node "${cliPath}" help progress`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(output.includes('gsd progress'));
+    assert.ok(output.includes('--json'));
+  });
+
+  test('help nonexistent shows error', () => {
+    const output = execSync(`node "${cliPath}" help nonexistent`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(output.includes('nonexistent'));
+  });
+
   test('exits 1 when run outside GSD project', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-cli-int-'));
     try {
@@ -788,5 +799,60 @@ describe('handleSettings', () => {
     assert.strictEqual(result.updated, true);
     const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
     assert.strictEqual(config.workflow.research, false);
+  });
+});
+
+// ─── handleHelp ──────────────────────────────────────────────────────────────
+
+describe('handleHelp', () => {
+  test('overview mode lists all commands with descriptions (HELP-01)', () => {
+    const result = routeCommand('help', null, [], 'json');
+    assert.strictEqual(result.command, 'help');
+    assert.ok(result.message.includes('progress'));
+    assert.ok(result.message.includes('todos'));
+    assert.ok(result.message.includes('health'));
+    assert.ok(result.message.includes('settings'));
+    assert.ok(result.message.includes('help'));
+    assert.ok(result.message.includes('Usage:'));
+  });
+
+  test('per-command detail returns usage, description, flags, examples (HELP-02)', () => {
+    const result = routeCommand('help', null, ['progress'], 'json');
+    assert.strictEqual(result.command, 'help');
+    assert.ok(result.detail, 'Should have detail object');
+    assert.strictEqual(result.detail.name, 'progress');
+    assert.ok(result.detail.usage.includes('gsd progress'));
+    assert.ok(result.detail.description.length > 0);
+    assert.ok(Array.isArray(result.detail.flags));
+    assert.ok(result.detail.flags.length > 0);
+    assert.ok(Array.isArray(result.detail.examples));
+    assert.ok(result.detail.examples.length > 0);
+  });
+
+  test('per-command detail works for all commands (HELP-02)', () => {
+    for (const cmd of ['progress', 'todos', 'health', 'settings', 'help']) {
+      const result = routeCommand('help', null, [cmd], 'json');
+      assert.ok(result.detail, `Should have detail for '${cmd}'`);
+      assert.ok(result.detail.usage.length > 0, `Usage should be non-empty for '${cmd}'`);
+    }
+  });
+
+  test('unknown command returns error with available commands (HELP-02)', () => {
+    const result = routeCommand('help', null, ['nonexistent'], 'json');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('nonexistent'));
+    assert.ok(result.message.includes('progress'));
+  });
+
+  test('per-command detail rich mode includes ANSI formatting', () => {
+    const result = routeCommand('help', null, ['todos'], 'rich');
+    assert.ok(result.message.includes('\x1b['));
+    assert.ok(result.message.includes('gsd todos'));
+  });
+
+  test('help --json returns structured data for overview', () => {
+    const result = routeCommand('help', null, [], 'json');
+    assert.strictEqual(result.command, 'help');
+    assert.strictEqual(typeof result.message, 'string');
   });
 });
