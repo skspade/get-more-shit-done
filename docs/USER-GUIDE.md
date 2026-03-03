@@ -320,7 +320,7 @@ claude --dangerously-skip-permissions
 /gsd:discuss-phase 2        # Repeat for each phase
 ...
 /gsd:audit-milestone        # Check everything shipped
-/gsd:complete-milestone     # Archive, tag, done
+/gsd:complete-milestone     # Archive and done
 ```
 
 ### New Project from Existing Document
@@ -359,7 +359,7 @@ claude --dangerously-skip-permissions
 ```bash
 /gsd:audit-milestone        # Check requirements coverage, detect stubs
 /gsd:plan-milestone-gaps    # If audit found gaps, create phases to close them
-/gsd:complete-milestone     # Archive, tag, done
+/gsd:complete-milestone     # Archive and done
 ```
 
 ### Speed vs Quality Presets
