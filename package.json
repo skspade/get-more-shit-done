@@ -3,7 +3,8 @@
   "version": "1.22.1",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "get-shit-done-cc": "bin/install.js",
+    "gsd": "get-shit-done/bin/gsd-cli.cjs"
   },
   "files": [
     "bin",
@@ -46,6 +47,8 @@
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
     "test": "node scripts/run-tests.cjs",
-    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs"
+    "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs",
+    "install-fork": "bash bin/replace-vanilla.sh",
+    "install-fork:dry": "bash bin/replace-vanilla.sh --dry-run"
   }
 }
