@@ -184,6 +184,33 @@ print_halt_report() {
   echo ""
 }
 
+print_escalation_report() {
+  local iterations="$1"
+  local max_iterations="$2"
+
+  local audit_file
+  audit_file=$(ls -t "$PROJECT_DIR/.planning/v"*"-MILESTONE-AUDIT.md" 2>/dev/null | head -1)
+
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════╗"
+  echo "║  AUTOPILOT ESCALATION                                       ║"
+  echo "╚══════════════════════════════════════════════════════════════╝"
+  echo ""
+  echo "Gap closure exhausted: $iterations/$max_iterations iterations completed"
+  echo "Audit gaps persist after $iterations fix cycles."
+  echo ""
+  if [[ -n "$audit_file" ]]; then
+    echo "Latest audit: $audit_file"
+    echo ""
+  fi
+  echo "The autopilot could not converge to a passing audit."
+  echo "Human review is required to diagnose remaining gaps."
+  echo ""
+  echo "To resume after manual fixes:"
+  echo "  autopilot.sh --project-dir $PROJECT_DIR"
+  echo ""
+}
+
 print_final_report() {
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -262,6 +289,125 @@ run_milestone_audit() {
       return 1
       ;;
   esac
+}
+
+# ─── Gap Closure Loop ────────────────────────────────────────────────────────
+
+run_gap_closure_loop() {
+  local max_iterations
+  max_iterations=$(get_config "autopilot.max_audit_fix_iterations" "3")
+  local iteration=0
+
+  while true; do
+    # Check iteration limit BEFORE planning
+    if [[ $iteration -ge $max_iterations ]]; then
+      print_escalation_report "$iteration" "$max_iterations"
+      exit 1
+    fi
+
+    iteration=$((iteration + 1))
+
+    print_banner "GAP CLOSURE: Iteration $iteration/$max_iterations"
+
+    # Reset circuit breaker and iteration log for fresh cycle
+    NO_PROGRESS_COUNT=0
+    ITERATION_LOG=()
+
+    # LOOP-01: Invoke plan-milestone-gaps to create fix phases
+    local gap_plan_prompt="/gsd:plan-milestone-gaps --auto"
+    local gap_plan_exit=0
+    run_step_with_retry "$gap_plan_prompt" "gap-planning" || gap_plan_exit=$?
+
+    if [[ $gap_plan_exit -ne 0 ]]; then
+      echo "ERROR: Gap planning failed (exit $gap_plan_exit)" >&2
+      print_escalation_report "$iteration" "$max_iterations"
+      exit 1
+    fi
+
+    # LOOP-02: Execute fix phases through existing phase loop
+    while true; do
+      local fix_phase
+      fix_phase=$(find_first_incomplete_phase)
+
+      if [[ -z "$fix_phase" ]]; then
+        # All fix phases complete — break to re-audit
+        break
+      fi
+
+      CURRENT_PHASE="$fix_phase"
+
+      # Reset progress tracking for each fix phase
+      NO_PROGRESS_COUNT=0
+      ITERATION_LOG=()
+
+      # Run the fix phase through the normal lifecycle
+      while true; do
+        local status_json step
+        status_json=$(get_phase_status "$CURRENT_PHASE")
+        step=$(echo "$status_json" | jq -r '.step')
+
+        case "$step" in
+          discuss)
+            run_step "/gsd:discuss-phase $CURRENT_PHASE --auto" "discuss"
+            ;;
+          plan)
+            run_step "/gsd:plan-phase $CURRENT_PHASE --auto" "plan"
+            ;;
+          execute)
+            run_step_with_retry "/gsd:execute-phase $CURRENT_PHASE" "execute"
+            local exec_exit=$?
+            if [[ $exec_exit -ne 0 ]]; then
+              print_halt_report "Fix phase execution failed after debug retries" "execute" "$exec_exit"
+              exit 1
+            fi
+            ;;
+          verify)
+            run_verify_with_debug_retry "$CURRENT_PHASE"
+            local verify_exit=$?
+            if [[ $verify_exit -ne 0 ]]; then
+              print_halt_report "Fix phase verification failed after debug retries" "verify" "$verify_exit"
+              exit 1
+            fi
+            if [[ "$DRY_RUN" == true ]]; then
+              echo "[DRY RUN] Auto-approving verification gate"
+            else
+              run_verification_gate "$CURRENT_PHASE"
+            fi
+            gsd_tools phase complete "$CURRENT_PHASE"
+            ;;
+          complete)
+            print_banner "Fix Phase $CURRENT_PHASE COMPLETE ✓"
+            break
+            ;;
+          *)
+            echo "ERROR: Unknown step '$step' for fix phase $CURRENT_PHASE" >&2
+            exit 1
+            ;;
+        esac
+      done
+    done
+
+    # LOOP-03: Re-run milestone audit after fix phases complete
+    print_banner "RE-AUDIT: After iteration $iteration"
+
+    local audit_result=0
+    run_milestone_audit || audit_result=$?
+
+    if [[ $audit_result -eq 0 ]]; then
+      # Audit passed — gap closure successful
+      print_banner "GAP CLOSURE COMPLETE ✓"
+      echo "Audit passed after $iteration iteration(s)."
+      return 0
+    elif [[ $audit_result -eq 10 ]]; then
+      # LOOP-04: Gaps still found — loop continues
+      echo "Gaps remain after iteration $iteration. Continuing..."
+      continue
+    else
+      # Audit error
+      echo "ERROR: Milestone audit encountered an error during re-audit" >&2
+      exit 1
+    fi
+  done
 }
 
 # ─── Step Execution ───────────────────────────────────────────────────────────
