@@ -166,7 +166,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves | After planning is complete |
 | `/gsd:verify-work [N]` | Manual UAT with auto-diagnosis | After execution completes |
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
-| `/gsd:complete-milestone` | Archive milestone, tag release | All phases verified |
+| `/gsd:complete-milestone` | Archive milestone | All phases verified |
 | `/gsd:new-milestone [name]` | Start next version cycle | After completing a milestone |
 
 ### Navigation
