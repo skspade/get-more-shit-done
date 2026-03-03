@@ -129,7 +129,7 @@ Phases execute in numeric order.
 | 11. Gap Closure Loop | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 12. Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 13. Verify Phase 12 Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 14. CLI Infrastructure | v1.3 | 0/? | Not started | - |
+| 14. CLI Infrastructure | 1/2 | In Progress|  | - |
 | 15. Progress Command | v1.3 | 0/? | Not started | - |
 | 16. Todos Command | v1.3 | 0/? | Not started | - |
 | 17. Health Command | v1.3 | 0/? | Not started | - |
