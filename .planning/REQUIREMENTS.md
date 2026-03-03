@@ -9,12 +9,12 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### CLI Infrastructure
 
-- [ ] **CLI-01**: User can run `gsd` binary from any directory within a GSD project
-- [ ] **CLI-02**: CLI auto-discovers .planning/ directory by walking up from cwd
-- [ ] **CLI-03**: CLI routes to subcommands (progress, todos, health, settings, help)
-- [ ] **CLI-04**: All commands support `--json` flag for machine-readable JSON output
-- [ ] **CLI-05**: All commands support `--plain` flag for ANSI-free text output
-- [ ] **CLI-06**: CLI displays helpful error when run outside a GSD project
+- [x] **CLI-01**: User can run `gsd` binary from any directory within a GSD project
+- [x] **CLI-02**: CLI auto-discovers .planning/ directory by walking up from cwd
+- [x] **CLI-03**: CLI routes to subcommands (progress, todos, health, settings, help)
+- [x] **CLI-04**: All commands support `--json` flag for machine-readable JSON output
+- [x] **CLI-05**: All commands support `--plain` flag for ANSI-free text output
+- [x] **CLI-06**: CLI displays helpful error when run outside a GSD project
 
 ### Progress Command
 
@@ -32,21 +32,21 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### Health Command
 
-- [ ] **HLTH-01**: User can validate that required .planning/ files exist
-- [ ] **HLTH-02**: User can check config.json structure and values
-- [ ] **HLTH-03**: User can detect state inconsistencies (STATE.md vs ROADMAP.md)
-- [ ] **HLTH-04**: User can see errors and warnings with clear descriptions
+- [x] **HLTH-01**: User can validate that required .planning/ files exist
+- [x] **HLTH-02**: User can check config.json structure and values
+- [x] **HLTH-03**: User can detect state inconsistencies (STATE.md vs ROADMAP.md)
+- [x] **HLTH-04**: User can see errors and warnings with clear descriptions
 
 ### Settings Command
 
-- [ ] **SETT-01**: User can view all current config values
-- [ ] **SETT-02**: User can update a config value (`gsd settings set <key> <value>`)
-- [ ] **SETT-03**: Config values are validated before writing
+- [x] **SETT-01**: User can view all current config values
+- [x] **SETT-02**: User can update a config value (`gsd settings set <key> <value>`)
+- [x] **SETT-03**: Config values are validated before writing
 
 ### Help Command
 
-- [ ] **HELP-01**: User can see all available CLI commands with descriptions
-- [ ] **HELP-02**: User can see detailed help for a specific command (`gsd help <command>`)
+- [x] **HELP-01**: User can see all available CLI commands with descriptions
+- [x] **HELP-02**: User can see detailed help for a specific command (`gsd help <command>`)
 
 ## Future Requirements
 
@@ -77,12 +77,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | Phase 19 | Pending |
-| CLI-02 | Phase 19 | Pending |
-| CLI-03 | Phase 19 | Pending |
-| CLI-04 | Phase 19 | Pending |
-| CLI-05 | Phase 19 | Pending |
-| CLI-06 | Phase 19 | Pending |
+| CLI-01 | Phase 19 | Complete |
+| CLI-02 | Phase 19 | Complete |
+| CLI-03 | Phase 19 | Complete |
+| CLI-04 | Phase 19 | Complete |
+| CLI-05 | Phase 19 | Complete |
+| CLI-06 | Phase 19 | Complete |
 | PROG-01 | Phase 15 | Complete |
 | PROG-02 | Phase 15 | Complete |
 | PROG-03 | Phase 15 | Complete |
@@ -91,22 +91,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TODO-01 | Phase 16 | Complete |
 | TODO-02 | Phase 16 | Complete |
 | TODO-03 | Phase 16 | Complete |
-| HLTH-01 | Phase 19 | Pending |
-| HLTH-02 | Phase 19 | Pending |
-| HLTH-03 | Phase 19 | Pending |
-| HLTH-04 | Phase 19 | Pending |
-| SETT-01 | Phase 19 | Pending |
-| SETT-02 | Phase 19 | Pending |
-| SETT-03 | Phase 19 | Pending |
-| HELP-01 | Phase 19 | Pending |
-| HELP-02 | Phase 19 | Pending |
+| HLTH-01 | Phase 19 | Complete |
+| HLTH-02 | Phase 19 | Complete |
+| HLTH-03 | Phase 19 | Complete |
+| HLTH-04 | Phase 19 | Complete |
+| SETT-01 | Phase 19 | Complete |
+| SETT-02 | Phase 19 | Complete |
+| SETT-03 | Phase 19 | Complete |
+| HELP-01 | Phase 19 | Complete |
+| HELP-02 | Phase 19 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 23 total
 - Mapped to phases: 23
 - Unmapped: 0
-- Satisfied: 8 | Pending (gap closure): 15
+- Satisfied: 23 | Pending: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after gap closure phase creation*
+*Last updated: 2026-03-03 after Phase 19 gap closure*
