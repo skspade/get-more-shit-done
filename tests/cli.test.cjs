@@ -256,6 +256,28 @@ describe('gsd-cli binary', () => {
     assert.ok(Array.isArray(parsed.todos));
   });
 
+  test('todos --area filters by area (TODO-02)', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-area-test-'));
+    const pendingDir = path.join(tmpDir, '.planning', 'todos', 'pending');
+    fs.mkdirSync(pendingDir, { recursive: true });
+    fs.writeFileSync(path.join(pendingDir, 'bug-one.md'),
+      '---\ntitle: Bug One\narea: bugfix\ncreated: 2026-01-01\n---\nBug details\n');
+    fs.writeFileSync(path.join(pendingDir, 'feat-one.md'),
+      '---\ntitle: Feature One\narea: feature\ncreated: 2026-01-02\n---\nFeature details\n');
+    try {
+      const output = execSync(`node "${cliPath}" todos --area=bugfix --json`, { cwd: tmpDir, encoding: 'utf-8' });
+      const parsed = JSON.parse(output);
+      assert.strictEqual(parsed.command, 'todos');
+      assert.strictEqual(parsed.count, 1);
+      assert.ok(Array.isArray(parsed.todos));
+      for (const todo of parsed.todos) {
+        assert.strictEqual(todo.area, 'bugfix', 'Every returned todo should have area=bugfix');
+      }
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   test('health --json returns valid JSON with status field', () => {
     const output = execSync(`node "${cliPath}" health --json`, { cwd: projectRoot, encoding: 'utf-8' });
     const parsed = JSON.parse(output);
