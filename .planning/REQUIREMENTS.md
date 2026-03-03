@@ -9,12 +9,12 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### CLI Infrastructure
 
-- [ ] **CLI-01**: User can run `gsd` binary from any directory within a GSD project
-- [ ] **CLI-02**: CLI auto-discovers .planning/ directory by walking up from cwd
-- [ ] **CLI-03**: CLI routes to subcommands (progress, todos, health, settings, help)
-- [ ] **CLI-04**: All commands support `--json` flag for machine-readable JSON output
-- [ ] **CLI-05**: All commands support `--plain` flag for ANSI-free text output
-- [ ] **CLI-06**: CLI displays helpful error when run outside a GSD project
+- [x] **CLI-01**: User can run `gsd` binary from any directory within a GSD project
+- [x] **CLI-02**: CLI auto-discovers .planning/ directory by walking up from cwd
+- [x] **CLI-03**: CLI routes to subcommands (progress, todos, health, settings, help)
+- [x] **CLI-04**: All commands support `--json` flag for machine-readable JSON output
+- [x] **CLI-05**: All commands support `--plain` flag for ANSI-free text output
+- [x] **CLI-06**: CLI displays helpful error when run outside a GSD project
 
 ### Progress Command
 
@@ -77,12 +77,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | Phase 14 | Pending |
-| CLI-02 | Phase 14 | Pending |
-| CLI-03 | Phase 14 | Pending |
-| CLI-04 | Phase 14 | Pending |
-| CLI-05 | Phase 14 | Pending |
-| CLI-06 | Phase 14 | Pending |
+| CLI-01 | Phase 14 | Complete |
+| CLI-02 | Phase 14 | Complete |
+| CLI-03 | Phase 14 | Complete |
+| CLI-04 | Phase 14 | Complete |
+| CLI-05 | Phase 14 | Complete |
+| CLI-06 | Phase 14 | Complete |
 | PROG-01 | Phase 15 | Pending |
 | PROG-02 | Phase 15 | Pending |
 | PROG-03 | Phase 15 | Pending |

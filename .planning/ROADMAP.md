@@ -44,7 +44,7 @@
 
 **Milestone Goal:** Replace token-expensive LLM-powered status commands with a deterministic CLI that reads .planning/ state and presents it instantly.
 
-- [ ] **Phase 14: CLI Infrastructure** - Binary entry point, project discovery, command routing, output flags, and error handling
+- [x] **Phase 14: CLI Infrastructure** - Binary entry point, project discovery, command routing, output flags, and error handling (completed 2026-03-03)
 - [ ] **Phase 15: Progress Command** - Milestone status dashboard showing phases, plans, progress bar, and current position
 - [ ] **Phase 16: Todos Command** - List, filter, and inspect pending todos from the .planning/todos directory
 - [ ] **Phase 17: Health Command** - Validate .planning/ directory structure, config integrity, and state consistency
@@ -129,7 +129,7 @@ Phases execute in numeric order.
 | 11. Gap Closure Loop | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 12. Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 13. Verify Phase 12 Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 14. CLI Infrastructure | 1/2 | In Progress|  | - |
+| 14. CLI Infrastructure | 2/2 | Complete    | 2026-03-03 | - |
 | 15. Progress Command | v1.3 | 0/? | Not started | - |
 | 16. Todos Command | v1.3 | 0/? | Not started | - |
 | 17. Health Command | v1.3 | 0/? | Not started | - |
