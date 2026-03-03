@@ -162,9 +162,11 @@ describe('routeCommand', () => {
     assert.ok(result.progress, 'Should have progress data');
   });
 
-  test('routes todos to handler', () => {
+  test('routes todos to handler with structured data', () => {
     const result = routeCommand('todos', '/tmp', [], 'rich');
     assert.strictEqual(result.command, 'todos');
+    assert.strictEqual(result.count, 0);
+    assert.deepStrictEqual(result.todos, []);
   });
 
   test('routes health to handler', () => {
@@ -238,6 +240,14 @@ describe('gsd-cli binary', () => {
       assert.ok(err.stderr.includes('Unknown command'));
       assert.ok(err.stderr.includes('badcommand'));
     }
+  });
+
+  test('todos --json returns valid JSON with count and todos array', () => {
+    const output = execSync(`node "${cliPath}" todos --json`, { cwd: projectRoot, encoding: 'utf-8' });
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.command, 'todos');
+    assert.strictEqual(typeof parsed.count, 'number');
+    assert.ok(Array.isArray(parsed.todos));
   });
 
   test('exits 1 when run outside GSD project', () => {
@@ -361,5 +371,99 @@ describe('handleProgress', () => {
     const phase3 = result.phases.find(p => p.number === '03');
     assert.strictEqual(phase3.status_indicator, 'not_started');
     assert.strictEqual(phase3.plan_counts, '0 plans');
+  });
+});
+
+// ─── handleTodos ─────────────────────────────────────────────────────────────
+
+describe('handleTodos', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-todos-test-'));
+    const pendingDir = path.join(tmpDir, '.planning', 'todos', 'pending');
+    fs.mkdirSync(pendingDir, { recursive: true });
+
+    // Create test todo files
+    fs.writeFileSync(path.join(pendingDir, 'fix-login-bug.md'),
+      '---\ncreated: 2026-03-01\ntitle: Fix login bug\narea: bugfix\n---\n\n## Description\n\nLogin fails on mobile.\n');
+    fs.writeFileSync(path.join(pendingDir, 'add-dark-mode.md'),
+      '---\ncreated: 2026-03-02\ntitle: Add dark mode\narea: feature\n---\n\n## Description\n\nUsers want dark mode.\n');
+    fs.writeFileSync(path.join(pendingDir, 'update-docs.md'),
+      '---\ncreated: 2026-03-03\ntitle: Update documentation\narea: docs\n---\n\n## Description\n\nDocs are outdated.\n');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('list mode returns all pending todos with ID, title, area (TODO-01)', () => {
+    const result = routeCommand('todos', tmpDir, [], 'json');
+    assert.strictEqual(result.command, 'todos');
+    assert.strictEqual(result.count, 3);
+    assert.ok(Array.isArray(result.todos));
+    for (const todo of result.todos) {
+      assert.ok(todo.id, 'Each todo should have an id');
+      assert.ok(todo.title, 'Each todo should have a title');
+      assert.ok(todo.area, 'Each todo should have an area');
+      assert.ok(todo.created, 'Each todo should have a created date');
+    }
+  });
+
+  test('detail mode returns full todo content (TODO-03)', () => {
+    const result = routeCommand('todos', tmpDir, ['fix-login-bug'], 'json');
+    assert.strictEqual(result.command, 'todos');
+    assert.ok(result.todo, 'Should have todo object');
+    assert.strictEqual(result.todo.id, 'fix-login-bug');
+    assert.strictEqual(result.todo.title, 'Fix login bug');
+    assert.strictEqual(result.todo.area, 'bugfix');
+    assert.ok(result.todo.content.includes('Login fails on mobile'));
+    assert.ok(result.todo.path.includes('fix-login-bug.md'));
+  });
+
+  test('detail mode returns error for non-existent ID', () => {
+    const result = routeCommand('todos', tmpDir, ['nonexistent'], 'json');
+    assert.strictEqual(result.command, 'todos');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('nonexistent'));
+    assert.ok(result.message.includes('gsd todos'));
+  });
+
+  test('rich mode list shows count header and todo lines', () => {
+    const result = routeCommand('todos', tmpDir, [], 'rich');
+    assert.ok(result.message.includes('3 pending todos'));
+    assert.ok(result.message.includes('Fix login bug'));
+    assert.ok(result.message.includes('Add dark mode'));
+    assert.ok(result.message.includes('Update documentation'));
+  });
+
+  test('rich mode detail shows title and content', () => {
+    const result = routeCommand('todos', tmpDir, ['add-dark-mode'], 'rich');
+    assert.ok(result.message.includes('Add dark mode'));
+    assert.ok(result.message.includes('Users want dark mode'));
+  });
+
+  test('empty state shows no pending todos message', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-todos-empty-'));
+    fs.mkdirSync(path.join(emptyDir, '.planning', 'todos', 'pending'), { recursive: true });
+    try {
+      const result = routeCommand('todos', emptyDir, [], 'rich');
+      assert.strictEqual(result.count, 0);
+      assert.ok(result.message.includes('No pending todos'));
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  test('handles missing todos directory gracefully', () => {
+    const noTodosDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-todos-nodir-'));
+    fs.mkdirSync(path.join(noTodosDir, '.planning'), { recursive: true });
+    try {
+      const result = routeCommand('todos', noTodosDir, [], 'json');
+      assert.strictEqual(result.count, 0);
+      assert.deepStrictEqual(result.todos, []);
+    } finally {
+      fs.rmSync(noTodosDir, { recursive: true, force: true });
+    }
   });
 });
