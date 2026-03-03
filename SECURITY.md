@@ -4,7 +4,9 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to: **security@gsd.build** (or DM @glittercowboy on Discord/Twitter if email bounces)
+This is a fork of the upstream GSD project. For security issues specific to this fork, please DM @skspade on Discord/Twitter.
+
+For issues affecting the upstream GSD project, report via email to: **security@gsd.build**
 
 Include:
 - Description of the vulnerability
