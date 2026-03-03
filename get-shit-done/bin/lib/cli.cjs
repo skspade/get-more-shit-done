@@ -93,9 +93,71 @@ function cliError(message) {
   process.exit(1);
 }
 
+// ─── Stub Handlers ──────────────────────────────────────────────────────────
+
+function handleProgress() {
+  return { command: 'progress', message: 'Progress command not yet implemented. See Phase 15.' };
+}
+
+function handleTodos() {
+  return { command: 'todos', message: 'Todos command not yet implemented. See Phase 16.' };
+}
+
+function handleHealth() {
+  return { command: 'health', message: 'Health command not yet implemented. See Phase 17.' };
+}
+
+function handleSettings() {
+  return { command: 'settings', message: 'Settings command not yet implemented. See Phase 18.' };
+}
+
+function handleHelp() {
+  const lines = [
+    'gsd - GSD CLI Utilities',
+    '',
+    'Usage: gsd <command> [options]',
+    '',
+    'Commands:',
+  ];
+  for (const [name, entry] of Object.entries(COMMANDS)) {
+    lines.push('  ' + name.padEnd(12) + entry.description);
+  }
+  lines.push('');
+  lines.push('Options:');
+  lines.push('  --json      Output as JSON');
+  lines.push('  --plain     Output as plain text (no colors)');
+  return { command: 'help', message: lines.join('\n') };
+}
+
+// ─── Command Registry ───────────────────────────────────────────────────────
+
+const COMMANDS = {
+  progress: { description: 'Show milestone progress and status', handler: handleProgress },
+  todos: { description: 'List and inspect pending todos', handler: handleTodos },
+  health: { description: 'Validate .planning/ directory integrity', handler: handleHealth },
+  settings: { description: 'View and update configuration', handler: handleSettings },
+  help: { description: 'Show available commands and usage', handler: handleHelp },
+};
+
+// ─── Command Router ─────────────────────────────────────────────────────────
+
+/**
+ * Route a command to its handler.
+ * Returns the handler result, or null if command not found.
+ */
+function routeCommand(command, projectRoot, args, mode) {
+  const entry = COMMANDS[command];
+  if (!entry) {
+    return null;
+  }
+  return entry.handler(projectRoot, args, mode);
+}
+
 module.exports = {
   findProjectRoot,
   parseArgs,
   formatOutput,
   cliError,
+  COMMANDS,
+  routeCommand,
 };
