@@ -55,7 +55,7 @@ See PROJECT.md Key Decisions table for full history.
 
 ### Pending Todos
 
-None.
+1. **Add milestone audit loop to autopilot mode** (planning) — `.planning/todos/pending/2026-03-03-add-milestone-audit-loop-to-autopilot-mode.md`
 
 ### Blockers/Concerns
 
