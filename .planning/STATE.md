@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Add Milestone Audit Loop
-status: complete
+milestone: v1.3
+milestone_name: CLI Utilities
+status: active
 last_updated: "2026-03-03"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** CLI Utilities — deterministic status commands
 
 ## Current Position
 
-Milestone v1.2 complete. All 13 phases across 3 milestones shipped.
-Last activity: 2026-03-03 — Completed v1.2 milestone
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-03 — Milestone v1.3 started
 
 ## Performance Metrics
 
@@ -64,5 +64,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Milestone v1.2 complete — ready for next milestone
+Stopped at: Milestone v1.3 started — defining requirements
 Resume file: None

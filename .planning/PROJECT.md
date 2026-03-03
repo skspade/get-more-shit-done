@@ -34,7 +34,14 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- [ ] Standalone `gsd` CLI binary with command routing
+- [ ] `gsd progress` — milestone status dashboard (phases, plans, progress bar)
+- [ ] `gsd todos` — list and display pending todos
+- [ ] `gsd health` — validate .planning/ directory structure and state consistency
+- [ ] `gsd settings` — view and update config.json interactively
+- [ ] `gsd help` — display GSD command reference
+- [ ] Rich terminal output (ANSI colors, unicode formatting, tables)
+- [ ] `--json` flag for machine-readable output on all commands
 
 ### Out of Scope
 
@@ -73,13 +80,26 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Gap closure reuses existing phase lifecycle | Fix phases use identical discuss/plan/execute/verify cycle as normal phases | Good — no special-case code |
 | Version extracted from STATE.md frontmatter | Single source of truth for milestone version | Good — consistent across invocations |
 
+## Current Milestone: v1.3 CLI Utilities
+
+**Goal:** Replace token-expensive LLM-powered status commands with a deterministic CLI that reads .planning/ state and presents it instantly.
+
+**Target features:**
+- Standalone `gsd` CLI with rich terminal output and `--json` flag
+- `gsd progress` — milestone status dashboard
+- `gsd todos` — pending todo list
+- `gsd health` — planning directory validation
+- `gsd settings` — config management
+- `gsd help` — command reference
+
 ## Context
 
 Shipped v1.2 with full milestone audit loop — autopilot now detects completion, audits requirements, closes gaps iteratively, and completes the milestone autonomously. 3 milestones shipped (v1.0, v1.1, v1.2) across 13 phases.
 
 **Architecture:** Unchanged from v1.0. Three new functions in `autopilot.sh`: `run_milestone_audit`, `run_gap_closure_loop`, `run_milestone_completion`.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
+**Existing CLI infrastructure:** `gsd-tools.cjs` already handles state parsing (`state-snapshot`, `roadmap analyze`, `progress bar`, `validate health`). The new `gsd` CLI builds on this parsing layer.
 **Known tech debt:** `run_gap_closure_loop` return value unchecked at call sites (safe due to exit semantics), `print_escalation_report` message slightly misleading on mid-iteration vs exhaustion (cosmetic)
 
 ---
-*Last updated: 2026-03-03 after v1.2 milestone*
+*Last updated: 2026-03-03 after v1.3 milestone start*
