@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.1 Remove Git Tagging (Shipped: 2026-03-03)
+
+**Phases completed:** 2 phases, 3 plans, 6 tasks
+**Timeline:** ~1.5 hours (2026-03-02 19:41 → 21:13)
+**Git range:** ed47a11 → 10ec1c8 (15 commits)
+
+**Key accomplishments:**
+- Removed entire `git_tag` step (tag creation + push logic) from complete-milestone workflow
+- Cleaned all tag references from command spec, workflow purpose, and success criteria
+- Removed tag references from help.md, README.md, and USER-GUIDE.md documentation
+- Fixed residual "Tag: v[X.Y]" in workflow output template and "Archive, tag, done" in USER-GUIDE.md examples
+- Full audit passed: 6/6 requirements satisfied, 2/2 E2E flows verified
+
+---
+
 ## v1.0 GSD Autopilot (Shipped: 2026-03-02)
 
 **Phases completed:** 7 phases, 12 plans

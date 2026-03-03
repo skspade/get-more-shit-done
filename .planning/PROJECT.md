@@ -24,11 +24,13 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Native GSD implementation using workflows, agents, and commands — not an external wrapper — v1.0
 - Bash helpers where native GSD patterns are insufficient (outer loop, state polling) — v1.0
 
+- ✓ Remove git tag creation from complete-milestone workflow — v1.1
+- ✓ Remove git tag push from complete-milestone workflow — v1.1
+- ✓ Update all documentation references to git tagging — v1.1
+
 ### Active
 
-- [ ] Remove git tag creation from complete-milestone workflow
-- [ ] Remove git tag push from complete-milestone workflow
-- [ ] Update documentation references to git tagging
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -37,20 +39,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Budget/cost caps — progress circuit breaker handles runaway, no token budget enforcement
 - Interactive discuss mode — always auto-decide, never prompt during autonomous execution
 - Upstream contribution — this is a fork, not a PR to gsd-build/get-shit-done
-
-## Context
-
-Shipped v1.0 with ~19,626 LOC across shell scripts (autopilot.sh), Node.js tooling (gsd-tools.cjs, phase.cjs, config.cjs), and markdown workflows/agents.
-
-**Architecture:**
-- `autopilot.sh` — bash outer loop, ~900 lines, reinvokes `claude -p` per phase step
-- `gsd-auto-context` agent — autonomous CONTEXT.md generation with layered decision sourcing
-- `autopilot.md` workflow — entry point that launches autopilot.sh
-- Verification gate — blocks for human approve/fix/abort at each phase
-- Debug-retry — spawns gsd-debugger on failures, retries up to N times
-
-**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
-**Known tech debt:** 7 cosmetic items (dead import, missing config scaffold key, Phase 6 ROADMAP status — see v1.0 audit)
+- CHANGELOG link updates — historical links to upstream tags, leave as-is
 
 ## Constraints
 
@@ -73,15 +62,16 @@ Shipped v1.0 with ~19,626 LOC across shell scripts (autopilot.sh), Node.js tooli
 | Layered decision approach for context generation | Front-loading from PROJECT.md eliminates obvious ambiguities; Claude handles the rest with documented reasoning | Good — domain adaptation works across phase types |
 | Artifact-based state inference | Phase lifecycle step determined by file presence (CONTEXT, PLAN, SUMMARY, VERIFICATION) | Good — stateless, survives context resets |
 | ROADMAP checkbox completion detection | Use ROADMAP checkbox line for completion status instead of section parsing | Good — simpler and more reliable |
+| Remove git tagging entirely over making it optional | Fork doesn't need release tags; simpler to remove than add config toggles | Good — clean removal, no dead code |
+| Preserve README Bash(git tag:*) permissions example | Generic Claude Code permissions snippet, not a GSD feature claim | Good — correct scope boundary |
 
-## Current Milestone: v1.1 Remove Git Tagging
+## Context
 
-**Goal:** Strip the automated git tag mechanism from this fork — tags should not be created or pushed during milestone completion.
+Shipped v1.1 with git tagging fully removed from the complete-milestone workflow and all documentation. ~19,626 LOC unchanged (v1.1 was a removal milestone — net deletion).
 
-**Target features:**
-- Remove git tag creation step from complete-milestone workflow
-- Remove git tag push logic
-- Update all documentation referencing automated tagging
+**Architecture:** Unchanged from v1.0.
+**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
+**Known tech debt:** 7 cosmetic items from v1.0 audit + 1 from v1.1 audit (`audit-milestone.md` line 197 "archive and tag" stale wording)
 
 ---
-*Last updated: 2026-03-02 after v1.1 milestone started*
+*Last updated: 2026-03-03 after v1.1 milestone*

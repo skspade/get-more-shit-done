@@ -46,6 +46,41 @@
 
 ---
 
+## Milestone: v1.1 — Remove Git Tagging
+
+**Shipped:** 2026-03-03
+**Phases:** 2 | **Plans:** 3 | **Commits:** 15
+
+### What Was Built
+- Removed entire `git_tag` step from complete-milestone workflow (tag creation, push prompt, push logic)
+- Cleaned all tag references from command spec, workflow purpose, and success criteria
+- Updated help.md, README.md, and USER-GUIDE.md to remove automated tagging claims
+- Fixed residual tag references in workflow output template and USER-GUIDE.md examples
+
+### What Worked
+- Audit-driven gap closure: first pass (Phase 8) caught the main targets, audit found 2 residual references, Phase 9 closed them cleanly
+- Scope discipline: correctly preserved `Bash(git tag:*)` permissions example as out-of-scope (generic Claude Code snippet, not a GSD feature claim)
+- Fast turnaround: entire milestone completed in ~1.5 hours with 15 commits
+
+### What Was Inefficient
+- Phase 8 missed 2 residual references (offer_next output template, USER-GUIDE.md inline comments) that required a gap closure phase — a more thorough grep sweep in Phase 8 could have caught these
+- ROADMAP.md phase checkboxes and plan counts were not updated during Phase 8/9 execution (showed `0/0` and `[ ] TBD`)
+
+### Patterns Established
+- Removal milestones: focused removal of a feature can be completed very quickly with audit verification
+- Gap closure as standard practice: expecting an audit-then-fix cycle produces better quality than trying to get it right in one pass
+
+### Key Lessons
+1. For removal tasks, grep for all variations early — "tag", "Tag", "tagged", "tagging", inline comments — reduces gap closure phases
+2. ROADMAP checkbox/plan count updates should happen during execution, not just at milestone completion
+
+### Cost Observations
+- Model mix: quality profile (opus primary)
+- Sessions: 3 plan executions across 2 phases
+- Notable: removal milestones are very fast — clear scope, no design decisions, mechanical edits
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -53,7 +88,9 @@
 | Milestone | Commits | Phases | Key Change |
 |-----------|---------|--------|------------|
 | v1.0 | 52 | 7 | First milestone — established artifact-based state, gap closure cycle |
+| v1.1 | 15 | 2 | First removal milestone — confirmed audit-gap-closure cycle works |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. (First milestone — lessons above need cross-validation in v2)
+1. Gap closure phases are consistently valuable — found real issues in both v1.0 (3 phases) and v1.1 (1 phase)
+2. ROADMAP checkbox maintenance during execution is a recurring gap — needs process improvement
