@@ -48,23 +48,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | — | Pending |
-| AUDIT-02 | — | Pending |
-| LOOP-01 | — | Pending |
-| LOOP-02 | — | Pending |
-| LOOP-03 | — | Pending |
-| LOOP-04 | — | Pending |
-| LOOP-05 | — | Pending |
-| COMP-01 | — | Pending |
-| COMP-02 | — | Pending |
-| CONF-01 | — | Pending |
-| CONF-02 | — | Pending |
+| AUDIT-01 | Phase 10 | Pending |
+| AUDIT-02 | Phase 10 | Pending |
+| LOOP-01 | Phase 11 | Pending |
+| LOOP-02 | Phase 11 | Pending |
+| LOOP-03 | Phase 11 | Pending |
+| LOOP-04 | Phase 11 | Pending |
+| LOOP-05 | Phase 11 | Pending |
+| COMP-01 | Phase 12 | Pending |
+| COMP-02 | Phase 12 | Pending |
+| CONF-01 | Phase 11 | Pending |
+| CONF-02 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11 ⚠️
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 after roadmap creation*
