@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, and debug-retry handles failures automatically.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone.
 
 ## Core Value
 
@@ -23,22 +23,18 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Progress circuit breaker: pause after N consecutive iterations with no state change (configurable, default 3) — v1.0
 - Native GSD implementation using workflows, agents, and commands — not an external wrapper — v1.0
 - Bash helpers where native GSD patterns are insufficient (outer loop, state polling) — v1.0
-
 - ✓ Remove git tag creation from complete-milestone workflow — v1.1
 - ✓ Remove git tag push from complete-milestone workflow — v1.1
 - ✓ Update all documentation references to git tagging — v1.1
+- ✓ Automatic milestone audit after all phases complete with three-way routing — v1.2
+- ✓ Audit-fix-reaudit loop with configurable max iterations and escalation — v1.2
+- ✓ Automatic gap planning and fix phase execution — v1.2
+- ✓ Autonomous milestone completion (archival, PROJECT.md evolution, commit) on audit pass — v1.2
+- ✓ Configurable tech debt handling and max audit-fix iterations — v1.2
 
 ### Active
 
-## Current Milestone: v1.2 Add Milestone Audit Loop
-
-**Goal:** Close the autopilot loop — after all phases execute, automatically audit the milestone and fix gaps until the audit passes, then complete the milestone.
-
-**Target features:**
-- Automatic milestone audit after all phases complete
-- Audit-fix-reaudit loop with configurable max iterations
-- Automatic gap planning and fix phase execution
-- Milestone completion on audit pass
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -72,14 +68,18 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | ROADMAP checkbox completion detection | Use ROADMAP checkbox line for completion status instead of section parsing | Good — simpler and more reliable |
 | Remove git tagging entirely over making it optional | Fork doesn't need release tags; simpler to remove than add config toggles | Good — clean removal, no dead code |
 | Preserve README Bash(git tag:*) permissions example | Generic Claude Code permissions snippet, not a GSD feature claim | Good — correct scope boundary |
+| Exit code 10 for gaps_found | Avoid conflict with existing codes 0/1/2/130 | Good — clean routing signal |
+| DRY milestone completion function | Single function called from all 4 audit-passed paths | Good — eliminates duplication |
+| Gap closure reuses existing phase lifecycle | Fix phases use identical discuss/plan/execute/verify cycle as normal phases | Good — no special-case code |
+| Version extracted from STATE.md frontmatter | Single source of truth for milestone version | Good — consistent across invocations |
 
 ## Context
 
-Shipped v1.1 with git tagging fully removed from the complete-milestone workflow and all documentation. ~19,626 LOC unchanged (v1.1 was a removal milestone — net deletion).
+Shipped v1.2 with full milestone audit loop — autopilot now detects completion, audits requirements, closes gaps iteratively, and completes the milestone autonomously. 3 milestones shipped (v1.0, v1.1, v1.2) across 13 phases.
 
-**Architecture:** Unchanged from v1.0.
+**Architecture:** Unchanged from v1.0. Three new functions in `autopilot.sh`: `run_milestone_audit`, `run_gap_closure_loop`, `run_milestone_completion`.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
-**Known tech debt:** 7 cosmetic items from v1.0 audit + 1 from v1.1 audit (`audit-milestone.md` line 197 "archive and tag" stale wording)
+**Known tech debt:** `run_gap_closure_loop` return value unchecked at call sites (safe due to exit semantics), `print_escalation_report` message slightly misleading on mid-iteration vs exhaustion (cosmetic)
 
 ---
-*Last updated: 2026-03-03 after v1.2 milestone started*
+*Last updated: 2026-03-03 after v1.2 milestone*

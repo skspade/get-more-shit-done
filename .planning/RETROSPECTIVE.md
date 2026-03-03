@@ -81,6 +81,45 @@
 
 ---
 
+## Milestone: v1.2 — Add Milestone Audit Loop
+
+**Shipped:** 2026-03-03
+**Phases:** 4 | **Plans:** 4 | **Commits:** 29
+
+### What Was Built
+- `run_milestone_audit` function — auto-triggers audit after all phases complete, routes on passed/gaps_found/tech_debt
+- `run_gap_closure_loop` — iterative audit-fix cycles with configurable max iterations and `print_escalation_report`
+- `run_milestone_completion` — DRY function called from all 4 audit-passed paths for autonomous archival
+- Phase 13 gap closure — formal VERIFICATION.md for Phase 12 closing orphaned COMP-01/COMP-02
+
+### What Worked
+- DRY function pattern: `run_milestone_completion` called from all 4 exit paths instead of duplicating logic
+- Gap closure reusing existing phase lifecycle: fix phases use identical discuss/plan/execute/verify as normal phases
+- Config-driven behavior: `auto_accept_tech_debt` and `max_audit_fix_iterations` keep the loop adaptable
+- Rapid iteration: 4 phases planned and executed in a single session
+
+### What Was Inefficient
+- Phase 12 skipped creating VERIFICATION.md, requiring Phase 13 as a gap closure phase — formal verification should be part of every phase
+- Audit file remained stale (`gaps_found`) after Phase 13 closed the gaps — no re-audit step was run
+- `run_gap_closure_loop` return value unchecked at call sites — safe but fragile to future changes
+
+### Patterns Established
+- Milestone completion pattern: extract version from STATE.md frontmatter, invoke complete-milestone via `run_step_with_retry`
+- Gap closure verification pattern: create VERIFICATION.md for the implementation phase, update REQUIREMENTS.md traceability
+- Three-function decomposition for audit loop: audit, gap closure, completion — each independently testable
+
+### Key Lessons
+1. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (same lesson as v1.0 Phase 6)
+2. The audit-gap-closure cycle is now automated end-to-end — the manual overhead is effectively zero
+3. DRY function patterns for common exit paths prevent divergence when multiple code paths need the same behavior
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for plan checker)
+- Sessions: 4 plan executions across 4 phases
+- Notable: gap closure (Phase 13) was trivially fast — writing VERIFICATION.md and updating traceability checkboxes
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -89,8 +128,10 @@
 |-----------|---------|--------|------------|
 | v1.0 | 52 | 7 | First milestone — established artifact-based state, gap closure cycle |
 | v1.1 | 15 | 2 | First removal milestone — confirmed audit-gap-closure cycle works |
+| v1.2 | 29 | 4 | Automated the audit-gap-closure cycle itself — now runs without human intervention |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in both v1.0 (3 phases) and v1.1 (1 phase)
+1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), and v1.2 (1 phase)
 2. ROADMAP checkbox maintenance during execution is a recurring gap — needs process improvement
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in v1.0 Phase 6 and v1.2 Phase 13)

@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.2 Add Milestone Audit Loop (Shipped: 2026-03-03)
+
+**Phases completed:** 4 phases, 4 plans
+**Timeline:** ~1 day (2026-03-02 → 2026-03-03)
+**Git range:** 9c1de87 → 623f3ff (29 commits)
+
+**Key accomplishments:**
+- Added `run_milestone_audit` function with three-way routing (passed/gaps_found/tech_debt) and configurable `auto_accept_tech_debt` setting
+- Added `run_gap_closure_loop` with iterative audit-fix cycles, configurable max iterations, and `print_escalation_report` for human escalation
+- Added `run_milestone_completion` function called from all 4 audit-passed paths for autonomous milestone archival
+- Formal verification of all 11 requirements with line-level code evidence across 3 VERIFICATION.md files
+- Full audit passed: 11/11 requirements satisfied, 11/11 integrations wired, 4/4 E2E flows verified
+
+---
+
 ## v1.1 Remove Git Tagging (Shipped: 2026-03-03)
 
 **Phases completed:** 2 phases, 3 plans, 6 tasks
