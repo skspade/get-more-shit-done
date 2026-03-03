@@ -11,10 +11,14 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { execSync } = require('child_process');
+
 const {
   findProjectRoot,
   parseArgs,
   formatOutput,
+  COMMANDS,
+  routeCommand,
 } = require('../get-shit-done/bin/lib/cli.cjs');
 
 // ─── findProjectRoot ─────────────────────────────────────────────────────────
@@ -125,5 +129,119 @@ describe('formatOutput', () => {
     const data = { command: 'test', message: 'hello world' };
     const result = formatOutput(data, 'plain');
     assert.strictEqual(result, 'hello world');
+  });
+});
+
+// ─── COMMANDS registry ──────────────────────────────────────────────────────
+
+describe('COMMANDS', () => {
+  test('all five commands are registered', () => {
+    const expected = ['progress', 'todos', 'health', 'settings', 'help'];
+    for (const name of expected) {
+      assert.ok(COMMANDS[name], `Command '${name}' should be registered`);
+    }
+  });
+
+  test('each command has description and handler', () => {
+    for (const [name, entry] of Object.entries(COMMANDS)) {
+      assert.strictEqual(typeof entry.description, 'string', `${name} should have string description`);
+      assert.strictEqual(typeof entry.handler, 'function', `${name} should have function handler`);
+    }
+  });
+});
+
+// ─── routeCommand ───────────────────────────────────────────────────────────
+
+describe('routeCommand', () => {
+  test('routes progress to handler', () => {
+    const result = routeCommand('progress', '/tmp', [], 'rich');
+    assert.strictEqual(result.command, 'progress');
+    assert.ok(result.message);
+  });
+
+  test('routes todos to handler', () => {
+    const result = routeCommand('todos', '/tmp', [], 'rich');
+    assert.strictEqual(result.command, 'todos');
+  });
+
+  test('routes health to handler', () => {
+    const result = routeCommand('health', '/tmp', [], 'rich');
+    assert.strictEqual(result.command, 'health');
+  });
+
+  test('routes settings to handler', () => {
+    const result = routeCommand('settings', '/tmp', [], 'rich');
+    assert.strictEqual(result.command, 'settings');
+  });
+
+  test('routes help to handler with all command names', () => {
+    const result = routeCommand('help', null, [], 'rich');
+    assert.strictEqual(result.command, 'help');
+    assert.ok(result.message.includes('progress'));
+    assert.ok(result.message.includes('todos'));
+    assert.ok(result.message.includes('health'));
+    assert.ok(result.message.includes('settings'));
+    assert.ok(result.message.includes('help'));
+  });
+
+  test('returns null for unknown command', () => {
+    const result = routeCommand('nonexistent', '/tmp', [], 'rich');
+    assert.strictEqual(result, null);
+  });
+});
+
+// ─── Integration tests (CLI binary) ────────────────────────────────────────
+
+describe('gsd-cli binary', () => {
+  const cliPath = path.resolve(__dirname, '..', 'get-shit-done', 'bin', 'gsd-cli.cjs');
+  const projectRoot = path.resolve(__dirname, '..');
+
+  test('help command exits 0 and lists commands', () => {
+    const output = execSync(`node "${cliPath}" help`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(output.includes('progress'));
+    assert.ok(output.includes('todos'));
+    assert.ok(output.includes('health'));
+    assert.ok(output.includes('settings'));
+  });
+
+  test('bare invocation shows help', () => {
+    const output = execSync(`node "${cliPath}"`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(output.includes('Usage:'));
+    assert.ok(output.includes('Commands:'));
+  });
+
+  test('progress --json returns valid JSON', () => {
+    const output = execSync(`node "${cliPath}" progress --json`, { cwd: projectRoot, encoding: 'utf-8' });
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.command, 'progress');
+  });
+
+  test('progress --plain returns no ANSI codes', () => {
+    const output = execSync(`node "${cliPath}" progress --plain`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(!output.includes('\x1b'));
+  });
+
+  test('unknown command exits 1 with error', () => {
+    try {
+      execSync(`node "${cliPath}" badcommand`, { cwd: projectRoot, encoding: 'utf-8', stdio: 'pipe' });
+      assert.fail('Should have thrown');
+    } catch (err) {
+      assert.strictEqual(err.status, 1);
+      assert.ok(err.stderr.includes('Unknown command'));
+      assert.ok(err.stderr.includes('badcommand'));
+    }
+  });
+
+  test('exits 1 when run outside GSD project', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-cli-int-'));
+    try {
+      execSync(`node "${cliPath}" progress`, { cwd: tmpDir, encoding: 'utf-8', stdio: 'pipe' });
+      assert.fail('Should have thrown');
+    } catch (err) {
+      assert.strictEqual(err.status, 1);
+      assert.ok(err.stderr.includes('.planning/'));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
