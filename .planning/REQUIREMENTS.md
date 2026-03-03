@@ -39,14 +39,14 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### Settings Command
 
-- [ ] **SETT-01**: User can view all current config values
-- [ ] **SETT-02**: User can update a config value (`gsd settings set <key> <value>`)
-- [ ] **SETT-03**: Config values are validated before writing
+- [x] **SETT-01**: User can view all current config values
+- [x] **SETT-02**: User can update a config value (`gsd settings set <key> <value>`)
+- [x] **SETT-03**: Config values are validated before writing
 
 ### Help Command
 
-- [ ] **HELP-01**: User can see all available CLI commands with descriptions
-- [ ] **HELP-02**: User can see detailed help for a specific command (`gsd help <command>`)
+- [x] **HELP-01**: User can see all available CLI commands with descriptions
+- [x] **HELP-02**: User can see detailed help for a specific command (`gsd help <command>`)
 
 ## Future Requirements
 
@@ -95,11 +95,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HLTH-02 | Phase 17 | Complete |
 | HLTH-03 | Phase 17 | Complete |
 | HLTH-04 | Phase 17 | Complete |
-| SETT-01 | Phase 18 | Pending |
-| SETT-02 | Phase 18 | Pending |
-| SETT-03 | Phase 18 | Pending |
-| HELP-01 | Phase 18 | Pending |
-| HELP-02 | Phase 18 | Pending |
+| SETT-01 | Phase 18 | Complete |
+| SETT-02 | Phase 18 | Complete |
+| SETT-03 | Phase 18 | Complete |
+| HELP-01 | Phase 18 | Complete |
+| HELP-02 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 23 total
@@ -108,4 +108,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after Phase 17 completion*
+*Last updated: 2026-03-03 after Phase 18 completion*
