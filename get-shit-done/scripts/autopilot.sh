@@ -1000,7 +1000,22 @@ while true; do
       NEXT_PHASE=$(next_incomplete_phase "$CURRENT_PHASE")
       if [[ -z "$NEXT_PHASE" ]]; then
         print_final_report
-        exit 0
+
+        # All phases complete — trigger milestone audit
+        local audit_result=0
+        run_milestone_audit || audit_result=$?
+
+        if [[ $audit_result -eq 0 ]]; then
+          # Audit passed (or tech debt accepted) — signal milestone completion
+          exit 0
+        elif [[ $audit_result -eq 10 ]]; then
+          # Gaps found (or tech debt rejected) — signal gap closure needed
+          exit 10
+        else
+          # Audit failed with error
+          echo "ERROR: Milestone audit encountered an error" >&2
+          exit 1
+        fi
       fi
 
       CURRENT_PHASE="$NEXT_PHASE"
