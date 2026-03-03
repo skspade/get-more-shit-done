@@ -9,8 +9,8 @@ Requirements for milestone v1.2: Add Milestone Audit Loop.
 
 ### Audit Integration
 
-- [ ] **AUDIT-01**: Autopilot automatically runs milestone audit after all phases complete
-- [ ] **AUDIT-02**: Autopilot parses audit result status (passed / gaps_found / tech_debt) and routes accordingly
+- [x] **AUDIT-01**: Autopilot automatically runs milestone audit after all phases complete
+- [x] **AUDIT-02**: Autopilot parses audit result status (passed / gaps_found / tech_debt) and routes accordingly
 
 ### Gap Closure Loop
 
@@ -28,7 +28,7 @@ Requirements for milestone v1.2: Add Milestone Audit Loop.
 ### Configuration
 
 - [ ] **CONF-01**: Max audit-fix iterations is configurable (default: 3)
-- [ ] **CONF-02**: Tech debt handling is configurable via `auto_accept_tech_debt` setting (default: true)
+- [x] **CONF-02**: Tech debt handling is configurable via `auto_accept_tech_debt` setting (default: true)
 
 ## Future Requirements
 
@@ -48,8 +48,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | Phase 10 | Pending |
-| AUDIT-02 | Phase 10 | Pending |
+| AUDIT-01 | Phase 10 | Complete |
+| AUDIT-02 | Phase 10 | Complete |
 | LOOP-01 | Phase 11 | Pending |
 | LOOP-02 | Phase 11 | Pending |
 | LOOP-03 | Phase 11 | Pending |
@@ -58,7 +58,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-01 | Phase 12 | Pending |
 | COMP-02 | Phase 12 | Pending |
 | CONF-01 | Phase 11 | Pending |
-| CONF-02 | Phase 10 | Pending |
+| CONF-02 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 11 total
