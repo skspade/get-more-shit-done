@@ -825,7 +825,109 @@ function handleSettings(projectRoot, args) {
   return { command: 'settings', settings: data.settings, message: lines.join('\n') };
 }
 
-function handleHelp() {
+// ─── Help Command ───────────────────────────────────────────────────────────
+
+const COMMAND_DETAILS = {
+  progress: {
+    usage: 'gsd progress [--json] [--plain]',
+    description: 'Show milestone progress and status. Displays the current milestone name, version, phase list with completion status, plan counts, progress bar, and suggested next action.',
+    flags: [
+      { flag: '--json', description: 'Output as JSON' },
+      { flag: '--plain', description: 'Output as plain text (no colors)' },
+    ],
+    examples: [
+      'gsd progress',
+      'gsd progress --json',
+    ],
+  },
+  todos: {
+    usage: 'gsd todos [<id>] [--area=<area>] [--json] [--plain]',
+    description: 'List and inspect pending todos. Shows all pending todos by default. Use an ID to see full details of a specific todo, or filter by area.',
+    flags: [
+      { flag: '<id>', description: 'Show full details for a specific todo' },
+      { flag: '--area=<area>', description: 'Filter todos by area' },
+      { flag: '--json', description: 'Output as JSON' },
+      { flag: '--plain', description: 'Output as plain text (no colors)' },
+    ],
+    examples: [
+      'gsd todos',
+      'gsd todos fix-login-bug',
+      'gsd todos --area=bugfix',
+    ],
+  },
+  health: {
+    usage: 'gsd health [--json] [--plain]',
+    description: 'Validate .planning/ directory integrity. Checks that required files exist, config.json is valid, and STATE.md is consistent with ROADMAP.md.',
+    flags: [
+      { flag: '--json', description: 'Output as JSON' },
+      { flag: '--plain', description: 'Output as plain text (no colors)' },
+    ],
+    examples: [
+      'gsd health',
+      'gsd health --json',
+    ],
+  },
+  settings: {
+    usage: 'gsd settings [set <key> <value>] [--json] [--plain]',
+    description: 'View and update configuration. Shows all config.json settings by default. Use "set" to update a value with validation.',
+    flags: [
+      { flag: 'set <key> <value>', description: 'Set a config value (dot notation for nested keys)' },
+      { flag: '--json', description: 'Output as JSON' },
+      { flag: '--plain', description: 'Output as plain text (no colors)' },
+    ],
+    examples: [
+      'gsd settings',
+      'gsd settings set model_profile quality',
+      'gsd settings set workflow.research false',
+    ],
+  },
+  help: {
+    usage: 'gsd help [<command>]',
+    description: 'Show available commands and usage. Without arguments, lists all commands. With a command name, shows detailed usage information.',
+    flags: [
+      { flag: '<command>', description: 'Show detailed help for a specific command' },
+    ],
+    examples: [
+      'gsd help',
+      'gsd help progress',
+    ],
+  },
+};
+
+function handleHelp(projectRoot, args) {
+  const BOLD = '\x1b[1m';
+  const RESET = '\x1b[0m';
+  const DIM = '\x1b[2m';
+
+  // Per-command detail mode: gsd help <command>
+  if (args && args.length > 0) {
+    const cmdName = args[0];
+    const detail = COMMAND_DETAILS[cmdName];
+
+    if (!detail) {
+      const available = Object.keys(COMMANDS).join(', ');
+      return { command: 'help', error: true, message: `Unknown command: '${cmdName}'\n\nAvailable commands: ${available}` };
+    }
+
+    const lines = [];
+    lines.push(`${BOLD}${detail.usage}${RESET}`);
+    lines.push('');
+    lines.push(detail.description);
+    lines.push('');
+    lines.push(`${BOLD}Arguments and flags:${RESET}`);
+    for (const f of detail.flags) {
+      lines.push(`  ${f.flag.padEnd(20)}  ${DIM}${f.description}${RESET}`);
+    }
+    lines.push('');
+    lines.push(`${BOLD}Examples:${RESET}`);
+    for (const ex of detail.examples) {
+      lines.push(`  ${DIM}${ex}${RESET}`);
+    }
+
+    return { command: 'help', detail: { name: cmdName, ...detail }, message: lines.join('\n') };
+  }
+
+  // Overview mode: gsd help
   const lines = [
     'gsd - GSD CLI Utilities',
     '',
