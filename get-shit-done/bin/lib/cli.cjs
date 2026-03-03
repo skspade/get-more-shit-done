@@ -537,7 +537,7 @@ function gatherHealthData(projectRoot) {
       const stateContent = fs.readFileSync(statePath, 'utf-8');
 
       // Extract phase references from STATE.md
-      const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
+      const phaseRefs = [...stateContent.matchAll(/[Pp]hase:?\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
 
       // Get phases on disk
       const diskPhases = new Set();
@@ -554,9 +554,11 @@ function gatherHealthData(projectRoot) {
       }
 
       // Check for invalid phase references
+      // Build a set of normalized disk phase numbers for comparison
+      const normalizedDiskPhases = new Set([...diskPhases].map(p => String(parseInt(p, 10))));
       for (const ref of phaseRefs) {
         const normalizedRef = String(parseInt(ref, 10));
-        if (diskPhases.size > 0 && !diskPhases.has(ref) && !diskPhases.has(normalizedRef)) {
+        if (diskPhases.size > 0 && !diskPhases.has(ref) && !normalizedDiskPhases.has(normalizedRef)) {
           addIssue('warning', 'W002', `STATE.md references Phase ${ref}, but no matching directory found`, 'Update STATE.md or create phase directory');
         }
       }

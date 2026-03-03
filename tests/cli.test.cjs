@@ -169,9 +169,15 @@ describe('routeCommand', () => {
     assert.deepStrictEqual(result.todos, []);
   });
 
-  test('routes health to handler', () => {
+  test('routes health to handler with structured data', () => {
     const result = routeCommand('health', '/tmp', [], 'rich');
     assert.strictEqual(result.command, 'health');
+    assert.ok(result.status, 'Should have status');
+    assert.ok(Array.isArray(result.checks), 'Should have checks array');
+    assert.ok(Array.isArray(result.errors), 'Should have errors array');
+    assert.ok(Array.isArray(result.warnings), 'Should have warnings array');
+    assert.ok(Array.isArray(result.info), 'Should have info array');
+    assert.ok(result.message, 'Should have message');
   });
 
   test('routes settings to handler', () => {
@@ -248,6 +254,22 @@ describe('gsd-cli binary', () => {
     assert.strictEqual(parsed.command, 'todos');
     assert.strictEqual(typeof parsed.count, 'number');
     assert.ok(Array.isArray(parsed.todos));
+  });
+
+  test('health --json returns valid JSON with status field', () => {
+    const output = execSync(`node "${cliPath}" health --json`, { cwd: projectRoot, encoding: 'utf-8' });
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.command, 'health');
+    assert.ok(['healthy', 'degraded', 'broken'].includes(parsed.status));
+    assert.ok(Array.isArray(parsed.checks));
+    assert.ok(Array.isArray(parsed.errors));
+    assert.ok(Array.isArray(parsed.warnings));
+  });
+
+  test('health --plain returns no ANSI codes', () => {
+    const output = execSync(`node "${cliPath}" health --plain`, { cwd: projectRoot, encoding: 'utf-8' });
+    assert.ok(!output.includes('\x1b'));
+    assert.ok(output.includes('Health Check'));
   });
 
   test('exits 1 when run outside GSD project', () => {
@@ -465,5 +487,187 @@ describe('handleTodos', () => {
     } finally {
       fs.rmSync(noTodosDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ─── handleHealth ────────────────────────────────────────────────────────────
+
+describe('handleHealth', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-health-test-'));
+    const planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(path.join(planningDir, 'phases', '01-setup'), { recursive: true });
+    // PROJECT.md with required sections
+    fs.writeFileSync(path.join(planningDir, 'PROJECT.md'),
+      '# Project\n\n## What This Is\nA test project\n\n## Core Value\nTesting\n\n## Requirements\n- REQ-01\n');
+    // ROADMAP.md
+    fs.writeFileSync(path.join(planningDir, 'ROADMAP.md'),
+      '### v1.0 Test Milestone (In Progress)\n\n- [ ] Phase 1: Setup\n');
+    // STATE.md
+    fs.writeFileSync(path.join(planningDir, 'STATE.md'),
+      '---\nmilestone: v1.0\nmilestone_name: Test Milestone\nstatus: active\n---\n\nPhase: 1 of 1 (Setup)\n');
+    // config.json
+    fs.writeFileSync(path.join(planningDir, 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' }, null, 2));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // HLTH-01: File existence checks
+
+  test('healthy state when all required files present (HLTH-01)', () => {
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'healthy');
+    assert.ok(result.checks.every(c => c.passed), 'All checks should pass');
+    assert.strictEqual(result.errors.length, 0);
+    assert.strictEqual(result.warnings.length, 0);
+  });
+
+  test('broken status when PROJECT.md missing (HLTH-01)', () => {
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'PROJECT.md'));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'broken');
+    const projectCheck = result.checks.find(c => c.name === 'PROJECT.md');
+    assert.strictEqual(projectCheck.passed, false);
+    const err = result.errors.find(e => e.code === 'E002');
+    assert.ok(err, 'Should have E002 error');
+    assert.ok(err.fix, 'Error should have fix suggestion');
+  });
+
+  test('broken status when ROADMAP.md missing (HLTH-01)', () => {
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'ROADMAP.md'));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'broken');
+    const err = result.errors.find(e => e.code === 'E003');
+    assert.ok(err, 'Should have E003 error');
+  });
+
+  test('broken status when STATE.md missing (HLTH-01)', () => {
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'STATE.md'));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'broken');
+    const err = result.errors.find(e => e.code === 'E004');
+    assert.ok(err, 'Should have E004 error');
+  });
+
+  test('degraded status when config.json missing (HLTH-01)', () => {
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'config.json'));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'degraded');
+    const warn = result.warnings.find(w => w.code === 'W003');
+    assert.ok(warn, 'Should have W003 warning');
+  });
+
+  test('phases/ directory check shows failed when missing (HLTH-01)', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+    const result = routeCommand('health', tmpDir, [], 'json');
+    const phasesCheck = result.checks.find(c => c.name === 'phases/');
+    assert.strictEqual(phasesCheck.passed, false);
+  });
+
+  test('broken status when .planning/ entirely missing (HLTH-01)', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-health-empty-'));
+    try {
+      const result = routeCommand('health', emptyDir, [], 'json');
+      assert.strictEqual(result.status, 'broken');
+      assert.strictEqual(result.errors.length, 1);
+      assert.strictEqual(result.errors[0].code, 'E001');
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  // HLTH-02: Config validation
+
+  test('no config errors with valid config.json (HLTH-02)', () => {
+    const result = routeCommand('health', tmpDir, [], 'json');
+    const configErrors = result.errors.filter(e => e.code === 'E005');
+    assert.strictEqual(configErrors.length, 0);
+  });
+
+  test('error E005 when config.json has invalid JSON (HLTH-02)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{bad json');
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'broken');
+    const err = result.errors.find(e => e.code === 'E005');
+    assert.ok(err, 'Should have E005 error');
+    assert.ok(err.message.includes('parse error'), 'Should mention parse error');
+  });
+
+  test('warning W004 when model_profile invalid (HLTH-02)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'invalid-profile' }));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.status, 'degraded');
+    const warn = result.warnings.find(w => w.code === 'W004');
+    assert.ok(warn, 'Should have W004 warning');
+    assert.ok(warn.message.includes('invalid-profile'));
+  });
+
+  // HLTH-03: State consistency
+
+  test('no consistency warnings when state matches roadmap (HLTH-03)', () => {
+    const result = routeCommand('health', tmpDir, [], 'json');
+    const consistencyWarnings = result.warnings.filter(w => w.code === 'W002' || w.code === 'W005');
+    assert.strictEqual(consistencyWarnings.length, 0);
+  });
+
+  test('warning W002 when STATE.md references non-existent phase (HLTH-03)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone: v1.0\nstatus: active\n---\n\nPhase: 99 of 99 (Missing)\n');
+    const result = routeCommand('health', tmpDir, [], 'json');
+    const warn = result.warnings.find(w => w.code === 'W002');
+    assert.ok(warn, 'Should have W002 warning');
+    assert.ok(warn.message.includes('99'));
+  });
+
+  // HLTH-04: Error/warning reporting
+
+  test('each issue has code, message, and fix fields (HLTH-04)', () => {
+    // Create a state with issues
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'config.json'));
+    const result = routeCommand('health', tmpDir, [], 'json');
+    for (const warn of result.warnings) {
+      assert.ok(warn.code, 'Warning should have code');
+      assert.ok(warn.message, 'Warning should have message');
+      assert.ok(warn.fix, 'Warning should have fix');
+    }
+  });
+
+  test('PROJECT.md missing required sections produces warnings (HLTH-04)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), '# Project\nSome content\n');
+    const result = routeCommand('health', tmpDir, [], 'json');
+    const sectionWarnings = result.warnings.filter(w => w.code === 'W001');
+    assert.ok(sectionWarnings.length > 0, 'Should warn about missing sections');
+    assert.ok(sectionWarnings[0].message.includes('PROJECT.md'));
+  });
+
+  // Output modes
+
+  test('rich mode returns message with ANSI codes', () => {
+    const result = routeCommand('health', tmpDir, [], 'rich');
+    assert.ok(result.message.includes('\x1b['));
+    assert.ok(result.message.includes('Health Check'));
+  });
+
+  test('JSON mode returns all structured fields', () => {
+    const result = routeCommand('health', tmpDir, [], 'json');
+    assert.strictEqual(result.command, 'health');
+    assert.ok(['healthy', 'degraded', 'broken'].includes(result.status));
+    assert.ok(Array.isArray(result.checks));
+    assert.ok(Array.isArray(result.errors));
+    assert.ok(Array.isArray(result.warnings));
+    assert.ok(Array.isArray(result.info));
+  });
+
+  test('plain mode message contains no ANSI escape sequences', () => {
+    const result = routeCommand('health', tmpDir, [], 'rich');
+    const plain = formatOutput(result, 'plain');
+    assert.ok(!plain.includes('\x1b'), 'Should have no ANSI codes');
+    assert.ok(plain.includes('Health Check'));
   });
 });
