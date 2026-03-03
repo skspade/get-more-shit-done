@@ -895,6 +895,7 @@ const COMMAND_DETAILS = {
 };
 
 function handleHelp(projectRoot, args) {
+  void projectRoot;
   const BOLD = '\x1b[1m';
   const RESET = '\x1b[0m';
   const DIM = '\x1b[2m';
