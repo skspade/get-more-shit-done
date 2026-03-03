@@ -398,8 +398,258 @@ function handleTodos(projectRoot, args) {
   return { command: 'todos', count: data.count, todos: data.todos, message: lines.join('\n') };
 }
 
-function handleHealth() {
-  return { command: 'health', message: 'Health command not yet implemented. See Phase 17.' };
+// ─── Health Command ─────────────────────────────────────────────────────────
+
+/**
+ * Gather health data by validating .planning/ directory structure,
+ * config integrity, and state consistency.
+ * Returns { status, checks, errors, warnings, info }.
+ */
+function gatherHealthData(projectRoot) {
+  const planningDir = path.join(projectRoot, '.planning');
+  const checks = [];
+  const errors = [];
+  const warnings = [];
+  const info = [];
+
+  const addIssue = (severity, code, message, fix) => {
+    const issue = { code, message, fix };
+    if (severity === 'error') errors.push(issue);
+    else if (severity === 'warning') warnings.push(issue);
+    else info.push(issue);
+  };
+
+  // ─── HLTH-01: Required file checks ──────────────────────────────────────
+
+  // Check .planning/ directory
+  const planningExists = fs.existsSync(planningDir);
+  checks.push({
+    name: '.planning/',
+    path: '.planning/',
+    passed: planningExists,
+    detail: planningExists ? 'Directory exists' : 'Directory not found',
+  });
+  if (!planningExists) {
+    addIssue('error', 'E001', '.planning/ directory not found', 'Run /gsd:new-project to initialize');
+    const status = 'broken';
+    return { status, checks, errors, warnings, info };
+  }
+
+  // Check PROJECT.md
+  const projectPath = path.join(planningDir, 'PROJECT.md');
+  const projectExists = fs.existsSync(projectPath);
+  checks.push({
+    name: 'PROJECT.md',
+    path: '.planning/PROJECT.md',
+    passed: projectExists,
+    detail: projectExists ? 'File exists' : 'File not found',
+  });
+  if (!projectExists) {
+    addIssue('error', 'E002', 'PROJECT.md not found', 'Run /gsd:new-project to create');
+  } else {
+    const projectContent = fs.readFileSync(projectPath, 'utf-8');
+    const requiredSections = ['## What This Is', '## Core Value', '## Requirements'];
+    for (const section of requiredSections) {
+      if (!projectContent.includes(section)) {
+        addIssue('warning', 'W001', `PROJECT.md missing section: ${section}`, 'Add section manually');
+      }
+    }
+  }
+
+  // Check ROADMAP.md
+  const roadmapPath = path.join(planningDir, 'ROADMAP.md');
+  const roadmapExists = fs.existsSync(roadmapPath);
+  checks.push({
+    name: 'ROADMAP.md',
+    path: '.planning/ROADMAP.md',
+    passed: roadmapExists,
+    detail: roadmapExists ? 'File exists' : 'File not found',
+  });
+  if (!roadmapExists) {
+    addIssue('error', 'E003', 'ROADMAP.md not found', 'Run /gsd:new-milestone to create roadmap');
+  }
+
+  // Check STATE.md
+  const statePath = path.join(planningDir, 'STATE.md');
+  const stateExists = fs.existsSync(statePath);
+  checks.push({
+    name: 'STATE.md',
+    path: '.planning/STATE.md',
+    passed: stateExists,
+    detail: stateExists ? 'File exists' : 'File not found',
+  });
+  if (!stateExists) {
+    addIssue('error', 'E004', 'STATE.md not found', 'Run /gsd:health --repair to regenerate');
+  }
+
+  // Check config.json
+  const configPath = path.join(planningDir, 'config.json');
+  const configExists = fs.existsSync(configPath);
+  checks.push({
+    name: 'config.json',
+    path: '.planning/config.json',
+    passed: configExists,
+    detail: configExists ? 'File exists' : 'File not found',
+  });
+  if (!configExists) {
+    addIssue('warning', 'W003', 'config.json not found', 'Run /gsd:health --repair to create with defaults');
+  }
+
+  // Check phases/ directory
+  const phasesDir = path.join(planningDir, 'phases');
+  const phasesExists = fs.existsSync(phasesDir);
+  checks.push({
+    name: 'phases/',
+    path: '.planning/phases/',
+    passed: phasesExists,
+    detail: phasesExists ? 'Directory exists' : 'Directory not found',
+  });
+
+  // ─── HLTH-02: Config validation ─────────────────────────────────────────
+
+  if (configExists) {
+    try {
+      const configRaw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(configRaw);
+
+      const validProfiles = ['quality', 'balanced', 'budget'];
+      if (parsed.model_profile && !validProfiles.includes(parsed.model_profile)) {
+        addIssue('warning', 'W004', `config.json: invalid model_profile "${parsed.model_profile}"`, `Valid values: ${validProfiles.join(', ')}`);
+      }
+
+      const knownKeys = ['model_profile', 'commit_docs', 'search_gitignored', 'branching_strategy',
+        'workflow', 'parallelization', 'autopilot', 'mode', 'depth', 'model_overrides',
+        'research', 'plan_checker', 'verifier', 'nyquist_validation'];
+      for (const key of Object.keys(parsed)) {
+        if (!knownKeys.includes(key)) {
+          addIssue('info', 'I001', `config.json: unknown key "${key}"`, 'May be a custom extension');
+        }
+      }
+    } catch (err) {
+      addIssue('error', 'E005', `config.json: JSON parse error - ${err.message}`, 'Fix JSON syntax or run /gsd:health --repair to reset');
+    }
+  }
+
+  // ─── HLTH-03: State consistency ─────────────────────────────────────────
+
+  if (stateExists && roadmapExists) {
+    try {
+      const stateContent = fs.readFileSync(statePath, 'utf-8');
+
+      // Extract phase references from STATE.md
+      const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
+
+      // Get phases on disk
+      const diskPhases = new Set();
+      if (phasesExists) {
+        try {
+          const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.isDirectory()) {
+              const dm = e.name.match(/^(\d+(?:\.\d+)*)/);
+              if (dm) diskPhases.add(dm[1]);
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Check for invalid phase references
+      for (const ref of phaseRefs) {
+        const normalizedRef = String(parseInt(ref, 10));
+        if (diskPhases.size > 0 && !diskPhases.has(ref) && !diskPhases.has(normalizedRef)) {
+          addIssue('warning', 'W002', `STATE.md references Phase ${ref}, but no matching directory found`, 'Update STATE.md or create phase directory');
+        }
+      }
+
+      // Check STATE.md current phase vs ROADMAP completion
+      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
+      const fm = extractFrontmatter(stateContent);
+
+      // Find current phase from STATE.md body text
+      const currentPhaseMatch = stateContent.match(/Phase:\s*(\d+)\s+of\s+\d+/);
+      if (currentPhaseMatch) {
+        const currentPhaseNum = currentPhaseMatch[1];
+        // Check if ROADMAP shows this phase as already completed
+        const completedPattern = new RegExp(`\\[x\\]\\s+\\*\\*Phase\\s+${currentPhaseNum}:`, 'i');
+        if (completedPattern.test(roadmapContent)) {
+          addIssue('warning', 'W005', `STATE.md reports Phase ${currentPhaseNum} as current, but ROADMAP.md shows it completed`, 'Run /gsd:health --repair to sync state');
+        }
+      }
+    } catch { /* ignore read errors */ }
+  }
+
+  // ─── Determine overall status ──────────────────────────────────────────
+
+  let status;
+  if (errors.length > 0) {
+    status = 'broken';
+  } else if (warnings.length > 0) {
+    status = 'degraded';
+  } else {
+    status = 'healthy';
+  }
+
+  return { status, checks, errors, warnings, info };
+}
+
+function handleHealth(projectRoot) {
+  const data = gatherHealthData(projectRoot || '.');
+
+  // Build rich-mode formatted string
+  const BOLD = '\x1b[1m';
+  const RESET = '\x1b[0m';
+  const GREEN = '\x1b[32m';
+  const YELLOW = '\x1b[33m';
+  const RED = '\x1b[31m';
+  const DIM = '\x1b[2m';
+
+  const lines = [];
+
+  // Header with status
+  const statusColors = { healthy: GREEN, degraded: YELLOW, broken: RED };
+  const statusLabels = { healthy: 'Healthy', degraded: 'Degraded', broken: 'Broken' };
+  const color = statusColors[data.status] || RED;
+  lines.push(`${BOLD}Health Check${RESET}  ${color}${statusLabels[data.status] || data.status}${RESET}`);
+  lines.push('');
+
+  // File checks
+  lines.push('Files:');
+  for (const check of data.checks) {
+    const icon = check.passed ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
+    const detail = check.passed ? '' : `  ${DIM}${check.detail}${RESET}`;
+    lines.push(`  ${icon} ${check.name}${detail}`);
+  }
+
+  // Issues
+  if (data.errors.length > 0) {
+    lines.push('');
+    lines.push(`${RED}Errors:${RESET}`);
+    for (const err of data.errors) {
+      lines.push(`  ${RED}${err.code}${RESET} ${err.message}`);
+      lines.push(`       ${DIM}Fix: ${err.fix}${RESET}`);
+    }
+  }
+
+  if (data.warnings.length > 0) {
+    lines.push('');
+    lines.push(`${YELLOW}Warnings:${RESET}`);
+    for (const warn of data.warnings) {
+      lines.push(`  ${YELLOW}${warn.code}${RESET} ${warn.message}`);
+      lines.push(`       ${DIM}Fix: ${warn.fix}${RESET}`);
+    }
+  }
+
+  // Summary
+  lines.push('');
+  const parts = [];
+  if (data.errors.length > 0) parts.push(`${data.errors.length} error${data.errors.length !== 1 ? 's' : ''}`);
+  if (data.warnings.length > 0) parts.push(`${data.warnings.length} warning${data.warnings.length !== 1 ? 's' : ''}`);
+  if (data.info.length > 0) parts.push(`${data.info.length} info`);
+  lines.push(parts.length > 0 ? parts.join(', ') : 'No issues found');
+
+  const message = lines.join('\n');
+
+  return { command: 'health', ...data, message };
 }
 
 function handleSettings() {
