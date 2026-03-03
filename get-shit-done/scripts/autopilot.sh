@@ -1138,11 +1138,13 @@ else
     run_milestone_audit || AUDIT_RESULT=$?
 
     if [[ $AUDIT_RESULT -eq 0 ]]; then
+      run_milestone_completion
       exit 0
     elif [[ $AUDIT_RESULT -eq 10 ]]; then
       # Gaps found — enter gap closure loop
       run_gap_closure_loop
-      # If loop returns 0, audit passed
+      # If loop returns 0, audit passed — complete the milestone
+      run_milestone_completion
       exit 0
     else
       echo "ERROR: Milestone audit encountered an error" >&2
@@ -1214,12 +1216,14 @@ while true; do
         run_milestone_audit || AUDIT_RESULT=$?
 
         if [[ $AUDIT_RESULT -eq 0 ]]; then
-          # Audit passed (or tech debt accepted) — signal milestone completion
+          # Audit passed (or tech debt accepted) — complete the milestone
+          run_milestone_completion
           exit 0
         elif [[ $AUDIT_RESULT -eq 10 ]]; then
           # Gaps found (or tech debt rejected) — enter gap closure loop
           run_gap_closure_loop
-          # If loop returns 0, audit passed
+          # If loop returns 0, audit passed — complete the milestone
+          run_milestone_completion
           exit 0
         else
           # Audit failed with error
