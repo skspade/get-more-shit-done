@@ -670,7 +670,6 @@ Archived:
 - milestones/v[X.Y]-REQUIREMENTS.md
 
 Summary: .planning/MILESTONES.md
-Tag: v[X.Y]
 
 ---
 
