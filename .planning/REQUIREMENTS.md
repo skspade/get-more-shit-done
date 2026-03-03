@@ -22,8 +22,8 @@ Requirements for milestone v1.2: Add Milestone Audit Loop.
 
 ### Milestone Completion
 
-- [ ] **COMP-01**: Autopilot automatically invokes complete-milestone when audit passes
-- [ ] **COMP-02**: Milestone completion runs autonomously (archival, PROJECT.md evolution, commit)
+- [x] **COMP-01**: Autopilot automatically invokes complete-milestone when audit passes
+- [x] **COMP-02**: Milestone completion runs autonomously (archival, PROJECT.md evolution, commit)
 
 ### Configuration
 
@@ -55,8 +55,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOOP-03 | Phase 11 | Complete |
 | LOOP-04 | Phase 11 | Complete |
 | LOOP-05 | Phase 11 | Complete |
-| COMP-01 | Phase 13 | Pending |
-| COMP-02 | Phase 13 | Pending |
+| COMP-01 | Phase 13 | Complete |
+| COMP-02 | Phase 13 | Complete |
 | CONF-01 | Phase 11 | Complete |
 | CONF-02 | Phase 10 | Complete |
 
