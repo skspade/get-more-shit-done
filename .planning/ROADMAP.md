@@ -3,7 +3,7 @@
 ## Milestones
 
 - **v1.0 GSD Autopilot** — Phases 1-7 (shipped 2026-03-02)
-- **v1.1 Remove Git Tagging** — Phase 8 (in progress)
+- **v1.1 Remove Git Tagging** — Phases 8-9 (in progress)
 
 ## Phases
 
@@ -25,6 +25,7 @@
 **Milestone Goal:** Strip automated git tag creation and push from complete-milestone workflow and all documentation references.
 
 - [ ] **Phase 8: Remove Git Tagging** - Remove tag creation, tag push, and all documentation references to automated tagging
+- [ ] **Phase 9: Fix Residual Tag References** - Close gaps from audit: remove missed tag references in workflow output and user guide examples (Gap Closure)
 
 ## Phase Details
 
@@ -42,6 +43,18 @@
 Plans:
 - [ ] 08-01: TBD
 
+### Phase 9: Fix Residual Tag References
+**Goal**: All residual tag references identified by v1.1 audit are removed from workflow output and documentation
+**Depends on**: Phase 8
+**Requirements**: WF-03, DOC-03
+**Gap Closure**: Closes gaps from v1.1 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `complete-milestone.md` offer_next step output does not contain `Tag: v[X.Y]`
+  2. `USER-GUIDE.md` usage examples do not contain `# Archive, tag, done`
+
+Plans:
+- [ ] 09-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -57,3 +70,4 @@ Phases execute in numeric order.
 | 6. Verify Phase 4 Implementation | v1.0 | 1/1 | Complete | 2026-03-02 |
 | 7. Fix Gap-Path Verify & Fix Cycle | v1.0 | 1/1 | Complete | 2026-03-02 |
 | 8. Remove Git Tagging | v1.1 | 0/0 | Not started | - |
+| 9. Fix Residual Tag References | v1.1 | 0/0 | Not started | - |

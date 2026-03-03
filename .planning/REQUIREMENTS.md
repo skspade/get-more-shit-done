@@ -11,13 +11,13 @@ Requirements for removing automated git tagging from this fork.
 
 - [x] **WF-01**: The `git_tag` step is removed from the `complete-milestone.md` workflow (no annotated tag creation)
 - [x] **WF-02**: The git tag push prompt and logic is removed from the `complete-milestone.md` workflow
-- [x] **WF-03**: The `complete-milestone.md` command spec no longer references git tagging
+- [ ] **WF-03**: The `complete-milestone.md` command spec no longer references git tagging
 
 ### Documentation
 
 - [x] **DOC-01**: `help.md` no longer mentions "Creates git tag for the release"
 - [x] **DOC-02**: `README.md` no longer references automated git tagging during milestone completion
-- [x] **DOC-03**: `USER-GUIDE.md` no longer references automated git tagging
+- [ ] **DOC-03**: `USER-GUIDE.md` no longer references automated git tagging
 
 ## Future Requirements
 
@@ -37,10 +37,10 @@ None — this is a focused removal milestone.
 |-------------|-------|--------|
 | WF-01 | Phase 8 | Complete |
 | WF-02 | Phase 8 | Complete |
-| WF-03 | Phase 8 | Complete |
+| WF-03 | Phase 9 | Pending |
 | DOC-01 | Phase 8 | Complete |
 | DOC-02 | Phase 8 | Complete |
-| DOC-03 | Phase 8 | Complete |
+| DOC-03 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 6 total
@@ -49,4 +49,4 @@ None — this is a focused removal milestone.
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after Phase 8 completion*
+*Last updated: 2026-03-02 after v1.1 audit gap closure planning*
