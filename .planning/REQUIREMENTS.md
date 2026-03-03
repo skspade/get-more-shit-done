@@ -14,11 +14,11 @@ Requirements for milestone v1.2: Add Milestone Audit Loop.
 
 ### Gap Closure Loop
 
-- [ ] **LOOP-01**: Autopilot automatically invokes plan-milestone-gaps when audit finds gaps
-- [ ] **LOOP-02**: Autopilot executes generated fix phases using existing phase loop
-- [ ] **LOOP-03**: Autopilot re-runs milestone audit after fix phases complete
-- [ ] **LOOP-04**: Audit-fix loop repeats until audit passes or max iterations reached
-- [ ] **LOOP-05**: Autopilot pauses for human escalation when max iterations exhausted
+- [x] **LOOP-01**: Autopilot automatically invokes plan-milestone-gaps when audit finds gaps
+- [x] **LOOP-02**: Autopilot executes generated fix phases using existing phase loop
+- [x] **LOOP-03**: Autopilot re-runs milestone audit after fix phases complete
+- [x] **LOOP-04**: Audit-fix loop repeats until audit passes or max iterations reached
+- [x] **LOOP-05**: Autopilot pauses for human escalation when max iterations exhausted
 
 ### Milestone Completion
 
@@ -27,7 +27,7 @@ Requirements for milestone v1.2: Add Milestone Audit Loop.
 
 ### Configuration
 
-- [ ] **CONF-01**: Max audit-fix iterations is configurable (default: 3)
+- [x] **CONF-01**: Max audit-fix iterations is configurable (default: 3)
 - [x] **CONF-02**: Tech debt handling is configurable via `auto_accept_tech_debt` setting (default: true)
 
 ## Future Requirements
@@ -50,14 +50,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | AUDIT-01 | Phase 10 | Complete |
 | AUDIT-02 | Phase 10 | Complete |
-| LOOP-01 | Phase 11 | Pending |
-| LOOP-02 | Phase 11 | Pending |
-| LOOP-03 | Phase 11 | Pending |
-| LOOP-04 | Phase 11 | Pending |
-| LOOP-05 | Phase 11 | Pending |
+| LOOP-01 | Phase 11 | Complete |
+| LOOP-02 | Phase 11 | Complete |
+| LOOP-03 | Phase 11 | Complete |
+| LOOP-04 | Phase 11 | Complete |
+| LOOP-05 | Phase 11 | Complete |
 | COMP-01 | Phase 12 | Pending |
 | COMP-02 | Phase 12 | Pending |
-| CONF-01 | Phase 11 | Pending |
+| CONF-01 | Phase 11 | Complete |
 | CONF-02 | Phase 10 | Complete |
 
 **Coverage:**
