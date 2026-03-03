@@ -565,7 +565,6 @@ function gatherHealthData(projectRoot) {
 
       // Check STATE.md current phase vs ROADMAP completion
       const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-      const fm = extractFrontmatter(stateContent);
 
       // Find current phase from STATE.md body text
       const currentPhaseMatch = stateContent.match(/Phase:\s*(\d+)\s+of\s+\d+/);
