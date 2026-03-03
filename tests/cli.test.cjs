@@ -272,6 +272,13 @@ describe('gsd-cli binary', () => {
     assert.ok(output.includes('Health Check'));
   });
 
+  test('settings --json returns valid JSON with settings array', () => {
+    const output = execSync(`node "${cliPath}" settings --json`, { cwd: projectRoot, encoding: 'utf-8' });
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.command, 'settings');
+    assert.ok(Array.isArray(parsed.settings));
+  });
+
   test('exits 1 when run outside GSD project', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-cli-int-'));
     try {
@@ -669,5 +676,117 @@ describe('handleHealth', () => {
     const plain = formatOutput(result, 'plain');
     assert.ok(!plain.includes('\x1b'), 'Should have no ANSI codes');
     assert.ok(plain.includes('Health Check'));
+  });
+});
+
+// ─── handleSettings ──────────────────────────────────────────────────────────
+
+describe('handleSettings', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-settings-test-'));
+    const planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(planningDir, { recursive: true });
+    fs.writeFileSync(path.join(planningDir, 'config.json'),
+      JSON.stringify({ model_profile: 'balanced', commit_docs: true, workflow: { research: true, plan_check: true } }, null, 2));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('view mode returns all settings as flat key-value pairs (SETT-01)', () => {
+    const result = routeCommand('settings', tmpDir, [], 'json');
+    assert.strictEqual(result.command, 'settings');
+    assert.ok(Array.isArray(result.settings), 'Should have settings array');
+    const keys = result.settings.map(s => s.key);
+    assert.ok(keys.includes('model_profile'), 'Should include model_profile');
+    assert.ok(keys.includes('commit_docs'), 'Should include commit_docs');
+    assert.ok(keys.includes('workflow.research'), 'Should include workflow.research');
+    assert.ok(keys.includes('workflow.plan_check'), 'Should include workflow.plan_check');
+  });
+
+  test('view mode shows error when config.json missing (SETT-01)', () => {
+    fs.unlinkSync(path.join(tmpDir, '.planning', 'config.json'));
+    const result = routeCommand('settings', tmpDir, [], 'json');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('config.json'));
+  });
+
+  test('set mode writes valid value to config (SETT-02)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'model_profile', 'quality'], 'json');
+    assert.strictEqual(result.updated, true);
+    assert.strictEqual(result.key, 'model_profile');
+    assert.strictEqual(result.value, 'quality');
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.model_profile, 'quality');
+  });
+
+  test('set mode parses boolean values correctly (SETT-02)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'commit_docs', 'false'], 'json');
+    assert.strictEqual(result.value, false);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.commit_docs, false);
+  });
+
+  test('set mode validates model_profile against allowed values (SETT-03)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'model_profile', 'invalid'], 'json');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('quality'));
+    assert.ok(result.message.includes('balanced'));
+    assert.ok(result.message.includes('budget'));
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.model_profile, 'balanced');
+  });
+
+  test('set mode validates boolean settings reject non-boolean (SETT-03)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'commit_docs', 'yes'], 'json');
+    assert.strictEqual(result.error, true);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.commit_docs, true);
+  });
+
+  test('set mode validates branching_strategy (SETT-03)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'branching_strategy', 'invalid'], 'json');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('none'));
+    assert.ok(result.message.includes('phase'));
+    assert.ok(result.message.includes('milestone'));
+  });
+
+  test('set mode validates autopilot.circuit_breaker_threshold is positive integer (SETT-03)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ autopilot: { circuit_breaker_threshold: 3 } }, null, 2));
+    const result = routeCommand('settings', tmpDir, ['set', 'autopilot.circuit_breaker_threshold', '0'], 'json');
+    assert.strictEqual(result.error, true);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.autopilot.circuit_breaker_threshold, 3);
+  });
+
+  test('set mode allows unknown keys with info notice (SETT-02)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'custom_key', 'custom_value'], 'json');
+    assert.strictEqual(result.updated, true);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.custom_key, 'custom_value');
+  });
+
+  test('set mode returns error when key or value missing', () => {
+    const result = routeCommand('settings', tmpDir, ['set'], 'json');
+    assert.strictEqual(result.error, true);
+    assert.ok(result.message.includes('Usage'));
+  });
+
+  test('rich mode view shows formatted output', () => {
+    const result = routeCommand('settings', tmpDir, [], 'rich');
+    assert.ok(result.message.includes('\x1b['));
+    assert.ok(result.message.includes('Settings'));
+  });
+
+  test('set mode writes nested key via dot notation (SETT-02)', () => {
+    const result = routeCommand('settings', tmpDir, ['set', 'workflow.research', 'false'], 'json');
+    assert.strictEqual(result.updated, true);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.workflow.research, false);
   });
 });
