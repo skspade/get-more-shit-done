@@ -875,9 +875,29 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
     error('phase required for phase-status');
   }
 
-  const phaseInfo = findPhaseInternal(cwd, phaseArg);
+  let phaseInfo = findPhaseInternal(cwd, phaseArg);
   if (!phaseInfo) {
-    error(`Phase ${phaseArg} not found`);
+    // Phase directory doesn't exist on disk — check if it's defined in the ROADMAP
+    // (e.g., a new milestone phase that hasn't been started yet)
+    const roadmapPhase = getRoadmapPhaseInternal(cwd, phaseArg);
+    if (!roadmapPhase) {
+      error(`Phase ${phaseArg} not found`);
+    }
+
+    // Auto-create the phase directory so the lifecycle can begin
+    const normalized = normalizePhaseName(phaseArg);
+    const slug = generateSlugInternal(roadmapPhase.phase_name);
+    const dirName = slug ? `${normalized}-${slug}` : normalized;
+    const phasesDir = path.join(cwd, '.planning', 'phases');
+    const dirPath = path.join(phasesDir, dirName);
+    fs.mkdirSync(dirPath, { recursive: true });
+    fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
+
+    // Re-find the phase now that the directory exists
+    phaseInfo = findPhaseInternal(cwd, phaseArg);
+    if (!phaseInfo) {
+      error(`Phase ${phaseArg} not found after creating directory`);
+    }
   }
 
   const phaseDir = path.join(cwd, phaseInfo.directory);
