@@ -26,9 +26,9 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### Todos Command
 
-- [ ] **TODO-01**: User can list all pending todos with ID, title, and area
-- [ ] **TODO-02**: User can filter todos by area (`gsd todos --area=feature`)
-- [ ] **TODO-03**: User can view full details of a specific todo (`gsd todos <id>`)
+- [x] **TODO-01**: User can list all pending todos with ID, title, and area
+- [x] **TODO-02**: User can filter todos by area (`gsd todos --area=feature`)
+- [x] **TODO-03**: User can view full details of a specific todo (`gsd todos <id>`)
 
 ### Health Command
 
@@ -88,9 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROG-03 | Phase 15 | Complete |
 | PROG-04 | Phase 15 | Complete |
 | PROG-05 | Phase 15 | Complete |
-| TODO-01 | Phase 16 | Pending |
-| TODO-02 | Phase 16 | Pending |
-| TODO-03 | Phase 16 | Pending |
+| TODO-01 | Phase 16 | Complete |
+| TODO-02 | Phase 16 | Complete |
+| TODO-03 | Phase 16 | Complete |
 | HLTH-01 | Phase 17 | Pending |
 | HLTH-02 | Phase 17 | Pending |
 | HLTH-03 | Phase 17 | Pending |
@@ -108,4 +108,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after roadmap creation*
+*Last updated: 2026-03-03 after Phase 16 completion*

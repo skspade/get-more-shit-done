@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: CLI Utilities
 status: unknown
-last_updated: "2026-03-03T20:55:36.298Z"
+last_updated: "2026-03-03T21:06:41.880Z"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
