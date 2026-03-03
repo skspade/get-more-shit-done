@@ -5,7 +5,7 @@ milestone_name: CLI Utilities
 status: active
 last_updated: "2026-03-03"
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -18,14 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** CLI Utilities — deterministic status commands
+**Current focus:** Phase 14 — CLI Infrastructure
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-03 — Milestone v1.3 started
+Phase: 14 of 18 (CLI Infrastructure)
+Plan: — of — in current phase
+Status: Ready to plan
+Last activity: 2026-03-03 — Roadmap created for v1.3 CLI Utilities
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -53,6 +55,9 @@ Last activity: 2026-03-03 — Milestone v1.3 started
 
 See PROJECT.md Key Decisions table for full history.
 
+- v1.3: gsd-tools.cjs already parses state — new `gsd` CLI builds on existing parsing layer
+- v1.3: CLI is read-only for settings except `gsd settings set`; no interactive prompts (inquirer-style)
+
 ### Pending Todos
 
 None.
@@ -64,5 +69,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Milestone v1.3 started — defining requirements
+Stopped at: Roadmap created — Phase 14 ready to plan
 Resume file: None

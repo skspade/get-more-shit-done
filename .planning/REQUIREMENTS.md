@@ -77,35 +77,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | — | Pending |
-| CLI-02 | — | Pending |
-| CLI-03 | — | Pending |
-| CLI-04 | — | Pending |
-| CLI-05 | — | Pending |
-| CLI-06 | — | Pending |
-| PROG-01 | — | Pending |
-| PROG-02 | — | Pending |
-| PROG-03 | — | Pending |
-| PROG-04 | — | Pending |
-| PROG-05 | — | Pending |
-| TODO-01 | — | Pending |
-| TODO-02 | — | Pending |
-| TODO-03 | — | Pending |
-| HLTH-01 | — | Pending |
-| HLTH-02 | — | Pending |
-| HLTH-03 | — | Pending |
-| HLTH-04 | — | Pending |
-| SETT-01 | — | Pending |
-| SETT-02 | — | Pending |
-| SETT-03 | — | Pending |
-| HELP-01 | — | Pending |
-| HELP-02 | — | Pending |
+| CLI-01 | Phase 14 | Pending |
+| CLI-02 | Phase 14 | Pending |
+| CLI-03 | Phase 14 | Pending |
+| CLI-04 | Phase 14 | Pending |
+| CLI-05 | Phase 14 | Pending |
+| CLI-06 | Phase 14 | Pending |
+| PROG-01 | Phase 15 | Pending |
+| PROG-02 | Phase 15 | Pending |
+| PROG-03 | Phase 15 | Pending |
+| PROG-04 | Phase 15 | Pending |
+| PROG-05 | Phase 15 | Pending |
+| TODO-01 | Phase 16 | Pending |
+| TODO-02 | Phase 16 | Pending |
+| TODO-03 | Phase 16 | Pending |
+| HLTH-01 | Phase 17 | Pending |
+| HLTH-02 | Phase 17 | Pending |
+| HLTH-03 | Phase 17 | Pending |
+| HLTH-04 | Phase 17 | Pending |
+| SETT-01 | Phase 18 | Pending |
+| SETT-02 | Phase 18 | Pending |
+| SETT-03 | Phase 18 | Pending |
+| HELP-01 | Phase 18 | Pending |
+| HELP-02 | Phase 18 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 after roadmap creation*
