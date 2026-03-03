@@ -153,10 +153,13 @@ describe('COMMANDS', () => {
 // ─── routeCommand ───────────────────────────────────────────────────────────
 
 describe('routeCommand', () => {
-  test('routes progress to handler', () => {
+  test('routes progress to handler with real data', () => {
     const result = routeCommand('progress', '/tmp', [], 'rich');
     assert.strictEqual(result.command, 'progress');
     assert.ok(result.message);
+    assert.ok(result.milestone, 'Should have milestone data');
+    assert.ok(Array.isArray(result.phases), 'Should have phases array');
+    assert.ok(result.progress, 'Should have progress data');
   });
 
   test('routes todos to handler', () => {
@@ -210,10 +213,15 @@ describe('gsd-cli binary', () => {
     assert.ok(output.includes('Commands:'));
   });
 
-  test('progress --json returns valid JSON', () => {
+  test('progress --json returns valid JSON with real milestone data', () => {
     const output = execSync(`node "${cliPath}" progress --json`, { cwd: projectRoot, encoding: 'utf-8' });
     const parsed = JSON.parse(output);
     assert.strictEqual(parsed.command, 'progress');
+    assert.ok(parsed.milestone, 'Should have milestone');
+    assert.ok(parsed.milestone.name, 'Should have milestone name');
+    assert.ok(parsed.milestone.version, 'Should have milestone version');
+    assert.ok(Array.isArray(parsed.phases), 'Should have phases array');
+    assert.ok(parsed.progress, 'Should have progress');
   });
 
   test('progress --plain returns no ANSI codes', () => {
@@ -243,5 +251,115 @@ describe('gsd-cli binary', () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+// ─── handleProgress ─────────────────────────────────────────────────────────
+
+describe('handleProgress', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-progress-test-'));
+    const planningDir = path.join(tmpDir, '.planning');
+    fs.mkdirSync(path.join(planningDir, 'phases', '01-setup'), { recursive: true });
+    fs.mkdirSync(path.join(planningDir, 'phases', '02-feature'), { recursive: true });
+    // ROADMAP.md with milestone info
+    fs.writeFileSync(path.join(planningDir, 'ROADMAP.md'),
+      '### v1.0 Test Milestone (In Progress)\n\n- [ ] Phase 1: Setup\n- [ ] Phase 2: Feature\n');
+    // STATE.md with frontmatter
+    fs.writeFileSync(path.join(planningDir, 'STATE.md'),
+      '---\nmilestone: v1.0\nmilestone_name: Test Milestone\nstatus: active\n---\n');
+    // Phase 1: 2 plans, 2 summaries (complete)
+    fs.writeFileSync(path.join(planningDir, 'phases', '01-setup', '01-01-PLAN.md'), '---\nplan: 01\n---\n');
+    fs.writeFileSync(path.join(planningDir, 'phases', '01-setup', '01-02-PLAN.md'), '---\nplan: 02\n---\n');
+    fs.writeFileSync(path.join(planningDir, 'phases', '01-setup', '01-01-SUMMARY.md'), 'done');
+    fs.writeFileSync(path.join(planningDir, 'phases', '01-setup', '01-02-SUMMARY.md'), 'done');
+    // Phase 2: 2 plans, 1 summary (in progress)
+    fs.writeFileSync(path.join(planningDir, 'phases', '02-feature', '02-01-PLAN.md'), '---\nplan: 01\n---\n');
+    fs.writeFileSync(path.join(planningDir, 'phases', '02-feature', '02-02-PLAN.md'), '---\nplan: 02\n---\n');
+    fs.writeFileSync(path.join(planningDir, 'phases', '02-feature', '02-01-SUMMARY.md'), 'done');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('json mode returns milestone info (PROG-01)', () => {
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    assert.strictEqual(result.milestone.version, 'v1.0');
+    assert.strictEqual(result.milestone.name, 'Test Milestone');
+    assert.strictEqual(result.milestone.status, 'active');
+  });
+
+  test('json mode returns phases with status indicators (PROG-02)', () => {
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    assert.ok(Array.isArray(result.phases));
+    assert.strictEqual(result.phases.length, 2);
+    const phase1 = result.phases.find(p => p.number === '01');
+    const phase2 = result.phases.find(p => p.number === '02');
+    assert.strictEqual(phase1.status_indicator, 'complete');
+    assert.strictEqual(phase2.status_indicator, 'in_progress');
+  });
+
+  test('json mode returns plan counts per phase (PROG-03)', () => {
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    const phase1 = result.phases.find(p => p.number === '01');
+    const phase2 = result.phases.find(p => p.number === '02');
+    assert.strictEqual(phase1.plan_counts, '2/2 plans');
+    assert.strictEqual(phase2.plan_counts, '1/2 plans');
+  });
+
+  test('json mode returns progress bar data (PROG-04)', () => {
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    assert.strictEqual(typeof result.progress.percent, 'number');
+    assert.strictEqual(result.progress.total_plans, 4);
+    assert.strictEqual(result.progress.completed_plans, 3);
+    assert.strictEqual(result.progress.percent, 75);
+    assert.ok(result.progress.bar.length > 0);
+  });
+
+  test('json mode returns current position and next action (PROG-05)', () => {
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    assert.ok(result.current_position);
+    assert.strictEqual(result.current_position.phase, '02');
+    assert.ok(result.next_action);
+    assert.strictEqual(typeof result.next_action, 'string');
+    assert.ok(result.next_action.includes('02'));
+  });
+
+  test('rich mode returns message with ANSI codes', () => {
+    const result = routeCommand('progress', tmpDir, [], 'rich');
+    assert.ok(result.message);
+    assert.ok(result.message.includes('\x1b['));
+    assert.ok(result.message.includes('Test Milestone'));
+  });
+
+  test('handles missing .planning directory gracefully', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-progress-empty-'));
+    try {
+      const result = routeCommand('progress', emptyDir, [], 'json');
+      assert.ok(result.milestone);
+      assert.ok(Array.isArray(result.phases));
+      assert.strictEqual(result.phases.length, 0);
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  test('all complete phases shows milestone done', () => {
+    // Make phase 2 complete too
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '02-feature', '02-02-SUMMARY.md'), 'done');
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    assert.strictEqual(result.progress.percent, 100);
+    assert.ok(result.next_action.includes('complete'));
+  });
+
+  test('phase with no plans shows not_started', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-empty'), { recursive: true });
+    const result = routeCommand('progress', tmpDir, [], 'json');
+    const phase3 = result.phases.find(p => p.number === '03');
+    assert.strictEqual(phase3.status_indicator, 'not_started');
+    assert.strictEqual(phase3.plan_counts, '0 plans');
   });
 });
