@@ -11,6 +11,8 @@ key-files:
   modified:
     - get-shit-done/bin/lib/cli.cjs
     - get-shit-done/bin/gsd-cli.cjs
+requirements-completed:
+  - CLI-03
 deviations: none
 ---
 

@@ -12,6 +12,12 @@ key-files:
     - tests/cli.test.cjs
   modified:
     - package.json
+requirements-completed:
+  - CLI-01
+  - CLI-02
+  - CLI-04
+  - CLI-05
+  - CLI-06
 deviations: none
 ---
 
