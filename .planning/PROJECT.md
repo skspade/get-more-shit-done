@@ -30,7 +30,15 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+## Current Milestone: v1.2 Add Milestone Audit Loop
+
+**Goal:** Close the autopilot loop — after all phases execute, automatically audit the milestone and fix gaps until the audit passes, then complete the milestone.
+
+**Target features:**
+- Automatic milestone audit after all phases complete
+- Audit-fix-reaudit loop with configurable max iterations
+- Automatic gap planning and fix phase execution
+- Milestone completion on audit pass
 
 ### Out of Scope
 
@@ -74,4 +82,4 @@ Shipped v1.1 with git tagging fully removed from the complete-milestone workflow
 **Known tech debt:** 7 cosmetic items from v1.0 audit + 1 from v1.1 audit (`audit-milestone.md` line 197 "archive and tag" stale wording)
 
 ---
-*Last updated: 2026-03-03 after v1.1 milestone*
+*Last updated: 2026-03-03 after v1.2 milestone started*
