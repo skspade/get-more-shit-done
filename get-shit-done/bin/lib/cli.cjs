@@ -653,8 +653,176 @@ function handleHealth(projectRoot) {
   return { command: 'health', ...data, message };
 }
 
-function handleSettings() {
-  return { command: 'settings', message: 'Settings command not yet implemented. See Phase 18.' };
+// ─── Settings Command ───────────────────────────────────────────────────────
+
+/**
+ * Flatten a nested object to dot-notation key-value pairs.
+ * e.g., { workflow: { research: true } } -> [{ key: 'workflow.research', value: true }]
+ */
+function flattenConfig(obj, prefix) {
+  const result = [];
+  for (const [key, val] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      result.push(...flattenConfig(val, fullKey));
+    } else {
+      result.push({ key: fullKey, value: val });
+    }
+  }
+  return result;
+}
+
+/**
+ * Validate a setting key-value pair.
+ * Returns null if valid, or an error message string if invalid.
+ */
+function validateSetting(key, value) {
+  const validProfiles = ['quality', 'balanced', 'budget'];
+  const validStrategies = ['none', 'phase', 'milestone'];
+  const booleanKeys = ['commit_docs', 'search_gitignored', 'parallelization',
+    'workflow.research', 'workflow.plan_check', 'workflow.verifier', 'workflow.auto_advance'];
+
+  if (key === 'model_profile') {
+    if (!validProfiles.includes(value)) {
+      return `Invalid model_profile '${value}'. Valid values: ${validProfiles.join(', ')}`;
+    }
+  } else if (key === 'branching_strategy') {
+    if (!validStrategies.includes(value)) {
+      return `Invalid branching_strategy '${value}'. Valid values: ${validStrategies.join(', ')}`;
+    }
+  } else if (booleanKeys.includes(key)) {
+    if (typeof value !== 'boolean') {
+      return `'${key}' must be a boolean (true or false)`;
+    }
+  } else if (key === 'autopilot.circuit_breaker_threshold') {
+    if (!Number.isInteger(value) || value <= 0) {
+      return `'autopilot.circuit_breaker_threshold' must be a positive integer`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Gather settings data from .planning/config.json.
+ * Returns { settings: [...] } or { error: true, message: '...' }.
+ */
+function gatherSettingsData(projectRoot) {
+  const configPath = path.join(projectRoot, '.planning', 'config.json');
+
+  if (!fs.existsSync(configPath)) {
+    return { error: true, message: 'config.json not found. Run /gsd:health --repair to create defaults.' };
+  }
+
+  try {
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(raw);
+    const settings = flattenConfig(config);
+    return { settings };
+  } catch (err) {
+    return { error: true, message: `Failed to read config.json: ${err.message}` };
+  }
+}
+
+/**
+ * List of known top-level and dot-notation config keys for unknown-key detection.
+ */
+const KNOWN_SETTINGS_KEYS = [
+  'model_profile', 'commit_docs', 'search_gitignored', 'branching_strategy',
+  'phase_branch_template', 'milestone_branch_template',
+  'workflow', 'workflow.research', 'workflow.plan_check', 'workflow.verifier',
+  'workflow.auto_advance', 'workflow.nyquist_validation',
+  'parallelization', 'brave_search',
+  'autopilot', 'autopilot.circuit_breaker_threshold',
+  'mode', 'depth', 'model_overrides',
+  'research', 'plan_checker', 'verifier', 'nyquist_validation',
+];
+
+function handleSettings(projectRoot, args) {
+  const BOLD = '\x1b[1m';
+  const RESET = '\x1b[0m';
+  const DIM = '\x1b[2m';
+  const GREEN = '\x1b[32m';
+  const RED = '\x1b[31m';
+
+  // Set mode: gsd settings set <key> <value>
+  if (args && args.length > 0 && args[0] === 'set') {
+    const key = args[1];
+    const rawValue = args[2];
+
+    if (!key || rawValue === undefined || rawValue === null) {
+      return { command: 'settings', error: true, message: 'Usage: gsd settings set <key> <value>' };
+    }
+
+    // Parse value: booleans and numbers
+    let parsedValue = rawValue;
+    if (rawValue === 'true') parsedValue = true;
+    else if (rawValue === 'false') parsedValue = false;
+    else if (!isNaN(rawValue) && rawValue !== '') parsedValue = Number(rawValue);
+
+    // Validate
+    const validationError = validateSetting(key, parsedValue);
+    if (validationError) {
+      const message = `${RED}Error:${RESET} ${validationError}`;
+      return { command: 'settings', error: true, key, value: rawValue, message };
+    }
+
+    // Read config
+    const configPath = path.join(projectRoot, '.planning', 'config.json');
+    let config = {};
+    try {
+      if (fs.existsSync(configPath)) {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      }
+    } catch (err) {
+      return { command: 'settings', error: true, message: `Failed to read config.json: ${err.message}` };
+    }
+
+    // Set nested value using dot notation
+    const keys = key.split('.');
+    let current = config;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const k = keys[i];
+      if (current[k] === undefined || typeof current[k] !== 'object') {
+        current[k] = {};
+      }
+      current = current[k];
+    }
+    current[keys[keys.length - 1]] = parsedValue;
+
+    // Write back
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (err) {
+      return { command: 'settings', error: true, message: `Failed to write config.json: ${err.message}` };
+    }
+
+    // Build confirmation message
+    const isUnknown = !KNOWN_SETTINGS_KEYS.includes(key);
+    const lines = [];
+    if (isUnknown) {
+      lines.push(`${DIM}Note: '${key}' is not a recognized setting${RESET}`);
+    }
+    lines.push(`${GREEN}${key}${RESET} = ${BOLD}${parsedValue}${RESET} (updated)`);
+
+    return { command: 'settings', updated: true, key, value: parsedValue, message: lines.join('\n') };
+  }
+
+  // View mode: gsd settings
+  const data = gatherSettingsData(projectRoot);
+
+  if (data.error) {
+    return { command: 'settings', error: true, message: data.message };
+  }
+
+  const lines = [];
+  lines.push(`${BOLD}Settings (.planning/config.json)${RESET}`);
+  lines.push('');
+  for (const setting of data.settings) {
+    lines.push(`  ${DIM}${setting.key}${RESET} = ${BOLD}${setting.value}${RESET}`);
+  }
+
+  return { command: 'settings', settings: data.settings, message: lines.join('\n') };
 }
 
 function handleHelp() {
