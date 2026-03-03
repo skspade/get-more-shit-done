@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Remove Git Tagging
-status: executing
-last_updated: "2026-03-03T01:44:49.000Z"
+status: unknown
+last_updated: "2026-03-03T01:46:38.423Z"
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
   completed_plans: 3
 ---
