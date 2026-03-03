@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: — (milestone v1.3 complete)
 Plan: —
 Status: Milestone complete
-Last activity: 2026-03-03 — Milestone v1.3 CLI Utilities archived
+Last activity: 2026-03-03 - Completed quick task 1: Write README documenting CLI commands, arguments, and usage
 
 Progress: [██████████] 100%
 
@@ -63,6 +63,12 @@ None.
 ### Blockers/Concerns
 
 None.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Write README documenting CLI commands, arguments, and usage | 2026-03-03 | 6c58fe0 | [1-write-readme-documenting-cli-commands-ar](./quick/1-write-readme-documenting-cli-commands-ar/) |
 
 ## Session Continuity
 
