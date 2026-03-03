@@ -1,10 +1,11 @@
 {
-  "name": "get-shit-done-cc",
+  "name": "get-more-shit-done-cc",
   "version": "1.22.1",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js",
-    "gsd": "get-shit-done/bin/gsd-cli.cjs"
+    "get-more-shit-done-cc": "bin/install.js",
+    "gsd": "get-shit-done/bin/gsd-cli.cjs",
+    "gsdc": "get-shit-done/bin/gsd-cli.cjs"
   },
   "files": [
     "bin",
@@ -30,11 +31,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glittercowboy/get-shit-done.git"
+    "url": "git+https://github.com/skspade/get-more-shit-done.git"
   },
-  "homepage": "https://github.com/glittercowboy/get-shit-done",
+  "homepage": "https://github.com/skspade/get-more-shit-done",
   "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
+    "url": "https://github.com/skspade/get-more-shit-done/issues"
   },
   "engines": {
     "node": ">=16.7.0"
