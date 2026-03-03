@@ -5,7 +5,7 @@
 - ✅ **v1.0 GSD Autopilot** — Phases 1-7 (shipped 2026-03-02)
 - ✅ **v1.1 Remove Git Tagging** — Phases 8-9 (shipped 2026-03-03)
 - ✅ **v1.2 Add Milestone Audit Loop** — Phases 10-13 (shipped 2026-03-03)
-- 🚧 **v1.3 CLI Utilities** — Phases 14-18 (in progress)
+- 🚧 **v1.3 CLI Utilities** — Phases 14-19 (in progress)
 
 ## Phases
 
@@ -49,6 +49,7 @@
 - [x] **Phase 16: Todos Command** - List, filter, and inspect pending todos from the .planning/todos directory (completed 2026-03-03)
 - [x] **Phase 17: Health Command** - Validate .planning/ directory structure, config integrity, and state consistency (completed 2026-03-03)
 - [x] **Phase 18: Settings and Help Commands** - View/update config values and display command reference (completed 2026-03-03)
+- [ ] **Phase 19: Close Audit Gaps** - Fix SUMMARY frontmatter, create Phase 17 VERIFICATION.md, add TODO-02 test (Gap Closure)
 
 ## Phase Details
 
@@ -109,6 +110,18 @@
   5. User runs `gsd help <command>` and sees detailed usage, flags, and examples for that command
 **Plans**: TBD
 
+### Phase 19: Close Audit Gaps
+**Goal**: Close all documentation and test gaps identified by the v1.3 milestone audit so all 23 requirements reach "satisfied" status
+**Depends on**: Phases 14, 16, 17, 18
+**Requirements**: CLI-01, CLI-02, CLI-03, CLI-04, CLI-05, CLI-06, HLTH-01, HLTH-02, HLTH-03, HLTH-04, SETT-01, SETT-02, SETT-03, HELP-01, HELP-02
+**Gap Closure:** Closes gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 14 SUMMARY files have `requirements_completed` listing CLI-01 through CLI-06
+  2. Phase 17 has a VERIFICATION.md confirming HLTH-01 through HLTH-04
+  3. Phase 18 SUMMARY files have `requirements_completed` listing SETT-01-03 and HELP-01-02
+  4. TODO-02 has an automated test for `--area` flag
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -134,3 +147,4 @@ Phases execute in numeric order.
 | 16. Todos Command | v1.3 | Complete    | 2026-03-03 | - |
 | 17. Health Command | v1.3 | Complete    | 2026-03-03 | - |
 | 18. Settings and Help Commands | v1.3 | Complete    | 2026-03-03 | - |
+| 19. Close Audit Gaps | v1.3 | Not Started | - | - |
