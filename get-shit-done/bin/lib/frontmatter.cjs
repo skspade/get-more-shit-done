@@ -239,7 +239,7 @@ function cmdFrontmatterGet(cwd, filePath, field, raw) {
   if (field) {
     const value = fm[field];
     if (value === undefined) { output({ error: 'Field not found', field }, raw); return; }
-    output({ [field]: value }, raw, JSON.stringify(value));
+    output({ [field]: value }, raw, typeof value === 'string' ? value : JSON.stringify(value));
   } else {
     output(fm, raw);
   }
