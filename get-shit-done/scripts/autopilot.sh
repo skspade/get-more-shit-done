@@ -410,6 +410,53 @@ run_gap_closure_loop() {
   done
 }
 
+# ─── Milestone Completion ────────────────────────────────────────────────────
+
+run_milestone_completion() {
+  print_banner "MILESTONE COMPLETION"
+
+  # Extract milestone version from STATE.md
+  local version_raw
+  version_raw=$(gsd_tools frontmatter get .planning/STATE.md --field milestone --raw 2>/dev/null || echo "")
+
+  if [[ -z "$version_raw" ]]; then
+    echo "ERROR: Could not extract milestone version from STATE.md" >&2
+    echo "Expected frontmatter field 'milestone' (e.g., 'milestone: v1.2')" >&2
+    print_halt_report "Milestone version extraction failed" "milestone-completion" "1"
+    exit 1
+  fi
+
+  # Strip "v" prefix: "v1.2" -> "1.2"
+  local version="${version_raw#v}"
+
+  echo "Completing milestone: $version_raw ($version)"
+
+  # Invoke complete-milestone via claude with retry support
+  local completion_prompt="/gsd:complete-milestone $version
+
+IMPORTANT: This is running in autopilot mode. Auto-approve ALL interactive confirmations including:
+- Milestone readiness verification
+- Phase directory archival
+- Any other confirmation prompts
+Do not wait for human input at any step."
+
+  local completion_exit=0
+  run_step_with_retry "$completion_prompt" "milestone-completion" || completion_exit=$?
+
+  if [[ $completion_exit -ne 0 ]]; then
+    echo "ERROR: Milestone completion failed (exit $completion_exit)" >&2
+    print_halt_report "Milestone completion failed after retries" "milestone-completion" "$completion_exit"
+    exit 1
+  fi
+
+  print_banner "MILESTONE COMPLETE ✓"
+  echo "Milestone $version_raw completed successfully."
+  echo "Archival, PROJECT.md evolution, and commit performed."
+  echo ""
+
+  return 0
+}
+
 # ─── Step Execution ───────────────────────────────────────────────────────────
 
 construct_debug_prompt() {
