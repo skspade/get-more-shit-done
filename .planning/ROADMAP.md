@@ -36,6 +36,7 @@
 - [x] **Phase 10: Audit Trigger and Routing** - Autopilot triggers milestone audit after phases complete and routes based on result (completed 2026-03-03)
 - [x] **Phase 11: Gap Closure Loop** - Autopilot plans fixes, executes them, re-audits, and repeats with iteration limits (completed 2026-03-03)
 - [x] **Phase 12: Milestone Completion** - Autopilot invokes complete-milestone autonomously when audit passes (completed 2026-03-03)
+- [ ] **Phase 13: Verify Phase 12 Milestone Completion** - Formally verify COMP-01 and COMP-02 with VERIFICATION.md (Gap Closure)
 
 ## Phase Details
 
@@ -81,6 +82,19 @@ Plans:
 Plans:
 - [ ] 12-01: TBD
 
+### Phase 13: Verify Phase 12 Milestone Completion
+**Goal**: Formally verify COMP-01 and COMP-02 by creating Phase 12 VERIFICATION.md with evidence from implementation, integration checker, and SUMMARY.md
+**Depends on**: Phase 12
+**Requirements**: COMP-01, COMP-02
+**Gap Closure:** Closes orphaned requirement gaps from v1.2 audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 12 VERIFICATION.md exists and confirms COMP-01 (auto-invoke complete-milestone) with code evidence
+  2. Phase 12 VERIFICATION.md exists and confirms COMP-02 (autonomous execution) with code evidence
+  3. Re-audit shows COMP-01 and COMP-02 as satisfied (not orphaned)
+
+Plans:
+- [ ] 13-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -100,3 +114,4 @@ Phases execute in numeric order.
 | 10. Audit Trigger and Routing | 1/1 | Complete    | 2026-03-03 | - |
 | 11. Gap Closure Loop | v1.2 | Complete    | 2026-03-03 | - |
 | 12. Milestone Completion | 1/1 | Complete    | 2026-03-03 | - |
+| 13. Verify Phase 12 Milestone Completion | v1.2 | 0/0 | Pending | - |
