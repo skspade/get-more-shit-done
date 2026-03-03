@@ -260,8 +260,142 @@ function handleProgress(projectRoot) {
   return { command: 'progress', ...data, message };
 }
 
-function handleTodos() {
-  return { command: 'todos', message: 'Todos command not yet implemented. See Phase 16.' };
+// ─── Todos Command ─────────────────────────────────────────────────────────
+
+/**
+ * Read .planning/todos/pending/ and return structured todo data.
+ * Optionally filter by area.
+ */
+function gatherTodosData(projectRoot, area) {
+  const pendingDir = path.join(projectRoot, '.planning', 'todos', 'pending');
+  const todos = [];
+
+  try {
+    const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.md'));
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(pendingDir, file), 'utf-8');
+        const createdMatch = content.match(/^created:\s*(.+)$/m);
+        const titleMatch = content.match(/^title:\s*(.+)$/m);
+        const areaMatch = content.match(/^area:\s*(.+)$/m);
+
+        const todoArea = areaMatch ? areaMatch[1].trim() : 'general';
+
+        if (area && todoArea !== area) continue;
+
+        todos.push({
+          id: file.replace(/\.md$/, ''),
+          title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+          area: todoArea,
+          created: createdMatch ? createdMatch[1].trim() : 'unknown',
+        });
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  } catch {
+    // Directory doesn't exist -- return empty list
+  }
+
+  return { count: todos.length, todos };
+}
+
+/**
+ * Read a single todo file and return full details including body content.
+ * Returns null if the todo file does not exist.
+ */
+function getTodoDetail(projectRoot, todoId) {
+  const pendingDir = path.join(projectRoot, '.planning', 'todos', 'pending');
+  const filePath = path.join(pendingDir, todoId + '.md');
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const createdMatch = raw.match(/^created:\s*(.+)$/m);
+    const titleMatch = raw.match(/^title:\s*(.+)$/m);
+    const areaMatch = raw.match(/^area:\s*(.+)$/m);
+
+    // Extract body content after frontmatter closing ---
+    const firstDash = raw.indexOf('---');
+    const fmEnd = firstDash !== -1 ? raw.indexOf('---', firstDash + 3) : -1;
+    const body = fmEnd !== -1 ? raw.slice(fmEnd + 3).trim() : '';
+
+    return {
+      id: todoId,
+      title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+      area: areaMatch ? areaMatch[1].trim() : 'general',
+      created: createdMatch ? createdMatch[1].trim() : 'unknown',
+      content: body,
+      path: path.join('.planning', 'todos', 'pending', todoId + '.md'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function handleTodos(projectRoot, args, mode) {
+  // Parse --area flag from process.argv (parseArgs drops it)
+  let area = null;
+  const argv = process.argv;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--area=')) {
+      area = argv[i].slice('--area='.length);
+    } else if (argv[i] === '--area' && i + 1 < argv.length) {
+      area = argv[i + 1];
+    }
+  }
+
+  const BOLD = '\x1b[1m';
+  const RESET = '\x1b[0m';
+  const CYAN = '\x1b[36m';
+  const DIM = '\x1b[2m';
+
+  // Detail mode: gsd todos <id>
+  if (args && args.length > 0) {
+    const todoId = args[0];
+    const todo = getTodoDetail(projectRoot, todoId);
+
+    if (!todo) {
+      const message = `Todo not found: ${todoId}\nRun gsd todos to see available IDs.`;
+      return { command: 'todos', error: true, message };
+    }
+
+    const lines = [];
+    lines.push(`${BOLD}${todo.title}${RESET}`);
+    lines.push(`${DIM}ID:${RESET}      ${todo.id}`);
+    lines.push(`${DIM}Area:${RESET}    ${CYAN}${todo.area}${RESET}`);
+    lines.push(`${DIM}Created:${RESET} ${todo.created}`);
+    lines.push(`${DIM}Path:${RESET}    ${todo.path}`);
+    if (todo.content) {
+      lines.push('');
+      lines.push(todo.content);
+    }
+
+    return { command: 'todos', todo, message: lines.join('\n') };
+  }
+
+  // List mode: gsd todos [--area=X]
+  const data = gatherTodosData(projectRoot, area);
+
+  if (data.count === 0) {
+    const emptyMsg = area
+      ? `No pending todos matching area '${area}'`
+      : 'No pending todos';
+    return { command: 'todos', count: 0, todos: [], message: emptyMsg };
+  }
+
+  const lines = [];
+  const header = area
+    ? `${data.count} pending todo${data.count !== 1 ? 's' : ''} (area: ${area})`
+    : `${data.count} pending todo${data.count !== 1 ? 's' : ''}`;
+  lines.push(`${BOLD}${header}${RESET}`);
+  lines.push('');
+
+  for (const todo of data.todos) {
+    lines.push(`  ${DIM}${todo.id}${RESET}  ${CYAN}[${todo.area}]${RESET}  ${todo.title}`);
+  }
+
+  return { command: 'todos', count: data.count, todos: data.todos, message: lines.join('\n') };
 }
 
 function handleHealth() {
