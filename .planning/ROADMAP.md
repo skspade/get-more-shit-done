@@ -130,7 +130,7 @@ Phases execute in numeric order.
 | 12. Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 13. Verify Phase 12 Milestone Completion | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 14. CLI Infrastructure | 2/2 | Complete    | 2026-03-03 | - |
-| 15. Progress Command | 1/1 | Complete   | 2026-03-03 | - |
+| 15. Progress Command | 1/1 | Complete    | 2026-03-03 | - |
 | 16. Todos Command | v1.3 | 0/? | Not started | - |
 | 17. Health Command | v1.3 | 0/? | Not started | - |
 | 18. Settings and Help Commands | v1.3 | 0/? | Not started | - |

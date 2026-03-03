@@ -18,11 +18,11 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### Progress Command
 
-- [ ] **PROG-01**: User can see current milestone name, version, and status
-- [ ] **PROG-02**: User can see phase list with completion status
-- [ ] **PROG-03**: User can see plan completion counts per phase
-- [ ] **PROG-04**: User can see progress bar visualization
-- [ ] **PROG-05**: User can see current position and next suggested action
+- [x] **PROG-01**: User can see current milestone name, version, and status
+- [x] **PROG-02**: User can see phase list with completion status
+- [x] **PROG-03**: User can see plan completion counts per phase
+- [x] **PROG-04**: User can see progress bar visualization
+- [x] **PROG-05**: User can see current position and next suggested action
 
 ### Todos Command
 
@@ -83,11 +83,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-04 | Phase 14 | Complete |
 | CLI-05 | Phase 14 | Complete |
 | CLI-06 | Phase 14 | Complete |
-| PROG-01 | Phase 15 | Pending |
-| PROG-02 | Phase 15 | Pending |
-| PROG-03 | Phase 15 | Pending |
-| PROG-04 | Phase 15 | Pending |
-| PROG-05 | Phase 15 | Pending |
+| PROG-01 | Phase 15 | Complete |
+| PROG-02 | Phase 15 | Complete |
+| PROG-03 | Phase 15 | Complete |
+| PROG-04 | Phase 15 | Complete |
+| PROG-05 | Phase 15 | Complete |
 | TODO-01 | Phase 16 | Pending |
 | TODO-02 | Phase 16 | Pending |
 | TODO-03 | Phase 16 | Pending |
