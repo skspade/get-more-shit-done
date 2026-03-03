@@ -32,10 +32,10 @@ Requirements for CLI Utilities milestone. Each maps to roadmap phases.
 
 ### Health Command
 
-- [ ] **HLTH-01**: User can validate that required .planning/ files exist
-- [ ] **HLTH-02**: User can check config.json structure and values
-- [ ] **HLTH-03**: User can detect state inconsistencies (STATE.md vs ROADMAP.md)
-- [ ] **HLTH-04**: User can see errors and warnings with clear descriptions
+- [x] **HLTH-01**: User can validate that required .planning/ files exist
+- [x] **HLTH-02**: User can check config.json structure and values
+- [x] **HLTH-03**: User can detect state inconsistencies (STATE.md vs ROADMAP.md)
+- [x] **HLTH-04**: User can see errors and warnings with clear descriptions
 
 ### Settings Command
 
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TODO-01 | Phase 16 | Complete |
 | TODO-02 | Phase 16 | Complete |
 | TODO-03 | Phase 16 | Complete |
-| HLTH-01 | Phase 17 | Pending |
-| HLTH-02 | Phase 17 | Pending |
-| HLTH-03 | Phase 17 | Pending |
-| HLTH-04 | Phase 17 | Pending |
+| HLTH-01 | Phase 17 | Complete |
+| HLTH-02 | Phase 17 | Complete |
+| HLTH-03 | Phase 17 | Complete |
+| HLTH-04 | Phase 17 | Complete |
 | SETT-01 | Phase 18 | Pending |
 | SETT-02 | Phase 18 | Pending |
 | SETT-03 | Phase 18 | Pending |
@@ -108,4 +108,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after Phase 16 completion*
+*Last updated: 2026-03-03 after Phase 17 completion*
