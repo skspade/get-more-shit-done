@@ -179,7 +179,6 @@ Archive completed milestone and prepare for next version.
 
 - Creates MILESTONES.md entry with stats
 - Archives full details to milestones/ directory
-- Creates git tag for the release
 - Prepares workspace for next version
 
 Usage: `/gsd:complete-milestone 1.0.0`
