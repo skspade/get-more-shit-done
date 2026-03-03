@@ -12,6 +12,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
 - [Recovery Quick Reference](#recovery-quick-reference)
+- [CLI Reference](CLI.md)
 
 ---
 
@@ -469,3 +470,9 @@ For reference, here is what GSD creates in your project:
       RESEARCH.md         # Ecosystem research findings
       VERIFICATION.md     # Post-execution verification results
 ```
+
+---
+
+## CLI Reference
+
+The `gsd` standalone CLI provides commands for checking progress, managing todos, validating project health, and configuring settings from any terminal. See [CLI.md](CLI.md) for the full reference.

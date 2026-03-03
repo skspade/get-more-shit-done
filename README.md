@@ -521,6 +521,18 @@ You're never locked in. The system adapts.
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
 
+### Standalone CLI
+
+GSD also provides a standalone `gsd` command for use outside of Claude Code sessions. See the [CLI Reference](docs/CLI.md) for full documentation.
+
+```bash
+gsd progress    # Show milestone progress
+gsd todos       # List pending todos
+gsd health      # Validate project integrity
+gsd settings    # View/update configuration
+gsd help        # Show available commands
+```
+
 ---
 
 ## Configuration
