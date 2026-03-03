@@ -939,7 +939,19 @@ else
   if [[ -z "$CURRENT_PHASE" ]]; then
     print_banner "ALL PHASES COMPLETE ✓"
     echo "All phases in the milestone are already complete."
-    exit 0
+
+    # All phases already complete — trigger milestone audit
+    AUDIT_RESULT=0
+    run_milestone_audit || AUDIT_RESULT=$?
+
+    if [[ $AUDIT_RESULT -eq 0 ]]; then
+      exit 0
+    elif [[ $AUDIT_RESULT -eq 10 ]]; then
+      exit 10
+    else
+      echo "ERROR: Milestone audit encountered an error" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -1002,13 +1014,13 @@ while true; do
         print_final_report
 
         # All phases complete — trigger milestone audit
-        local audit_result=0
-        run_milestone_audit || audit_result=$?
+        AUDIT_RESULT=0
+        run_milestone_audit || AUDIT_RESULT=$?
 
-        if [[ $audit_result -eq 0 ]]; then
+        if [[ $AUDIT_RESULT -eq 0 ]]; then
           # Audit passed (or tech debt accepted) — signal milestone completion
           exit 0
-        elif [[ $audit_result -eq 10 ]]; then
+        elif [[ $AUDIT_RESULT -eq 10 ]]; then
           # Gaps found (or tech debt rejected) — signal gap closure needed
           exit 10
         else
