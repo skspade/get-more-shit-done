@@ -9,15 +9,15 @@ Requirements for removing automated git tagging from this fork.
 
 ### Workflow
 
-- [ ] **WF-01**: The `git_tag` step is removed from the `complete-milestone.md` workflow (no annotated tag creation)
-- [ ] **WF-02**: The git tag push prompt and logic is removed from the `complete-milestone.md` workflow
-- [ ] **WF-03**: The `complete-milestone.md` command spec no longer references git tagging
+- [x] **WF-01**: The `git_tag` step is removed from the `complete-milestone.md` workflow (no annotated tag creation)
+- [x] **WF-02**: The git tag push prompt and logic is removed from the `complete-milestone.md` workflow
+- [x] **WF-03**: The `complete-milestone.md` command spec no longer references git tagging
 
 ### Documentation
 
-- [ ] **DOC-01**: `help.md` no longer mentions "Creates git tag for the release"
-- [ ] **DOC-02**: `README.md` no longer references automated git tagging during milestone completion
-- [ ] **DOC-03**: `USER-GUIDE.md` no longer references automated git tagging
+- [x] **DOC-01**: `help.md` no longer mentions "Creates git tag for the release"
+- [x] **DOC-02**: `README.md` no longer references automated git tagging during milestone completion
+- [x] **DOC-03**: `USER-GUIDE.md` no longer references automated git tagging
 
 ## Future Requirements
 
@@ -35,12 +35,12 @@ None — this is a focused removal milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WF-01 | Phase 8 | Pending |
-| WF-02 | Phase 8 | Pending |
-| WF-03 | Phase 8 | Pending |
-| DOC-01 | Phase 8 | Pending |
-| DOC-02 | Phase 8 | Pending |
-| DOC-03 | Phase 8 | Pending |
+| WF-01 | Phase 8 | Complete |
+| WF-02 | Phase 8 | Complete |
+| WF-03 | Phase 8 | Complete |
+| DOC-01 | Phase 8 | Complete |
+| DOC-02 | Phase 8 | Complete |
+| DOC-03 | Phase 8 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 6 total
@@ -49,4 +49,4 @@ None — this is a focused removal milestone.
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after roadmap creation*
+*Last updated: 2026-03-02 after Phase 8 completion*
