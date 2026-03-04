@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back.
 
 ## Core Value
 
@@ -39,25 +39,15 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ `gsd help` — display GSD command reference — v1.3
 - ✓ Rich terminal output (ANSI colors, unicode formatting, tables) — v1.3
 - ✓ `--json` flag for machine-readable output on all commands — v1.3
+- ✓ `init linear` CLI command providing initialization data for Linear workflow — v1.4
+- ✓ `/gsd:linear` command spec with Linear MCP tools (get_issue, list_comments, create_comment) — v1.4
+- ✓ `linear.md` workflow — parse args, fetch issues via MCP, complexity scoring heuristic, dual-path delegation, comment-back — v1.4
+- ✓ STATE.md Linear issue ID column for quick task table — v1.4
+- ✓ USER-GUIDE.md and README.md documentation for `/gsd:linear` — v1.4
 
 ### Active
 
-- [ ] `init linear` CLI command providing initialization data for Linear workflow
-- [ ] `/gsd:linear` command spec (frontmatter, objective, execution_context)
-- [ ] `linear.md` workflow — parse args, fetch Linear issues via MCP, routing heuristic, synthesize context, delegate to quick/milestone, comment back
-- [ ] STATE.md Linear issue ID column for quick task table
-- [ ] USER-GUIDE.md and README.md documentation for `/gsd:linear`
-
-## Current Milestone: v1.4 Linear Integration
-
-**Goal:** Add a `/gsd:linear` slash command that reads Linear issues via MCP, auto-routes to quick or milestone, and posts summary comments back.
-
-**Target features:**
-- `init linear` CLI command for initialization data
-- `/gsd:linear` command spec
-- `linear.md` workflow (fetch, route, synthesize, delegate, comment-back)
-- STATE.md tracking for Linear-originated tasks
-- Documentation updates
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -70,6 +60,10 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Interactive prompts (inquirer-style) — CLI is read-only for v1.3; interactive editing adds complexity
 - Package manager distribution (npm publish) — focus on local install first
 - Shell completions (bash/zsh) — nice-to-have, deferred
+- Linear issue creation from GSD — read-only integration for v1.4; creating issues adds write-side complexity
+- Linear project/cycle mapping — focus on individual issue routing, not project-level sync
+- Webhook-driven automation — MCP-based pull model is simpler and sufficient
+- Linear issue status updates — comment-back is sufficient; status transitions managed in Linear
 
 ## Constraints
 
@@ -102,15 +96,20 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Inline data gathering over calling existing commands | Avoids output() side-effects from existing functions | Good — clean separation of concerns |
 | gatherXData/handleX pattern for all commands | Consistent handler architecture across progress, todos, health, settings, help | Good — predictable, testable |
 | Read-only CLI except settings set | Minimizes risk; deterministic reads are the primary use case | Good — simple and safe |
+| Single workflow file for both quick and milestone routes | Inline delegation avoids subagent spawning limitations | Good — simpler control flow |
+| Additive complexity scoring heuristic | 6 factors (issue count, sub-issues, description length, labels, relations) combined into single score | Good — transparent routing decisions |
+| Error on conflicting flags (--quick + --milestone) | Explicit error vs first-wins prevents ambiguous intent | Good — clear UX |
+| MCP failures warn-and-continue for comment-back | Primary work already committed; non-critical MCP failures shouldn't fail the workflow | Good — resilient completion |
+| No Linear-specific data in init output | MCP tool names and issue ID formats belong in workflow, not init | Good — clean separation of concerns |
 
 ## Context
 
-Shipped v1.3 with standalone `gsd` CLI providing 5 deterministic commands. 4 milestones shipped (v1.0, v1.1, v1.2, v1.3) across 19 phases, 28 plans. Starting v1.4 to add Linear issue integration.
+Shipped v1.4 with Linear issue integration. 5 milestones shipped (v1.0, v1.1, v1.2, v1.3, v1.4) across 24 phases, 33 plans.
 
-**Architecture:** Core autopilot loop unchanged. New `gsd` CLI binary (`get-shit-done/bin/gsd-cli.cjs`) with `cli.cjs` module providing project discovery, argument parsing, command routing, and output formatting. 86 CLI tests.
-**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
-**Codebase:** ~20,900 LOC JavaScript/CJS
+**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. New `/gsd:linear` command backed by `linear.md` workflow (510 lines) providing issue-driven MCP integration with complexity-based routing.
+**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
+**Codebase:** ~18,040 LOC JavaScript/CJS
 **Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics)
 
 ---
-*Last updated: 2026-03-03 after v1.4 milestone start*
+*Last updated: 2026-03-03 after v1.4 milestone*

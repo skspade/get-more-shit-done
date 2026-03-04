@@ -165,6 +165,50 @@
 
 ---
 
+## Milestone: v1.4 — Linear Integration
+
+**Shipped:** 2026-03-03
+**Phases:** 5 | **Plans:** 5 | **Commits:** 29
+
+### What Was Built
+- `/gsd:linear` command spec with Linear MCP tool integration (get_issue, list_comments, create_comment)
+- `linear.md` workflow (510 lines) — argument parsing, MCP issue fetching, 6-factor complexity scoring heuristic
+- Dual-path delegation: quick route (score < 3) or milestone route (score >= 3) with flag overrides
+- Comment-back loop posting route-specific summary comments to Linear issues after completion
+- USER-GUIDE.md documentation (command reference, flags table, heuristic explanation, 6 usage examples)
+
+### What Worked
+- Single workflow file pattern: inline delegation avoided subagent spawning limitations while keeping all logic in one place
+- Additive complexity scoring: transparent routing with 6 factors, easy to understand and adjust threshold
+- MCP tool integration: get_issue with includeRelations + list_comments provided complete issue context in 2 calls
+- Gap closure Phase 24 was minimal (2 edits) — only portable paths and missing frontmatter, both caught by audit
+- Entire milestone completed in 1 day with 5 phases, clean audit on second pass
+
+### What Was Inefficient
+- Phase 23 SUMMARY.md missing requirements_completed frontmatter — same recurring gap as v1.3, caught by audit
+- Command spec used absolute path initially — portability concern caught by audit, not during Phase 20 execution
+- Phase completion dates in ROADMAP progress table had formatting inconsistency (missing milestone column for phases 20-24)
+
+### Patterns Established
+- MCP tool integration pattern: get_issue (includeRelations) + list_comments for full issue context
+- Complexity scoring heuristic: additive points from multiple signals combined into single routing score
+- Inline workflow delegation: execute another workflow's steps within a parent workflow, avoiding subagent spawning
+- Comment-back pattern: build route-specific markdown body, iterate issues, call create_comment for each
+- Warn-and-continue error handling: non-critical MCP failures display warning but don't fail the workflow
+
+### Key Lessons
+1. Portable paths (`@~/.claude/...`) should be the default for all command specs — absolute paths are a recurring defect
+2. SUMMARY frontmatter completeness continues to be the #1 audit gap — needs enforcement at execution time (3rd milestone in a row)
+3. Inline workflow delegation is a viable pattern when subagent spawning isn't possible — keeps control flow simple
+4. MCP integration is straightforward when tool names are declared in command spec allowed-tools — no runtime discovery needed
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for plan checker/verifier)
+- Sessions: 5 plan executions across 5 phases
+- Notable: MCP workflow development was fast — no external API setup, Linear MCP tools just work when declared
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -175,10 +219,12 @@
 | v1.1 | 15 | 2 | First removal milestone — confirmed audit-gap-closure cycle works |
 | v1.2 | 29 | 4 | Automated the audit-gap-closure cycle itself — now runs without human intervention |
 | v1.3 | 49 | 6 | First feature milestone post-automation — CLI tooling with consistent handler pattern |
+| v1.4 | 29 | 5 | First MCP integration milestone — Linear issue-driven workflows with complexity routing |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase)
-2. SUMMARY frontmatter completeness is the #1 recurring audit gap — needs execution-time enforcement
+1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase), v1.4 (1 phase)
+2. SUMMARY frontmatter completeness is the #1 recurring audit gap — needs execution-time enforcement (v1.3, v1.4 both hit this)
 3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in v1.0 Phase 6, v1.2 Phase 13, v1.3 Phase 19)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
+5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)

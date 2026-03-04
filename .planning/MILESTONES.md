@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.4 Linear Integration (Shipped: 2026-03-04)
+
+**Phases completed:** 5 phases, 5 plans, 7 tasks
+**Timeline:** 1 day (2026-03-03)
+**Git range:** aa006a0 → cce03d0 (29 commits)
+
+**Key accomplishments:**
+- Created `/gsd:linear` command with Linear MCP tool integration (get_issue, list_comments, create_comment)
+- Built `linear.md` workflow (510 lines) with argument parsing, issue fetching, and 6-factor complexity scoring heuristic
+- Implemented dual-path delegation — quick or milestone route based on complexity score threshold
+- Added comment-back loop posting route-specific summary comments to Linear issues after workflow completion
+- Documented Linear integration in USER-GUIDE.md (command reference, flags table, 6 usage examples) and README.md
+
+---
+
 ## v1.3 CLI Utilities (Shipped: 2026-03-03)
 
 **Phases completed:** 6 phases, 9 plans
