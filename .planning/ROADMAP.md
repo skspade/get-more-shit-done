@@ -72,7 +72,7 @@
 - [x] **Phase 25: Command Spec and Workflow Foundation** - Command file, workflow file, and brainstorming process through approach proposals (completed 2026-03-04)
 - [x] **Phase 26: Design Presentation and Output** - Interactive design sections, revision loop, and design doc writing to `.planning/designs/` (completed 2026-03-04)
 - [x] **Phase 27: GSD Routing Integration** - Auto-detect PROJECT.md and seed design context into new-milestone or new-project flow (completed 2026-03-04)
-- [ ] **Phase 28: Documentation** - help.md, USER-GUIDE.md, and README.md updates
+- [x] **Phase 28: Documentation** - help.md, USER-GUIDE.md, and README.md updates (completed 2026-03-04)
 
 ## Phase Details
 
@@ -153,4 +153,4 @@ Phases execute in numeric order.
 | 25. Command Spec and Workflow Foundation | 1/1 | Complete    | 2026-03-04 | - |
 | 26. Design Presentation and Output | 1/1 | Complete    | 2026-03-04 | - |
 | 27. GSD Routing Integration | v1.5 | 1/1 | Complete | 2026-03-04 |
-| 28. Documentation | v1.5 | 0/TBD | Not started | - |
+| 28. Documentation | 1/1 | Complete   | 2026-03-04 | - |
