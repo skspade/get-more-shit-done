@@ -73,9 +73,10 @@ None.
 | 2 | Update package.json and related references for fork identity | 2026-03-03 | 2c4d40a | [2-update-package-json-and-related-referenc](./quick/2-update-package-json-and-related-referenc/) |
 | 3 | Fix phase regex in verify.cjs to match colon format | 2026-03-03 | dde55ee | [3-fix-phase-regex-in-verify-cjs-to-match-c](./quick/3-fix-phase-regex-in-verify-cjs-to-match-c/) |
 | 4 | Remove GitHub Actions and NPM publishing configuration | 2026-03-04 | cdf2ff3 | [4-remove-github-actions-and-npm-publishing](./quick/4-remove-github-actions-and-npm-publishing/) |
+| 5 | Replace the GSDC CLI alias with GMSD | 2026-03-04 | c353318 | [5-replace-the-gsdc-cli-alias-with-gmsd](./quick/5-replace-the-gsdc-cli-alias-with-gmsd/) |
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: v1.4 milestone archived — ready for /gsd:new-milestone
+Last session: 2026-03-04
+Stopped at: Completed quick task 5 — rename gsdc alias to gmsd
 Resume file: None
