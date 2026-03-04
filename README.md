@@ -518,6 +518,7 @@ You're never locked in. The system adapts.
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
 | `/gsd:quick [--full]` | Execute ad-hoc task with GSD guarantees (`--full` adds plan-checking and verification) |
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
+| `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone |
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
 
