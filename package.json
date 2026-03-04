@@ -5,7 +5,7 @@
   "bin": {
     "get-more-shit-done-cc": "bin/install.js",
     "gsd": "get-shit-done/bin/gsd-cli.cjs",
-    "gsdc": "get-shit-done/bin/gsd-cli.cjs"
+    "gmsd": "get-shit-done/bin/gsd-cli.cjs"
   },
   "author": "TÂCHES",
   "license": "MIT",
