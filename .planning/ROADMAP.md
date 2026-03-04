@@ -61,7 +61,7 @@
 - [x] **Phase 21: Core Workflow** - Linear workflow with argument parsing, issue fetching, routing heuristic, and delegation (completed 2026-03-04)
 - [x] **Phase 22: Completion Loop** - Comment-back to Linear issues and temporary file cleanup (completed 2026-03-04)
 - [x] **Phase 23: Documentation** - USER-GUIDE.md and README.md updates for /gsd:linear (completed 2026-03-04)
-- [ ] **Phase 24: Close Audit Gaps** - Fix portability defect and bookkeeping gaps (Gap Closure)
+- [x] **Phase 24: Close Audit Gaps** - Fix portability defect and bookkeeping gaps (Gap Closure) (completed 2026-03-04)
 
 ## Phase Details
 
@@ -162,4 +162,4 @@ Phases execute in numeric order.
 | 21. Core Workflow | 1/1 | Complete    | 2026-03-04 | - |
 | 22. Completion Loop | 1/1 | Complete    | 2026-03-04 | - |
 | 23. Documentation | 1/1 | Complete   | 2026-03-04 | - |
-| 24. Close Audit Gaps | v1.4 | 0/1 | Planned | - |
+| 24. Close Audit Gaps | 1/1 | Complete   | 2026-03-04 | - |
