@@ -27,8 +27,8 @@ Requirements for GSD Brainstorming Command milestone.
 
 ### GSD Routing
 
-- [ ] **ROUTE-01**: After design approval, workflow auto-detects: PROJECT.md exists → new-milestone flow, no PROJECT.md → new-project flow
-- [ ] **ROUTE-02**: Design doc context is seeded into the milestone/project creation flow, replacing the questioning phase
+- [x] **ROUTE-01**: After design approval, workflow auto-detects: PROJECT.md exists → new-milestone flow, no PROJECT.md → new-project flow
+- [x] **ROUTE-02**: Design doc context is seeded into the milestone/project creation flow, replacing the questioning phase
 
 ### Documentation
 
@@ -64,8 +64,8 @@ Requirements for GSD Brainstorming Command milestone.
 | BRAIN-05 | Phase 26 | Pending |
 | DESIGN-01 | Phase 26 | Pending |
 | DESIGN-02 | Phase 26 | Pending |
-| ROUTE-01 | Phase 27 | Pending |
-| ROUTE-02 | Phase 27 | Pending |
+| ROUTE-01 | Phase 27 | Complete |
+| ROUTE-02 | Phase 27 | Complete |
 | DOCS-01 | Phase 28 | Pending |
 | DOCS-02 | Phase 28 | Pending |
 | DOCS-03 | Phase 28 | Pending |
