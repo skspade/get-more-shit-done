@@ -205,6 +205,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 | `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone | Have a Linear issue to implement |
+| `/gsd:brainstorm [topic]` | Collaborative brainstorming that produces a design doc and routes into milestone/project creation | Want to explore an idea before committing to implementation |
 
 ---
 
@@ -422,6 +423,18 @@ When no flag is provided, GSD scores the issue on six factors: multiple issues (
 ```
 
 After completion, GSD posts a summary comment back to each Linear issue with the task result or milestone details.
+
+### Brainstorming
+
+```bash
+# Start a brainstorming session
+/gsd:brainstorm
+
+# Seed with a specific topic
+/gsd:brainstorm "add webhook support"
+```
+
+**Flow:** The brainstorm command explores your codebase, asks clarifying questions, proposes approaches, and builds a design document section by section. After approval, it offers to create a milestone or project from the design.
 
 ---
 
