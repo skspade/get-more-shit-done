@@ -7,7 +7,7 @@
 - ✅ **v1.2 Add Milestone Audit Loop** — Phases 10-13 (shipped 2026-03-03)
 - ✅ **v1.3 CLI Utilities** — Phases 14-19 (shipped 2026-03-03)
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
-- 🚧 **v1.5 GSD Brainstorming Command** — Phases 25-28 (in progress)
+- 🚧 **v1.5 GSD Brainstorming Command** — Phases 25-29 (in progress)
 
 ## Phases
 
@@ -65,7 +65,7 @@
 
 </details>
 
-### 🚧 v1.5 GSD Brainstorming Command (In Progress)
+### 🚧 v1.5 GSD Brainstorming Command (Phases 25-29, In Progress)
 
 **Milestone Goal:** Add `/gsd:brainstorm` command that runs a collaborative brainstorming process, writes a design doc, then auto-routes into GSD milestone/project creation — bridging idea exploration to execution without manual handoff.
 
@@ -73,6 +73,19 @@
 - [x] **Phase 26: Design Presentation and Output** - Interactive design sections, revision loop, and design doc writing to `.planning/designs/` (completed 2026-03-04)
 - [x] **Phase 27: GSD Routing Integration** - Auto-detect PROJECT.md and seed design context into new-milestone or new-project flow (completed 2026-03-04)
 - [x] **Phase 28: Documentation** - help.md, USER-GUIDE.md, and README.md updates (completed 2026-03-04)
+- [ ] **Phase 29: Close Audit Gaps** - Create missing Phase 27 verification artifacts, fix stale REQUIREMENTS.md checkboxes (Gap Closure)
+
+### Phase 29: Close Audit Gaps
+**Goal**: Create missing Phase 27 verification artifacts and fix stale REQUIREMENTS.md checkboxes so all requirements are formally verified
+**Depends on**: Phase 28
+**Requirements**: ROUTE-01, ROUTE-02 (verification), BRAIN-04, BRAIN-05, DESIGN-01, DESIGN-02 (checkbox fix)
+**Gap Closure**: Closes gaps from v1.5 audit
+**Success Criteria** (what must be TRUE):
+  1. `27-01-SUMMARY.md` exists with plan outcomes from EXECUTION.md
+  2. `27-VERIFICATION.md` exists confirming ROUTE-01 and ROUTE-02
+  3. REQUIREMENTS.md checkboxes for BRAIN-04, BRAIN-05, DESIGN-01, DESIGN-02 are checked
+  4. Traceability table statuses updated to Complete for all satisfied requirements
+**Plans**: TBD
 
 ## Phase Details
 
@@ -154,3 +167,4 @@ Phases execute in numeric order.
 | 26. Design Presentation and Output | 1/1 | Complete    | 2026-03-04 | - |
 | 27. GSD Routing Integration | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 28. Documentation | 1/1 | Complete    | 2026-03-04 | - |
+| 29. Close Audit Gaps | v1.5 | 0/1 | Pending | - |

@@ -17,13 +17,13 @@ Requirements for GSD Brainstorming Command milestone.
 - [x] **BRAIN-01**: Session explores project context (files, docs, recent commits) before asking questions
 - [x] **BRAIN-02**: Session asks clarifying questions one at a time, preferring multiple choice
 - [x] **BRAIN-03**: Session proposes 2-3 approaches with trade-offs and a recommendation
-- [ ] **BRAIN-04**: Session presents design in sections scaled to complexity, with approval after each section
-- [ ] **BRAIN-05**: User can request revisions to design sections before approving
+- [x] **BRAIN-04**: Session presents design in sections scaled to complexity, with approval after each section
+- [x] **BRAIN-05**: User can request revisions to design sections before approving
 
 ### Design Output
 
-- [ ] **DESIGN-01**: Approved design is written to `.planning/designs/YYYY-MM-DD-<topic>-design.md`
-- [ ] **DESIGN-02**: Design doc is committed to git after writing
+- [x] **DESIGN-01**: Approved design is written to `.planning/designs/YYYY-MM-DD-<topic>-design.md`
+- [x] **DESIGN-02**: Design doc is committed to git after writing
 
 ### GSD Routing
 
@@ -60,12 +60,12 @@ Requirements for GSD Brainstorming Command milestone.
 | BRAIN-01 | Phase 25 | Complete |
 | BRAIN-02 | Phase 25 | Complete |
 | BRAIN-03 | Phase 25 | Complete |
-| BRAIN-04 | Phase 26 | Pending |
-| BRAIN-05 | Phase 26 | Pending |
-| DESIGN-01 | Phase 26 | Pending |
-| DESIGN-02 | Phase 26 | Pending |
-| ROUTE-01 | Phase 27 | Complete |
-| ROUTE-02 | Phase 27 | Complete |
+| BRAIN-04 | Phase 26 | Complete |
+| BRAIN-05 | Phase 26 | Complete |
+| DESIGN-01 | Phase 26 | Complete |
+| DESIGN-02 | Phase 26 | Complete |
+| ROUTE-01 | Phase 29 | Pending |
+| ROUTE-02 | Phase 29 | Pending |
 | DOCS-01 | Phase 28 | Complete |
 | DOCS-02 | Phase 28 | Complete |
 | DOCS-03 | Phase 28 | Complete |
