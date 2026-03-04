@@ -204,6 +204,7 @@ rapid prototyping phases where test infrastructure isn't the focus.
 | `/gsd:settings` | Configure workflow toggles and model profile | Change model, toggle agents |
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
+| `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone | Have a Linear issue to implement |
 
 ---
 
