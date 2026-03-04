@@ -6,6 +6,7 @@
 - ✅ **v1.1 Remove Git Tagging** — Phases 8-9 (shipped 2026-03-03)
 - ✅ **v1.2 Add Milestone Audit Loop** — Phases 10-13 (shipped 2026-03-03)
 - ✅ **v1.3 CLI Utilities** — Phases 14-19 (shipped 2026-03-03)
+- 🚧 **v1.4 Linear Integration** — Phases 20-23 (in progress)
 
 ## Phases
 
@@ -52,6 +53,71 @@
 
 </details>
 
+### 🚧 v1.4 Linear Integration (In Progress)
+
+**Milestone Goal:** Add a `/gsd:linear` slash command that reads Linear issues via MCP, auto-routes to quick or milestone, and posts summary comments back.
+
+- [ ] **Phase 20: Foundation** - CLI init command and command spec for Linear integration
+- [ ] **Phase 21: Core Workflow** - Linear workflow with argument parsing, issue fetching, routing heuristic, and delegation
+- [ ] **Phase 22: Completion Loop** - Comment-back to Linear issues and temporary file cleanup
+- [ ] **Phase 23: Documentation** - USER-GUIDE.md and README.md updates for /gsd:linear
+
+## Phase Details
+
+### Phase 20: Foundation
+**Goal**: Linear integration has its CLI plumbing and command entry point ready for the workflow
+**Depends on**: Phase 19 (v1.3 complete)
+**Requirements**: INIT-01, CMD-01
+**Success Criteria** (what must be TRUE):
+  1. Running `gsd-tools.cjs init linear` returns JSON with models, paths, quick task numbering, and config data
+  2. The `/gsd:linear` command spec exists and is discoverable by Claude Code with correct allowed-tools (including Linear MCP tools)
+  3. All existing tests pass after adding the new init subcommand
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: TBD
+
+### Phase 21: Core Workflow
+**Goal**: Users can invoke `/gsd:linear ISSUE-ID` to fetch a Linear issue, have it auto-routed to quick or milestone, and have the appropriate GSD workflow execute end-to-end
+**Depends on**: Phase 20
+**Requirements**: WKFL-01, WKFL-02, WKFL-03, WKFL-04, WKFL-05, WKFL-06
+**Success Criteria** (what must be TRUE):
+  1. Workflow parses issue IDs and flags (--quick, --milestone, --full) from arguments, prompting if no issue ID provided
+  2. Workflow fetches issue data and comments from Linear via MCP tools and displays what was fetched
+  3. Routing heuristic scores issues on count, sub-issues, description length, labels, and relations, choosing quick (score < 3) or milestone (score >= 3)
+  4. Flag overrides (--quick, --milestone) bypass the heuristic entirely
+  5. Quick route synthesizes a description and delegates to the quick workflow; milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: TBD
+
+### Phase 22: Completion Loop
+**Goal**: After workflow delegation completes, Linear issues receive a summary comment and temporary files are cleaned up
+**Depends on**: Phase 21
+**Requirements**: WKFL-07, WKFL-08
+**Success Criteria** (what must be TRUE):
+  1. After quick task completion, a summary comment with task description, commit hash, and summary excerpt is posted to each Linear issue via MCP
+  2. After milestone initialization, a summary comment with milestone name, phase count, and requirement count is posted to each Linear issue via MCP
+  3. The temporary `.planning/linear-context.md` file is deleted after completion
+**Plans**: TBD
+
+Plans:
+- [ ] 22-01: TBD
+
+### Phase 23: Documentation
+**Goal**: Users can find /gsd:linear usage, flags, and examples in the project documentation
+**Depends on**: Phase 21
+**Requirements**: DOCS-01, DOCS-02
+**Success Criteria** (what must be TRUE):
+  1. USER-GUIDE.md includes /gsd:linear in the command reference table with argument hints
+  2. USER-GUIDE.md has a Linear Integration section with flag descriptions and usage examples
+  3. README.md mentions the Linear integration capability
+**Plans**: TBD
+
+Plans:
+- [ ] 23-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -78,3 +144,7 @@ Phases execute in numeric order.
 | 17. Health Command | v1.3 | 1/1 | Complete | 2026-03-03 |
 | 18. Settings and Help Commands | v1.3 | 2/2 | Complete | 2026-03-03 |
 | 19. Close Audit Gaps | v1.3 | 2/2 | Complete | 2026-03-03 |
+| 20. Foundation | v1.4 | 0/0 | Not started | - |
+| 21. Core Workflow | v1.4 | 0/0 | Not started | - |
+| 22. Completion Loop | v1.4 | 0/0 | Not started | - |
+| 23. Documentation | v1.4 | 0/0 | Not started | - |

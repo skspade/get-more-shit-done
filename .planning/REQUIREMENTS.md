@@ -51,24 +51,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INIT-01 | — | Pending |
-| CMD-01 | — | Pending |
-| WKFL-01 | — | Pending |
-| WKFL-02 | — | Pending |
-| WKFL-03 | — | Pending |
-| WKFL-04 | — | Pending |
-| WKFL-05 | — | Pending |
-| WKFL-06 | — | Pending |
-| WKFL-07 | — | Pending |
-| WKFL-08 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
+| INIT-01 | Phase 20 | Pending |
+| CMD-01 | Phase 20 | Pending |
+| WKFL-01 | Phase 21 | Pending |
+| WKFL-02 | Phase 21 | Pending |
+| WKFL-03 | Phase 21 | Pending |
+| WKFL-04 | Phase 21 | Pending |
+| WKFL-05 | Phase 21 | Pending |
+| WKFL-06 | Phase 21 | Pending |
+| WKFL-07 | Phase 22 | Pending |
+| WKFL-08 | Phase 22 | Pending |
+| DOCS-01 | Phase 23 | Pending |
+| DOCS-02 | Phase 23 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 after roadmap creation*
