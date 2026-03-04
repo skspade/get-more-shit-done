@@ -382,6 +382,47 @@ claude --dangerously-skip-permissions
 /gsd:remove-phase 7         # Descope phase 7 and renumber
 ```
 
+### Linear Integration
+
+Route Linear issues directly to GSD workflows. Requires the Linear MCP plugin.
+
+#### Flags
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Auto-route based on complexity scoring |
+| `--quick` | Force quick task route (skip scoring) |
+| `--milestone` | Force milestone route (skip scoring) |
+| `--full` | Add plan-checking and verification to quick route |
+
+#### Routing Heuristic
+
+When no flag is provided, GSD scores the issue on six factors: multiple issues (+3), sub-issues (+2), long description (+1), feature/epic labels (+2), bug/fix/chore/docs labels (-1), and relations (+1). Score >= 3 routes to milestone; < 3 routes to quick task.
+
+#### Examples
+
+```bash
+# Route a single bug fix (likely scores as quick)
+/gsd:linear BUG-42
+
+# Route a feature epic (likely scores as milestone)
+/gsd:linear FEAT-100
+
+# Force quick task regardless of complexity
+/gsd:linear FEAT-100 --quick
+
+# Force milestone regardless of simplicity
+/gsd:linear BUG-42 --milestone
+
+# Multiple issues (auto-routes to milestone, score +3)
+/gsd:linear FEAT-100 FEAT-101 FEAT-102
+
+# Quick task with plan-checking and verification
+/gsd:linear BUG-42 --full
+```
+
+After completion, GSD posts a summary comment back to each Linear issue with the task result or milestone details.
+
 ---
 
 ## Troubleshooting
