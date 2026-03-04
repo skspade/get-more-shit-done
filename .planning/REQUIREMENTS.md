@@ -23,8 +23,8 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 - [x] **WKFL-04**: Flag overrides (`--quick`, `--milestone`) bypass routing heuristic
 - [x] **WKFL-05**: Quick route synthesizes description and delegates to quick workflow
 - [x] **WKFL-06**: Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow
-- [ ] **WKFL-07**: Summary comment posted back to Linear issues after completion
-- [ ] **WKFL-08**: Cleanup removes temporary linear-context.md after completion
+- [x] **WKFL-07**: Summary comment posted back to Linear issues after completion
+- [x] **WKFL-08**: Cleanup removes temporary linear-context.md after completion
 
 ### Documentation
 
@@ -59,8 +59,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WKFL-04 | Phase 21 | Complete |
 | WKFL-05 | Phase 21 | Complete |
 | WKFL-06 | Phase 21 | Complete |
-| WKFL-07 | Phase 22 | Pending |
-| WKFL-08 | Phase 22 | Pending |
+| WKFL-07 | Phase 22 | Complete |
+| WKFL-08 | Phase 22 | Complete |
 | DOCS-01 | Phase 23 | Pending |
 | DOCS-02 | Phase 23 | Pending |
 
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after roadmap creation*
+*Last updated: 2026-03-03 after Phase 22 completion*
