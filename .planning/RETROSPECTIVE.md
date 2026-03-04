@@ -209,6 +209,47 @@
 
 ---
 
+## Milestone: v1.5 — GSD Brainstorming Command
+
+**Shipped:** 2026-03-04
+**Phases:** 5 | **Plans:** 5 | **Tasks:** 14
+
+### What Was Built
+- `/gsd:brainstorm` command with 10-step workflow covering context exploration through GSD routing
+- Per-section design approval loop with unlimited revision rounds via AskUserQuestion
+- Design doc output to `.planning/designs/YYYY-MM-DD-<topic>-design.md` with automatic git commit
+- Auto-detect routing: PROJECT.md exists → new-milestone flow, else → new-project flow
+- MILESTONE-CONTEXT.md bridge seeding design sections into milestone creation
+
+### What Worked
+- In-place workflow extension: single brainstorm.md file grew from 5 steps (Phase 25) to 10 steps (Phase 27) across 3 phases
+- Reusing AskUserQuestion pattern for all interactions: consistent UX across topic prompt, questions, approach selection, section approval
+- Gap closure (Phase 29) was minimal: 2 missing artifacts and checkbox updates, all fixed in 2 minutes
+- Entire milestone completed in a single day (5 phases, 14 tasks, all 14 requirements satisfied)
+
+### What Was Inefficient
+- Phase 27 execution didn't produce SUMMARY.md or VERIFICATION.md — required Phase 29 gap closure to retroactively create them (same recurring issue)
+- ROADMAP progress table had formatting inconsistencies for phases 25-26 and 28-29 (missing milestone column)
+- Two audit passes needed: first found missing Phase 27 artifacts and stale checkboxes, gap closure resolved both
+
+### Patterns Established
+- Interactive design session pattern: context-first → questions → proposals → per-section approval → doc output → GSD routing
+- PROJECT.md existence as routing signal: simple file test for deterministic milestone vs project routing
+- MILESTONE-CONTEXT.md bridge: maps approved design sections as milestone features, replaces questioning phase
+
+### Key Lessons
+1. SUMMARY.md and VERIFICATION.md continue to be the #1 gap closure target — 4th milestone in a row (v1.0, v1.2, v1.3, v1.5)
+2. Workflow extension in-place (adding steps to an existing file) is simpler than creating new files — single source of truth
+3. Design-to-execution bridging requires an explicit artifact (MILESTONE-CONTEXT.md) — you can't just "pass context" between commands
+4. Minimal milestones (5 phases, 1 plan each) can ship meaningful features when scope is well-defined
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for verifier)
+- Sessions: 5 plan executions across 5 phases
+- Notable: fastest milestone yet in terms of tasks-per-phase — focused scope with clear boundaries
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -220,11 +261,13 @@
 | v1.2 | 29 | 4 | Automated the audit-gap-closure cycle itself — now runs without human intervention |
 | v1.3 | 49 | 6 | First feature milestone post-automation — CLI tooling with consistent handler pattern |
 | v1.4 | 29 | 5 | First MCP integration milestone — Linear issue-driven workflows with complexity routing |
+| v1.5 | ~25 | 5 | First interactive workflow milestone — brainstorm command with design-to-execution bridging |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase), v1.4 (1 phase)
-2. SUMMARY frontmatter completeness is the #1 recurring audit gap — needs execution-time enforcement (v1.3, v1.4 both hit this)
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in v1.0 Phase 6, v1.2 Phase 13, v1.3 Phase 19)
+1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase), v1.4 (1 phase), v1.5 (1 phase)
+2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — needs execution-time enforcement (v1.0, v1.2, v1.3, v1.4, v1.5 all hit this)
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 5 of 6 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
+6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 (5 → 10 steps)

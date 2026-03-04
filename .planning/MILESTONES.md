@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.5 GSD Brainstorming Command (Shipped: 2026-03-04)
+
+**Phases completed:** 5 phases, 5 plans, 14 tasks
+**Timeline:** 1 day (2026-03-04)
+
+**Key accomplishments:**
+- Created `/gsd:brainstorm` command with 10-step workflow covering context exploration, clarifying questions, approach proposals, design presentation, and GSD routing
+- Per-section design approval loop with unlimited revision rounds using AskUserQuestion
+- Design doc output to `.planning/designs/YYYY-MM-DD-<topic>-design.md` with automatic git commit
+- Auto-detect GSD routing: PROJECT.md exists → new-milestone flow, else → new-project flow with design context seeding
+- Full documentation in help.md, USER-GUIDE.md, and README.md
+- Gap closure phase resolved missing Phase 27 verification artifacts and stale REQUIREMENTS.md checkboxes
+
+---
+
 ## v1.4 Linear Integration (Shipped: 2026-03-04)
 
 **Phases completed:** 5 phases, 5 plans, 7 tasks

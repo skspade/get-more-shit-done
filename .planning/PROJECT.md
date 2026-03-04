@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation.
 
 ## Core Value
 
@@ -44,15 +44,16 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ `linear.md` workflow — parse args, fetch issues via MCP, complexity scoring heuristic, dual-path delegation, comment-back — v1.4
 - ✓ STATE.md Linear issue ID column for quick task table — v1.4
 - ✓ USER-GUIDE.md and README.md documentation for `/gsd:linear` — v1.4
+- ✓ `/gsd:brainstorm` command spec with 10-step workflow — v1.5
+- ✓ Brainstorming process (context exploration, clarifying questions, approach proposals, design presentation with per-section approval) — v1.5
+- ✓ Design doc output to `.planning/designs/YYYY-MM-DD-<topic>-design.md` with git commit — v1.5
+- ✓ Auto-detect routing: PROJECT.md exists → new-milestone, else → new-project — v1.5
+- ✓ Design context seeding into milestone/project creation via MILESTONE-CONTEXT.md — v1.5
+- ✓ Documentation in help.md, USER-GUIDE.md, README.md — v1.5
 
 ### Active
 
-- [ ] `/gsd:brainstorm` command spec with workflow file
-- [ ] Brainstorming process (explore context, clarifying questions, approach proposals, design presentation, approval)
-- [ ] Design doc output to `.planning/designs/YYYY-MM-DD-<topic>-design.md`
-- [ ] Auto-detect routing: PROJECT.md exists → new-milestone, else → new-project
-- [ ] Design context seeding into milestone/project creation (replaces questioning phase)
-- [ ] Documentation in help.md, USER-GUIDE.md, README.md
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -69,6 +70,10 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Linear project/cycle mapping — focus on individual issue routing, not project-level sync
 - Webhook-driven automation — MCP-based pull model is simpler and sufficient
 - Linear issue status updates — comment-back is sufficient; status transitions managed in Linear
+- Autopilot-compatible brainstorm mode — auto-approve design sections for fully autonomous brainstorming (future)
+- Resume previous brainstorming sessions — design docs are markdown; re-run or edit manually
+- Design templates per domain — single design format is sufficient
+- Modifying upstream superpowers:brainstorming skill — fork maintains its own commands independently
 
 ## Constraints
 
@@ -106,27 +111,21 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Error on conflicting flags (--quick + --milestone) | Explicit error vs first-wins prevents ambiguous intent | Good — clear UX |
 | MCP failures warn-and-continue for comment-back | Primary work already committed; non-critical MCP failures shouldn't fail the workflow | Good — resilient completion |
 | No Linear-specific data in init output | MCP tool names and issue ID formats belong in workflow, not init | Good — clean separation of concerns |
+| 10-step brainstorm workflow in single file | All brainstorm logic in one workflow file, extended in-place across phases 25-27 | Good — single source of truth, easy to follow |
+| AskUserQuestion for all brainstorm interactions | Consistent with GSD interactive patterns (topic prompt, questions, approach selection, section approval) | Good — familiar UX pattern |
+| Per-section design approval with unlimited revisions | User controls quality; no artificial limits on revision rounds | Good — flexibility without complexity |
+| MILESTONE-CONTEXT.md for design-to-milestone bridge | Maps approved design sections as milestone features, replaces questioning phase | Good — seamless handoff |
+| New-project route delegates to user command | Cannot execute new-project inline due to command context requirements | Good — honest about constraints |
+| PROJECT.md existence as routing signal | Simple file test determines milestone vs project route | Good — stateless, deterministic |
 
 ## Context
 
-## Current Milestone: v1.5 GSD Brainstorming Command
+Shipped v1.5 with brainstorming command. 6 milestones shipped (v1.0–v1.5) across 29 phases, 38 plans.
 
-**Goal:** Add a `/gsd:brainstorm` command that runs a collaborative brainstorming process, writes a design doc, then auto-routes into GSD milestone/project creation — bridging idea exploration to execution without manual handoff.
-
-**Target features:**
-- Full brainstorming process (context exploration, clarifying questions, approach proposals, design approval)
-- Design doc output to `.planning/designs/`
-- Auto-detect routing to new-milestone or new-project based on PROJECT.md existence
-- Design context seeding into milestone creation (replaces questioning phase)
-
-## Context
-
-Shipped v1.4 with Linear issue integration. 5 milestones shipped (v1.0, v1.1, v1.2, v1.3, v1.4) across 24 phases, 33 plans.
-
-**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. New `/gsd:linear` command backed by `linear.md` workflow (510 lines) providing issue-driven MCP integration with complexity-based routing.
+**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-routing to GSD creation flows.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~18,040 LOC JavaScript/CJS
-**Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics)
+**Codebase:** ~21,058 LOC JavaScript/CJS
+**Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale
 
 ---
-*Last updated: 2026-03-04 after v1.5 milestone start*
+*Last updated: 2026-03-04 after v1.5 milestone*
