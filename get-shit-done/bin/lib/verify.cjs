@@ -573,7 +573,7 @@ function cmdValidateHealth(cwd, options, raw) {
   } else {
     const stateContent = fs.readFileSync(statePath, 'utf-8');
     // Extract phase references from STATE.md
-    const phaseRefs = [...stateContent.matchAll(/[Pp]hase\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
+    const phaseRefs = [...stateContent.matchAll(/[Pp]hase:?\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
     // Get disk phases
     const diskPhases = new Set();
     try {
