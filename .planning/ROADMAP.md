@@ -72,10 +72,10 @@
   1. Running `gsd-tools.cjs init linear` returns JSON with models, paths, quick task numbering, and config data
   2. The `/gsd:linear` command spec exists and is discoverable by Claude Code with correct allowed-tools (including Linear MCP tools)
   3. All existing tests pass after adding the new init subcommand
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 20-01: TBD
+- [ ] 20-01-PLAN.md — Init linear command, gsd-tools routing, tests, and /gsd:linear command spec
 
 ### Phase 21: Core Workflow
 **Goal**: Users can invoke `/gsd:linear ISSUE-ID` to fetch a Linear issue, have it auto-routed to quick or milestone, and have the appropriate GSD workflow execute end-to-end
@@ -144,7 +144,7 @@ Phases execute in numeric order.
 | 17. Health Command | v1.3 | 1/1 | Complete | 2026-03-03 |
 | 18. Settings and Help Commands | v1.3 | 2/2 | Complete | 2026-03-03 |
 | 19. Close Audit Gaps | v1.3 | 2/2 | Complete | 2026-03-03 |
-| 20. Foundation | v1.4 | 0/0 | Not started | - |
+| 20. Foundation | v1.4 | 0/1 | In progress | - |
 | 21. Core Workflow | v1.4 | 0/0 | Not started | - |
 | 22. Completion Loop | v1.4 | 0/0 | Not started | - |
 | 23. Documentation | v1.4 | 0/0 | Not started | - |
