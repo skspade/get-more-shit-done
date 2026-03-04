@@ -42,7 +42,22 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- [ ] `init linear` CLI command providing initialization data for Linear workflow
+- [ ] `/gsd:linear` command spec (frontmatter, objective, execution_context)
+- [ ] `linear.md` workflow — parse args, fetch Linear issues via MCP, routing heuristic, synthesize context, delegate to quick/milestone, comment back
+- [ ] STATE.md Linear issue ID column for quick task table
+- [ ] USER-GUIDE.md and README.md documentation for `/gsd:linear`
+
+## Current Milestone: v1.4 Linear Integration
+
+**Goal:** Add a `/gsd:linear` slash command that reads Linear issues via MCP, auto-routes to quick or milestone, and posts summary comments back.
+
+**Target features:**
+- `init linear` CLI command for initialization data
+- `/gsd:linear` command spec
+- `linear.md` workflow (fetch, route, synthesize, delegate, comment-back)
+- STATE.md tracking for Linear-originated tasks
+- Documentation updates
 
 ### Out of Scope
 
@@ -90,7 +105,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v1.3 with standalone `gsd` CLI providing 5 deterministic commands. 4 milestones shipped (v1.0, v1.1, v1.2, v1.3) across 19 phases, 28 plans.
+Shipped v1.3 with standalone `gsd` CLI providing 5 deterministic commands. 4 milestones shipped (v1.0, v1.1, v1.2, v1.3) across 19 phases, 28 plans. Starting v1.4 to add Linear issue integration.
 
 **Architecture:** Core autopilot loop unchanged. New `gsd` CLI binary (`get-shit-done/bin/gsd-cli.cjs`) with `cli.cjs` module providing project discovery, argument parsing, command routing, and output formatting. 86 CLI tests.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state
@@ -98,4 +113,4 @@ Shipped v1.3 with standalone `gsd` CLI providing 5 deterministic commands. 4 mil
 **Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics)
 
 ---
-*Last updated: 2026-03-03 after v1.3 milestone*
+*Last updated: 2026-03-03 after v1.4 milestone start*

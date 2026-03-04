@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: CLI Utilities
-status: complete
+milestone: v1.4
+milestone_name: Linear Integration
+status: active
 last_updated: "2026-03-03"
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** v1.4 Linear Integration
 
 ## Current Position
 
-Phase: — (milestone v1.3 complete)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone complete
-Last activity: 2026-03-04 - Completed quick task 4: Remove GitHub Actions and NPM publishing configuration
+Status: Defining requirements
+Last activity: 2026-03-03 — Milestone v1.4 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
