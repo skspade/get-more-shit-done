@@ -64,8 +64,8 @@ Requirements for GSD Brainstorming Command milestone.
 | BRAIN-05 | Phase 26 | Complete |
 | DESIGN-01 | Phase 26 | Complete |
 | DESIGN-02 | Phase 26 | Complete |
-| ROUTE-01 | Phase 29 | Pending |
-| ROUTE-02 | Phase 29 | Pending |
+| ROUTE-01 | Phase 27 | Complete |
+| ROUTE-02 | Phase 27 | Complete |
 | DOCS-01 | Phase 28 | Complete |
 | DOCS-02 | Phase 28 | Complete |
 | DOCS-03 | Phase 28 | Complete |
