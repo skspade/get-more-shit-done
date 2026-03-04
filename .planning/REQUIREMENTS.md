@@ -55,26 +55,26 @@ Requirements for GSD Brainstorming Command milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | — | Pending |
-| CMD-02 | — | Pending |
-| BRAIN-01 | — | Pending |
-| BRAIN-02 | — | Pending |
-| BRAIN-03 | — | Pending |
-| BRAIN-04 | — | Pending |
-| BRAIN-05 | — | Pending |
-| DESIGN-01 | — | Pending |
-| DESIGN-02 | — | Pending |
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
-| DOCS-03 | — | Pending |
+| CMD-01 | Phase 25 | Pending |
+| CMD-02 | Phase 25 | Pending |
+| BRAIN-01 | Phase 25 | Pending |
+| BRAIN-02 | Phase 25 | Pending |
+| BRAIN-03 | Phase 25 | Pending |
+| BRAIN-04 | Phase 26 | Pending |
+| BRAIN-05 | Phase 26 | Pending |
+| DESIGN-01 | Phase 26 | Pending |
+| DESIGN-02 | Phase 26 | Pending |
+| ROUTE-01 | Phase 27 | Pending |
+| ROUTE-02 | Phase 27 | Pending |
+| DOCS-01 | Phase 28 | Pending |
+| DOCS-02 | Phase 28 | Pending |
+| DOCS-03 | Phase 28 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after v1.5 roadmap creation*

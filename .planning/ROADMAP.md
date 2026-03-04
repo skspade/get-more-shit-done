@@ -7,6 +7,7 @@
 - ✅ **v1.2 Add Milestone Audit Loop** — Phases 10-13 (shipped 2026-03-03)
 - ✅ **v1.3 CLI Utilities** — Phases 14-19 (shipped 2026-03-03)
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
+- 🚧 **v1.5 GSD Brainstorming Command** — Phases 25-28 (in progress)
 
 ## Phases
 
@@ -64,6 +65,60 @@
 
 </details>
 
+### 🚧 v1.5 GSD Brainstorming Command (In Progress)
+
+**Milestone Goal:** Add `/gsd:brainstorm` command that runs a collaborative brainstorming process, writes a design doc, then auto-routes into GSD milestone/project creation — bridging idea exploration to execution without manual handoff.
+
+- [ ] **Phase 25: Command Spec and Workflow Foundation** - Command file, workflow file, and brainstorming process through approach proposals
+- [ ] **Phase 26: Design Presentation and Output** - Interactive design sections, revision loop, and design doc writing to `.planning/designs/`
+- [ ] **Phase 27: GSD Routing Integration** - Auto-detect PROJECT.md and seed design context into new-milestone or new-project flow
+- [ ] **Phase 28: Documentation** - help.md, USER-GUIDE.md, and README.md updates
+
+## Phase Details
+
+### Phase 25: Command Spec and Workflow Foundation
+**Goal**: User can invoke `/gsd:brainstorm [topic]` and the workflow explores project context, asks clarifying questions one at a time, and proposes 2-3 approaches with trade-offs
+**Depends on**: Phase 24 (v1.4 complete)
+**Requirements**: CMD-01, CMD-02, BRAIN-01, BRAIN-02, BRAIN-03
+**Success Criteria** (what must be TRUE):
+  1. User can invoke `/gsd:brainstorm` with no arguments and the session starts
+  2. User can invoke `/gsd:brainstorm <topic>` and the topic is used to seed the session immediately
+  3. The workflow reads project files, docs, and recent commits before asking any questions
+  4. The workflow asks clarifying questions one at a time, preferring multiple choice format
+  5. The workflow presents 2-3 distinct approaches with trade-offs and a stated recommendation
+**Plans**: TBD
+
+### Phase 26: Design Presentation and Output
+**Goal**: User can approve a design presented in sections, request revisions, and the approved design is written to `.planning/designs/` and committed to git
+**Depends on**: Phase 25
+**Requirements**: BRAIN-04, BRAIN-05, DESIGN-01, DESIGN-02
+**Success Criteria** (what must be TRUE):
+  1. The workflow presents the design in sections scaled to complexity, pausing for approval after each section
+  2. User can request revisions to any design section before approving it
+  3. Approved design is written to `.planning/designs/YYYY-MM-DD-<topic>-design.md`
+  4. Design doc is committed to git after writing
+**Plans**: TBD
+
+### Phase 27: GSD Routing Integration
+**Goal**: After design approval, the workflow automatically detects project state and routes into the correct GSD creation flow with design context replacing the questioning phase
+**Depends on**: Phase 26
+**Requirements**: ROUTE-01, ROUTE-02
+**Success Criteria** (what must be TRUE):
+  1. When PROJECT.md exists, the workflow automatically routes into new-milestone flow after design approval
+  2. When PROJECT.md does not exist, the workflow automatically routes into new-project flow after design approval
+  3. The design doc content is seeded into the creation flow so the questioning phase is skipped or pre-answered
+**Plans**: TBD
+
+### Phase 28: Documentation
+**Goal**: The `/gsd:brainstorm` command is discoverable and documented in all user-facing reference materials
+**Depends on**: Phase 27
+**Requirements**: DOCS-01, DOCS-02, DOCS-03
+**Success Criteria** (what must be TRUE):
+  1. `help.md` command reference lists `/gsd:brainstorm` with its purpose and usage
+  2. `USER-GUIDE.md` contains a brainstorm section with usage instructions and at least one example
+  3. `README.md` includes an entry for the brainstorm command
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -95,3 +150,7 @@ Phases execute in numeric order.
 | 22. Completion Loop | v1.4 | 1/1 | Complete | 2026-03-04 |
 | 23. Documentation | v1.4 | 1/1 | Complete | 2026-03-04 |
 | 24. Close Audit Gaps | v1.4 | 1/1 | Complete | 2026-03-04 |
+| 25. Command Spec and Workflow Foundation | v1.5 | 0/TBD | Not started | - |
+| 26. Design Presentation and Output | v1.5 | 0/TBD | Not started | - |
+| 27. GSD Routing Integration | v1.5 | 0/TBD | Not started | - |
+| 28. Documentation | v1.5 | 0/TBD | Not started | - |
