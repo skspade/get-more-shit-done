@@ -47,7 +47,12 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- [ ] `/gsd:brainstorm` command spec with workflow file
+- [ ] Brainstorming process (explore context, clarifying questions, approach proposals, design presentation, approval)
+- [ ] Design doc output to `.planning/designs/YYYY-MM-DD-<topic>-design.md`
+- [ ] Auto-detect routing: PROJECT.md exists → new-milestone, else → new-project
+- [ ] Design context seeding into milestone/project creation (replaces questioning phase)
+- [ ] Documentation in help.md, USER-GUIDE.md, README.md
 
 ### Out of Scope
 
@@ -104,6 +109,18 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
+## Current Milestone: v1.5 GSD Brainstorming Command
+
+**Goal:** Add a `/gsd:brainstorm` command that runs a collaborative brainstorming process, writes a design doc, then auto-routes into GSD milestone/project creation — bridging idea exploration to execution without manual handoff.
+
+**Target features:**
+- Full brainstorming process (context exploration, clarifying questions, approach proposals, design approval)
+- Design doc output to `.planning/designs/`
+- Auto-detect routing to new-milestone or new-project based on PROJECT.md existence
+- Design context seeding into milestone creation (replaces questioning phase)
+
+## Context
+
 Shipped v1.4 with Linear issue integration. 5 milestones shipped (v1.0, v1.1, v1.2, v1.3, v1.4) across 24 phases, 33 plans.
 
 **Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. New `/gsd:linear` command backed by `linear.md` workflow (510 lines) providing issue-driven MCP integration with complexity-based routing.
@@ -112,4 +129,4 @@ Shipped v1.4 with Linear issue integration. 5 milestones shipped (v1.0, v1.1, v1
 **Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics)
 
 ---
-*Last updated: 2026-03-03 after v1.4 milestone*
+*Last updated: 2026-03-04 after v1.5 milestone start*
