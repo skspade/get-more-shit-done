@@ -27,7 +27,7 @@ Route Linear issues to GSD workflows. Fetches issue from Linear, auto-routes to 
 </objective>
 
 <execution_context>
-@/Users/seanspade/.claude/get-shit-done/workflows/linear.md
+@~/.claude/get-shit-done/workflows/linear.md
 </execution_context>
 
 <context>
@@ -37,6 +37,6 @@ Context files are resolved inside the workflow (`init linear`) and delegated via
 </context>
 
 <process>
-Execute the linear workflow from @/Users/seanspade/.claude/get-shit-done/workflows/linear.md end-to-end.
+Execute the linear workflow from @~/.claude/get-shit-done/workflows/linear.md end-to-end.
 Preserve all workflow gates (issue fetch, complexity scoring, routing, execution, Linear status updates).
 </process>

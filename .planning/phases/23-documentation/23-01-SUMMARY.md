@@ -5,6 +5,7 @@ title: Document /gsd:linear in USER-GUIDE.md and README.md
 status: complete
 started: "2026-03-03"
 completed: "2026-03-03"
+requirements_completed: [DOCS-01, DOCS-02]
 ---
 
 # Summary: 23-01 Document /gsd:linear
