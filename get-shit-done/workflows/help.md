@@ -183,6 +183,24 @@ Archive completed milestone and prepare for next version.
 
 Usage: `/gsd:complete-milestone 1.0.0`
 
+### Brainstorming
+
+**`/gsd:brainstorm [topic]`**
+
+Run a collaborative brainstorming session that explores your project context, asks clarifying questions, proposes approaches with trade-offs, and produces a design document. After the design is approved and committed, optionally routes into GSD milestone or project creation.
+
+- Explores project files, docs, and recent commits before asking questions
+- Asks clarifying questions one at a time, preferring multiple choice
+- Proposes 2-3 distinct approaches with trade-offs and a recommendation
+- Presents the design in sections, pausing for approval after each
+- Writes the approved design to `.planning/designs/`
+- After design commit, offers to create a milestone (if PROJECT.md exists) or project (if not)
+
+Usage: `/gsd:brainstorm` (start a free-form session)
+Usage: `/gsd:brainstorm "add dark mode support"` (seed with a topic)
+
+Result: Design doc in `.planning/designs/` + optional milestone/project creation
+
 ### Progress Tracking
 
 **`/gsd:progress`**
@@ -468,6 +486,13 @@ Example config:
 /gsd:add-todo Fix modal z-index  # Capture with explicit description
 /gsd:check-todos                 # Review and work on todos
 /gsd:check-todos api             # Filter by area
+```
+
+**Brainstorming:**
+
+```
+/gsd:brainstorm                              # Start brainstorming session
+/gsd:brainstorm "add caching layer"          # Start with a specific topic
 ```
 
 **Debugging an issue:**
