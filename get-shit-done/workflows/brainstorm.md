@@ -1,7 +1,7 @@
 <purpose>
-Run a collaborative brainstorming session: explore project context, ask clarifying questions one at a time, propose 2-3 distinct approaches with trade-offs and a stated recommendation, then present the selected approach as a design document in sections for approval. Approved design is written to `.planning/designs/` and committed to git.
+Run a collaborative brainstorming session: explore project context, ask clarifying questions one at a time, propose 2-3 distinct approaches with trade-offs and a stated recommendation, then present the selected approach as a design document in sections for approval. Approved design is written to `.planning/designs/` and committed to git. After commit, detect project state and offer to route into GSD milestone or project creation with design context seeded.
 
-You are a thinking partner. The user has an idea — your job is to understand it deeply through context and questions, then propose structured approaches they can evaluate. After approach selection, present the design in sections for review and revision, then write and commit the final design document. Ground everything in the actual project state.
+You are a thinking partner. The user has an idea — your job is to understand it deeply through context and questions, then propose structured approaches they can evaluate. After approach selection, present the design in sections for review and revision, then write and commit the final design document. After commit, offer to route into GSD creation flows. Ground everything in the actual project state.
 </purpose>
 
 <process>
@@ -220,11 +220,103 @@ git commit -m "docs(brainstorm): design for {topic}"
 
 Do NOT use `git add .` or `git add -A`.
 
-Display completion:
+Display:
 ```
 Design committed to git.
+```
 
+## 9. Offer GSD Routing
+
+After the design is committed, check project state and offer routing options.
+
+**Check project state:**
+```bash
+test -f .planning/PROJECT.md && echo "exists" || echo "missing"
+```
+
+**If PROJECT.md exists:**
+
+Use AskUserQuestion:
+- header: "Next Steps"
+- question: "Design committed. Want to create a new milestone from this design?"
+- options: ["Create milestone", "Done — just keep the design"]
+
+**If PROJECT.md does not exist:**
+
+Use AskUserQuestion:
+- header: "Next Steps"
+- question: "Design committed. Want to create a new project from this design?"
+- options: ["Create project", "Done — just keep the design"]
+
+**If user selects "Done":** Display:
+```
 Brainstorming session complete.
 ```
+Exit workflow.
+
+**If user selects "Create milestone" or "Create project":** Proceed to step 10.
+
+## 10. Route into Creation Flow
+
+### Milestone Route (PROJECT.md exists)
+
+**10a. Build MILESTONE-CONTEXT.md:**
+
+Write to `.planning/MILESTONE-CONTEXT.md`:
+
+```markdown
+# Milestone Context
+
+**Source:** Brainstorm session ({$TOPIC})
+**Design:** .planning/designs/{date}-{topic-slug}-design.md
+
+## Milestone Goal
+
+{Extract from design doc: the overall goal/purpose described in the selected approach}
+
+## Features
+
+{For each approved design section:}
+### {Section Name}
+
+{Approved section content}
+```
+
+**10b. Initialize milestone models:**
+
+```bash
+MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
+```
+
+Parse JSON for model parameters.
+
+**10c. Execute new-milestone workflow steps 1-11 inline:**
+
+Follow the new-milestone workflow (`new-milestone.md`) from Step 1 through Step 11:
+
+1. Load context (PROJECT.md, MILESTONES.md, STATE.md)
+2. Gather milestone goals — MILESTONE-CONTEXT.md exists, use it
+3. Determine milestone version
+4. Update PROJECT.md
+5. Update STATE.md
+6. Cleanup and commit (delete MILESTONE-CONTEXT.md after consuming)
+7. Resolve models from MINIT
+8. Research decision (ask user)
+9. Define requirements
+10. Create roadmap (spawn gsd-roadmapper)
+11. Done — display completion
+
+### New-Project Route (no PROJECT.md)
+
+Display:
+```
+Routing to new-project with design context...
+
+Run the following command to create a project from this design:
+
+/gsd:new-project --auto @.planning/designs/{date}-{topic-slug}-design.md
+```
+
+Note: new-project cannot be executed inline because it requires its own command context and spawns research subagents. The user must invoke it as a separate command.
 
 </process>
