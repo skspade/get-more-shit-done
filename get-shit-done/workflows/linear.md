@@ -6,7 +6,8 @@ Route Linear issues to GSD workflows. Fetches issue data from Linear via MCP too
 - Scores issue complexity to determine routing (quick vs milestone)
 - Accepts override flags: `--quick`, `--milestone`, `--full`
 - Delegates to quick workflow (steps 2-8) or new-milestone workflow (steps 1-11)
-- Writes `.planning/linear-context.md` for Phase 22 completion loop
+- Posts summary comments back to Linear issues after completion
+- Cleans up temporary `.planning/linear-context.md` after comment-back
 </purpose>
 
 <required_reading>
@@ -491,6 +492,73 @@ Route: Milestone
 
 Display next step from new-milestone workflow Step 11 output.
 
+---
+
+**Step 6: Comment-back to Linear issues**
+
+Post a summary comment to each Linear issue that triggered this workflow.
+
+**Build comment body based on route:**
+
+**If `$ROUTE == "quick"`:**
+
+Read `${QUICK_DIR}/${next_num}-SUMMARY.md`. Extract the first paragraph after the title line (the line starting with `#`) as `$SUMMARY_EXCERPT` (2-3 sentences).
+
+Build comment body:
+
+```markdown
+## GSD Quick Task Complete
+**Task:** {$DESCRIPTION truncated to 100 chars}
+**Commit:** `{$commit_hash}`
+**Summary:** {$SUMMARY_EXCERPT}
+Artifacts: `{$QUICK_DIR}/`
+```
+
+**If `$ROUTE == "milestone"`:**
+
+Read `.planning/ROADMAP.md`. Extract the latest milestone line (the `**v{X.Y} {Name}**` entry under `## Milestones`). Count phases under that milestone section. Read `.planning/REQUIREMENTS.md` and count requirements mapped to those phases.
+
+Build comment body:
+
+```markdown
+## GSD Milestone Initialized
+**Milestone:** v{version} {name}
+**Phases:** {N} planned
+**Requirements:** {N} mapped
+Roadmap: `.planning/ROADMAP.md`
+```
+
+**Post comment to each issue:**
+
+For each issue in `$ISSUES`:
+
+```
+mcp__plugin_linear_linear__create_comment(
+  issueId: issue.id,
+  body: comment_body
+)
+```
+
+Display: `✓ Comment posted to {issue.identifier}`
+
+**On MCP failure:** Display warning but do not fail:
+```
+⚠ Failed to post comment to {issue.identifier}. The task completed successfully.
+```
+Continue to next issue (do not abort the loop).
+
+---
+
+**Step 7: Cleanup**
+
+Delete the temporary linear-context.md file:
+
+```bash
+rm -f .planning/linear-context.md
+```
+
+Display: `✓ Cleaned up .planning/linear-context.md`
+
 </process>
 
 <success_criteria>
@@ -507,4 +575,6 @@ Display next step from new-milestone workflow Step 11 output.
 - [ ] Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow (WKFL-06)
 - [ ] .planning/linear-context.md written with issue IDs and route decision
 - [ ] STATE.md quick tasks table extended with Linear column for quick route
+- [ ] Summary comment posted to each Linear issue after completion (WKFL-07)
+- [ ] .planning/linear-context.md deleted after comment-back (WKFL-08)
 </success_criteria>
