@@ -178,6 +178,10 @@ CLI_WRAPPER="$GSD_DIR/scripts/gsd-autopilot"
 CLI_LINK="$HOME/.local/bin/gsd-autopilot"
 REPO_WRAPPER="bin/gsd-autopilot"
 
+GMSD_WRAPPER="$GSD_DIR/scripts/gmsd"
+GMSD_LINK="$HOME/.local/bin/gmsd"
+GMSD_REPO_WRAPPER="bin/gmsd"
+
 if [ ! -f "$REPO_WRAPPER" ]; then
   warn "bin/gsd-autopilot not found in repo — skipping CLI install"
 else
@@ -196,6 +200,22 @@ else
   if ! $DRY_RUN; then
     success "gsd-autopilot CLI installed"
   fi
+
+if [ -f "$GMSD_REPO_WRAPPER" ]; then
+  run_or_dry \
+    "cp $GMSD_REPO_WRAPPER → $GMSD_WRAPPER" \
+    "cp \"$GMSD_REPO_WRAPPER\" \"$GMSD_WRAPPER\" && chmod +x \"$GMSD_WRAPPER\""
+
+  run_or_dry \
+    "symlink $GMSD_LINK → $GMSD_WRAPPER" \
+    "ln -sf \"$GMSD_WRAPPER\" \"$GMSD_LINK\""
+
+  if ! $DRY_RUN; then
+    success "gmsd CLI installed"
+  fi
+else
+  warn "bin/gmsd not found in repo — skipping gmsd CLI install"
+fi
 
   # Check if ~/.local/bin is on PATH
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then
@@ -233,6 +253,7 @@ check_file "commands/gsd/"    "$CLAUDE_DIR/commands/gsd"
 check_file "hooks/"           "$CLAUDE_DIR/hooks"
 check_file "manifest"         "$CLAUDE_DIR/gsd-file-manifest.json"
 check_file "gsd-autopilot CLI" "$CLI_LINK"
+check_file "gmsd CLI"          "$GMSD_LINK"
 
 if ! $DRY_RUN && ! $VERIFY_PASS; then
   warn "Some files are missing — installation may be incomplete"

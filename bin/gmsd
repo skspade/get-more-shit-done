@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# gmsd — CLI alias for GSD CLI (Get More Shit Done)
+# Delegates to the installed gsd-cli.cjs script.
+
+set -euo pipefail
+
+GSD_CLI="$HOME/.claude/get-shit-done/bin/gsd-cli.cjs"
+
+if [ ! -f "$GSD_CLI" ]; then
+  echo "Error: GSD is not installed ($GSD_CLI not found)." >&2
+  echo "Run 'bash bin/replace-vanilla.sh' from the fork repo to install." >&2
+  exit 1
+fi
+
+exec node "$GSD_CLI" "$@"
