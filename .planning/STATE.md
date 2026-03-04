@@ -59,7 +59,7 @@ See PROJECT.md Key Decisions table for full history.
 
 ### Pending Todos
 
-3 pending todos. See `.planning/todos/pending/`.
+2 pending todos. See `.planning/todos/pending/`.
 
 ### Blockers/Concerns
 
