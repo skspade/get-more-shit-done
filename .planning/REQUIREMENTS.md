@@ -13,7 +13,7 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 
 ### Command Spec
 
-- [ ] **CMD-01**: `/gsd:linear` command spec with frontmatter (name, allowed-tools including Linear MCP tools), objective, and execution_context
+- [x] **CMD-01**: `/gsd:linear` command spec with frontmatter (name, allowed-tools including Linear MCP tools), objective, and execution_context
 
 ### Workflow
 
@@ -28,8 +28,8 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: USER-GUIDE.md includes `/gsd:linear` command reference with flags and examples
-- [ ] **DOCS-02**: README.md mentions Linear integration capability
+- [x] **DOCS-01**: USER-GUIDE.md includes `/gsd:linear` command reference with flags and examples
+- [x] **DOCS-02**: README.md mentions Linear integration capability
 
 ## Future Requirements
 
@@ -52,7 +52,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INIT-01 | Phase 20 | Complete |
-| CMD-01 | Phase 24 | Pending |
+| CMD-01 | Phase 24 | Complete |
 | WKFL-01 | Phase 21 | Complete |
 | WKFL-02 | Phase 21 | Complete |
 | WKFL-03 | Phase 21 | Complete |
@@ -61,8 +61,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WKFL-06 | Phase 21 | Complete |
 | WKFL-07 | Phase 22 | Complete |
 | WKFL-08 | Phase 22 | Complete |
-| DOCS-01 | Phase 24 | Pending |
-| DOCS-02 | Phase 24 | Pending |
+| DOCS-01 | Phase 24 | Complete |
+| DOCS-02 | Phase 24 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 12 total
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-04 after gap closure phase creation*
+*Last updated: 2026-03-04 after Phase 24 gap closure complete*
