@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: 24 of 24 (Close Audit Gaps)
 Plan: 1 of 1 in current phase
 Status: v1.4 milestone complete — archived to .planning/milestones/
-Last activity: 2026-03-03 — Milestone v1.4 Linear Integration shipped
+Last activity: 2026-03-04 - Completed quick task 5: Replace the GSDC CLI alias with GMSD
 
 Progress: [██████████] 100%
 
