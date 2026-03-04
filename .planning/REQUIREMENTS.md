@@ -9,11 +9,11 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 
 ### CLI Infrastructure
 
-- [ ] **INIT-01**: `init linear` command returns models, paths, quick task numbering, and config data as JSON
+- [x] **INIT-01**: `init linear` command returns models, paths, quick task numbering, and config data as JSON
 
 ### Command Spec
 
-- [ ] **CMD-01**: `/gsd:linear` command spec with frontmatter (name, allowed-tools including Linear MCP tools), objective, and execution_context
+- [x] **CMD-01**: `/gsd:linear` command spec with frontmatter (name, allowed-tools including Linear MCP tools), objective, and execution_context
 
 ### Workflow
 
@@ -51,8 +51,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INIT-01 | Phase 20 | Pending |
-| CMD-01 | Phase 20 | Pending |
+| INIT-01 | Phase 20 | Complete |
+| CMD-01 | Phase 20 | Complete |
 | WKFL-01 | Phase 21 | Pending |
 | WKFL-02 | Phase 21 | Pending |
 | WKFL-03 | Phase 21 | Pending |
