@@ -1,7 +1,7 @@
 <purpose>
-Run a collaborative brainstorming session: explore project context, ask clarifying questions one at a time, then propose 2-3 distinct approaches with trade-offs and a stated recommendation.
+Run a collaborative brainstorming session: explore project context, ask clarifying questions one at a time, propose 2-3 distinct approaches with trade-offs and a stated recommendation, then present the selected approach as a design document in sections for approval. Approved design is written to `.planning/designs/` and committed to git.
 
-You are a thinking partner. The user has an idea — your job is to understand it deeply through context and questions, then propose structured approaches they can evaluate. Ground everything in the actual project state.
+You are a thinking partner. The user has an idea — your job is to understand it deeply through context and questions, then propose structured approaches they can evaluate. After approach selection, present the design in sections for review and revision, then write and commit the final design document. Ground everything in the actual project state.
 </purpose>
 
 <process>
@@ -140,14 +140,91 @@ Use AskUserQuestion:
 
 **If user wants modifications:** Ask what they would change, revise the approaches incorporating their feedback, and re-present.
 
-## 5. Session Complete
+## 5. Present Design Sections
 
-After approach selection, display:
+After the user selects an approach, break the selected approach into design sections. Scale section count to topic complexity:
+- Simple topics (single feature, small scope): 3-4 sections
+- Complex topics (architecture, multi-component): 5-7 sections
+
+Section names and content should adapt to the topic domain rather than using a fixed template.
+
+Present each section one at a time:
 
 ```
-Approach selected: {Name}
+## Design: {Section Name}
 
-This brainstorming session is complete. The selected approach is ready for further development.
+{Section content — detailed design for this aspect of the selected approach}
+```
+
+After presenting each section, use AskUserQuestion:
+- header: "Design Review"
+- question: "How does this section look?"
+- options: ["Approve", "Request revisions"]
+
+**If user approves:** Store the approved section content and proceed to the next section.
+
+**If user requests revisions:** Go to step 6.
+
+After all sections are approved, proceed to step 7.
+
+## 6. Handle Revisions
+
+When a user requests revisions for a section:
+
+Use AskUserQuestion:
+- header: "Revisions"
+- question: "What would you like to change in this section?"
+
+Incorporate the user's feedback, revise the section content, and re-present it with the same approval prompt from step 5. This loop continues until the user approves the section. There is no limit on revision rounds.
+
+## 7. Write Design File
+
+After all sections are approved, assemble the full design into a markdown file.
+
+Create the designs directory if needed:
+```bash
+mkdir -p .planning/designs
+```
+
+Generate the topic slug from $TOPIC: lowercase, replace spaces and special characters with hyphens, remove consecutive hyphens.
+
+Generate the date string in YYYY-MM-DD format using the current date.
+
+Write to `.planning/designs/{date}-{topic-slug}-design.md`:
+
+```markdown
+# {$TOPIC} — Design
+
+**Date:** {YYYY-MM-DD}
+**Approach:** {Selected approach name}
+
+{For each approved section:}
+## {Section Name}
+
+{Approved section content}
+```
+
+Display the file path:
+```
+Design written to: .planning/designs/{date}-{topic-slug}-design.md
+```
+
+## 8. Commit Design File
+
+Stage and commit the design file individually:
+
+```bash
+git add ".planning/designs/{date}-{topic-slug}-design.md"
+git commit -m "docs(brainstorm): design for {topic}"
+```
+
+Do NOT use `git add .` or `git add -A`.
+
+Display completion:
+```
+Design committed to git.
+
+Brainstorming session complete.
 ```
 
 </process>
