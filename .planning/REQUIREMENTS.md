@@ -28,8 +28,8 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: USER-GUIDE.md includes `/gsd:linear` command reference with flags and examples
-- [ ] **DOCS-02**: README.md mentions Linear integration capability
+- [x] **DOCS-01**: USER-GUIDE.md includes `/gsd:linear` command reference with flags and examples
+- [x] **DOCS-02**: README.md mentions Linear integration capability
 
 ## Future Requirements
 
@@ -61,8 +61,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WKFL-06 | Phase 21 | Complete |
 | WKFL-07 | Phase 22 | Complete |
 | WKFL-08 | Phase 22 | Complete |
-| DOCS-01 | Phase 23 | Pending |
-| DOCS-02 | Phase 23 | Pending |
+| DOCS-01 | Phase 23 | Complete |
+| DOCS-02 | Phase 23 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 12 total
