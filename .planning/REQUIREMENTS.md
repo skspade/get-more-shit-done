@@ -9,14 +9,14 @@ Requirements for GSD Brainstorming Command milestone.
 
 ### Command
 
-- [ ] **CMD-01**: User can invoke `/gsd:brainstorm` to start a brainstorming session
-- [ ] **CMD-02**: User can pass an optional topic argument (`/gsd:brainstorm [topic]`) to seed the session
+- [x] **CMD-01**: User can invoke `/gsd:brainstorm` to start a brainstorming session
+- [x] **CMD-02**: User can pass an optional topic argument (`/gsd:brainstorm [topic]`) to seed the session
 
 ### Brainstorming Process
 
-- [ ] **BRAIN-01**: Session explores project context (files, docs, recent commits) before asking questions
-- [ ] **BRAIN-02**: Session asks clarifying questions one at a time, preferring multiple choice
-- [ ] **BRAIN-03**: Session proposes 2-3 approaches with trade-offs and a recommendation
+- [x] **BRAIN-01**: Session explores project context (files, docs, recent commits) before asking questions
+- [x] **BRAIN-02**: Session asks clarifying questions one at a time, preferring multiple choice
+- [x] **BRAIN-03**: Session proposes 2-3 approaches with trade-offs and a recommendation
 - [ ] **BRAIN-04**: Session presents design in sections scaled to complexity, with approval after each section
 - [ ] **BRAIN-05**: User can request revisions to design sections before approving
 
@@ -55,11 +55,11 @@ Requirements for GSD Brainstorming Command milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 25 | Pending |
-| CMD-02 | Phase 25 | Pending |
-| BRAIN-01 | Phase 25 | Pending |
-| BRAIN-02 | Phase 25 | Pending |
-| BRAIN-03 | Phase 25 | Pending |
+| CMD-01 | Phase 25 | Complete |
+| CMD-02 | Phase 25 | Complete |
+| BRAIN-01 | Phase 25 | Complete |
+| BRAIN-02 | Phase 25 | Complete |
+| BRAIN-03 | Phase 25 | Complete |
 | BRAIN-04 | Phase 26 | Pending |
 | BRAIN-05 | Phase 26 | Pending |
 | DESIGN-01 | Phase 26 | Pending |

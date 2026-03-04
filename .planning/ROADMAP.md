@@ -69,7 +69,7 @@
 
 **Milestone Goal:** Add `/gsd:brainstorm` command that runs a collaborative brainstorming process, writes a design doc, then auto-routes into GSD milestone/project creation — bridging idea exploration to execution without manual handoff.
 
-- [ ] **Phase 25: Command Spec and Workflow Foundation** - Command file, workflow file, and brainstorming process through approach proposals
+- [x] **Phase 25: Command Spec and Workflow Foundation** - Command file, workflow file, and brainstorming process through approach proposals (completed 2026-03-04)
 - [ ] **Phase 26: Design Presentation and Output** - Interactive design sections, revision loop, and design doc writing to `.planning/designs/`
 - [ ] **Phase 27: GSD Routing Integration** - Auto-detect PROJECT.md and seed design context into new-milestone or new-project flow
 - [ ] **Phase 28: Documentation** - help.md, USER-GUIDE.md, and README.md updates
@@ -150,7 +150,7 @@ Phases execute in numeric order.
 | 22. Completion Loop | v1.4 | 1/1 | Complete | 2026-03-04 |
 | 23. Documentation | v1.4 | 1/1 | Complete | 2026-03-04 |
 | 24. Close Audit Gaps | v1.4 | 1/1 | Complete | 2026-03-04 |
-| 25. Command Spec and Workflow Foundation | v1.5 | 0/TBD | Not started | - |
+| 25. Command Spec and Workflow Foundation | 1/1 | Complete    | 2026-03-04 | - |
 | 26. Design Presentation and Output | v1.5 | 0/TBD | Not started | - |
 | 27. GSD Routing Integration | v1.5 | 0/TBD | Not started | - |
 | 28. Documentation | v1.5 | 0/TBD | Not started | - |
