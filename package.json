@@ -7,26 +7,6 @@
     "gsd": "get-shit-done/bin/gsd-cli.cjs",
     "gsdc": "get-shit-done/bin/gsd-cli.cjs"
   },
-  "files": [
-    "bin",
-    "commands",
-    "get-shit-done",
-    "agents",
-    "hooks/dist",
-    "scripts"
-  ],
-  "keywords": [
-    "claude",
-    "claude-code",
-    "ai",
-    "meta-prompting",
-    "context-engineering",
-    "spec-driven-development",
-    "gemini",
-    "gemini-cli",
-    "codex",
-    "codex-cli"
-  ],
   "author": "TÂCHES",
   "license": "MIT",
   "repository": {
@@ -46,7 +26,6 @@
   },
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
-    "prepublishOnly": "npm run build:hooks",
     "test": "node scripts/run-tests.cjs",
     "test:coverage": "c8 --check-coverage --lines 70 --reporter text --include 'get-shit-done/bin/lib/*.cjs' --exclude 'tests/**' --all node scripts/run-tests.cjs",
     "install-fork": "bash bin/replace-vanilla.sh",
