@@ -32,9 +32,9 @@ Requirements for GSD Brainstorming Command milestone.
 
 ### Documentation
 
-- [ ] **DOCS-01**: `/gsd:brainstorm` added to help.md command reference
-- [ ] **DOCS-02**: USER-GUIDE.md updated with brainstorm command usage and examples
-- [ ] **DOCS-03**: README.md updated with brainstorm command entry
+- [x] **DOCS-01**: `/gsd:brainstorm` added to help.md command reference
+- [x] **DOCS-02**: USER-GUIDE.md updated with brainstorm command usage and examples
+- [x] **DOCS-03**: README.md updated with brainstorm command entry
 
 ## Future Requirements
 
@@ -66,9 +66,9 @@ Requirements for GSD Brainstorming Command milestone.
 | DESIGN-02 | Phase 26 | Pending |
 | ROUTE-01 | Phase 27 | Complete |
 | ROUTE-02 | Phase 27 | Complete |
-| DOCS-01 | Phase 28 | Pending |
-| DOCS-02 | Phase 28 | Pending |
-| DOCS-03 | Phase 28 | Pending |
+| DOCS-01 | Phase 28 | Complete |
+| DOCS-02 | Phase 28 | Complete |
+| DOCS-03 | Phase 28 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 14 total
