@@ -61,6 +61,7 @@
 - [x] **Phase 21: Core Workflow** - Linear workflow with argument parsing, issue fetching, routing heuristic, and delegation (completed 2026-03-04)
 - [x] **Phase 22: Completion Loop** - Comment-back to Linear issues and temporary file cleanup (completed 2026-03-04)
 - [x] **Phase 23: Documentation** - USER-GUIDE.md and README.md updates for /gsd:linear (completed 2026-03-04)
+- [ ] **Phase 24: Close Audit Gaps** - Fix portability defect and bookkeeping gaps (Gap Closure)
 
 ## Phase Details
 
@@ -118,6 +119,19 @@ Plans:
 Plans:
 - [ ] 23-01: TBD
 
+### Phase 24: Close Audit Gaps
+**Goal**: All audit gaps closed — command spec uses portable paths, SUMMARY frontmatter is complete
+**Depends on**: Phase 23
+**Requirements**: CMD-01, DOCS-01, DOCS-02
+**Gap Closure:** Closes gaps from v1.4 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `commands/gsd/linear.md` uses `@~/.claude/get-shit-done/workflows/linear.md` (not absolute path)
+  2. `.planning/phases/23-documentation/23-01-SUMMARY.md` includes `requirements_completed: [DOCS-01, DOCS-02]` in frontmatter
+**Plans**: 1 plan
+
+Plans:
+- [ ] 24-01-PLAN.md — Fix absolute path in command spec and add missing frontmatter
+
 ## Progress
 
 **Execution Order:**
@@ -148,3 +162,4 @@ Phases execute in numeric order.
 | 21. Core Workflow | 1/1 | Complete    | 2026-03-04 | - |
 | 22. Completion Loop | 1/1 | Complete    | 2026-03-04 | - |
 | 23. Documentation | 1/1 | Complete   | 2026-03-04 | - |
+| 24. Close Audit Gaps | v1.4 | 0/1 | Planned | - |
