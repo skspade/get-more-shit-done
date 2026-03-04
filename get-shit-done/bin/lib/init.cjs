@@ -694,6 +694,55 @@ function cmdInitProgress(cwd, raw) {
   output(result, raw);
 }
 
+function cmdInitLinear(cwd, raw) {
+  const config = loadConfig(cwd);
+  const now = new Date();
+
+  // Find next quick task number (same logic as cmdInitQuick)
+  const quickDir = path.join(cwd, '.planning', 'quick');
+  let nextNum = 1;
+  try {
+    const existing = fs.readdirSync(quickDir)
+      .filter(f => /^\d+-/.test(f))
+      .map(f => parseInt(f.split('-')[0], 10))
+      .filter(n => !isNaN(n));
+    if (existing.length > 0) {
+      nextNum = Math.max(...existing) + 1;
+    }
+  } catch {}
+
+  const result = {
+    // Models
+    planner_model: resolveModelInternal(cwd, 'gsd-planner'),
+    executor_model: resolveModelInternal(cwd, 'gsd-executor'),
+    checker_model: resolveModelInternal(cwd, 'gsd-plan-checker'),
+    verifier_model: resolveModelInternal(cwd, 'gsd-verifier'),
+
+    // Config
+    commit_docs: config.commit_docs,
+
+    // Quick task numbering
+    next_num: nextNum,
+
+    // Timestamps
+    date: now.toISOString().split('T')[0],
+    timestamp: now.toISOString(),
+
+    // Paths
+    quick_dir: '.planning/quick',
+    state_path: '.planning/STATE.md',
+    roadmap_path: '.planning/ROADMAP.md',
+    project_path: '.planning/PROJECT.md',
+    config_path: '.planning/config.json',
+
+    // File existence
+    planning_exists: pathExistsInternal(cwd, '.planning'),
+    roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+  };
+
+  output(result, raw);
+}
+
 module.exports = {
   cmdInitExecutePhase,
   cmdInitPlanPhase,
@@ -707,4 +756,5 @@ module.exports = {
   cmdInitMilestoneOp,
   cmdInitMapCodebase,
   cmdInitProgress,
+  cmdInitLinear,
 };
