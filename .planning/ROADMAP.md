@@ -58,7 +58,7 @@
 **Milestone Goal:** Add a `/gsd:linear` slash command that reads Linear issues via MCP, auto-routes to quick or milestone, and posts summary comments back.
 
 - [x] **Phase 20: Foundation** - CLI init command and command spec for Linear integration (completed 2026-03-04)
-- [ ] **Phase 21: Core Workflow** - Linear workflow with argument parsing, issue fetching, routing heuristic, and delegation
+- [x] **Phase 21: Core Workflow** - Linear workflow with argument parsing, issue fetching, routing heuristic, and delegation (completed 2026-03-04)
 - [ ] **Phase 22: Completion Loop** - Comment-back to Linear issues and temporary file cleanup
 - [ ] **Phase 23: Documentation** - USER-GUIDE.md and README.md updates for /gsd:linear
 
@@ -145,6 +145,6 @@ Phases execute in numeric order.
 | 18. Settings and Help Commands | v1.3 | 2/2 | Complete | 2026-03-03 |
 | 19. Close Audit Gaps | v1.3 | 2/2 | Complete | 2026-03-03 |
 | 20. Foundation | 1/1 | Complete    | 2026-03-04 | - |
-| 21. Core Workflow | v1.4 | 0/0 | Not started | - |
+| 21. Core Workflow | 1/1 | Complete   | 2026-03-04 | - |
 | 22. Completion Loop | v1.4 | 0/0 | Not started | - |
 | 23. Documentation | v1.4 | 0/0 | Not started | - |

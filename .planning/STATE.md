@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Phase 20 — Foundation (v1.4 Linear Integration)
+**Current focus:** Phase 21 — Core Workflow (v1.4 Linear Integration)
 
 ## Current Position
 
-Phase: 20 of 23 (Foundation)
+Phase: 21 of 23 (Core Workflow)
 Plan: 1 of 1 in current phase
-Status: Phase 20 plans complete
-Last activity: 2026-03-04 — Completed 20-01 CLI Init Linear + Command Spec
+Status: Phase 21 plans complete
+Last activity: 2026-03-03 — Completed 21-01 Linear workflow with routing and delegation
 
-Progress: [██░░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -75,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-04
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-03-03
+Stopped at: Completed 21-01-PLAN.md
 Resume file: None
