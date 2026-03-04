@@ -17,12 +17,12 @@ Requirements for Linear integration milestone. Each maps to roadmap phases.
 
 ### Workflow
 
-- [ ] **WKFL-01**: Workflow parses issue IDs and flags (`--quick`, `--milestone`, `--full`) from arguments
-- [ ] **WKFL-02**: Workflow fetches Linear issue data and comments via MCP tools (`get_issue`, `list_comments`)
-- [ ] **WKFL-03**: Workflow routes to quick or milestone based on scoring heuristic (issue count, sub-issues, description length, labels, relations)
-- [ ] **WKFL-04**: Flag overrides (`--quick`, `--milestone`) bypass routing heuristic
-- [ ] **WKFL-05**: Quick route synthesizes description and delegates to quick workflow
-- [ ] **WKFL-06**: Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow
+- [x] **WKFL-01**: Workflow parses issue IDs and flags (`--quick`, `--milestone`, `--full`) from arguments
+- [x] **WKFL-02**: Workflow fetches Linear issue data and comments via MCP tools (`get_issue`, `list_comments`)
+- [x] **WKFL-03**: Workflow routes to quick or milestone based on scoring heuristic (issue count, sub-issues, description length, labels, relations)
+- [x] **WKFL-04**: Flag overrides (`--quick`, `--milestone`) bypass routing heuristic
+- [x] **WKFL-05**: Quick route synthesizes description and delegates to quick workflow
+- [x] **WKFL-06**: Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow
 - [ ] **WKFL-07**: Summary comment posted back to Linear issues after completion
 - [ ] **WKFL-08**: Cleanup removes temporary linear-context.md after completion
 
@@ -53,12 +53,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | INIT-01 | Phase 20 | Complete |
 | CMD-01 | Phase 20 | Complete |
-| WKFL-01 | Phase 21 | Pending |
-| WKFL-02 | Phase 21 | Pending |
-| WKFL-03 | Phase 21 | Pending |
-| WKFL-04 | Phase 21 | Pending |
-| WKFL-05 | Phase 21 | Pending |
-| WKFL-06 | Phase 21 | Pending |
+| WKFL-01 | Phase 21 | Complete |
+| WKFL-02 | Phase 21 | Complete |
+| WKFL-03 | Phase 21 | Complete |
+| WKFL-04 | Phase 21 | Complete |
+| WKFL-05 | Phase 21 | Complete |
+| WKFL-06 | Phase 21 | Complete |
 | WKFL-07 | Phase 22 | Pending |
 | WKFL-08 | Phase 22 | Pending |
 | DOCS-01 | Phase 23 | Pending |
