@@ -8,6 +8,7 @@
 - ✅ **v1.3 CLI Utilities** — Phases 14-19 (shipped 2026-03-03)
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
 - ✅ **v1.5 GSD Brainstorming Command** — Phases 25-29 (shipped 2026-03-04)
+- [ ] **v1.6 Dual-Layer Test Architecture** — Phases 30-34
 
 ## Phases
 
@@ -76,6 +77,74 @@
 
 </details>
 
+### v1.6 Dual-Layer Test Architecture
+
+- [ ] **Phase 30: Foundation** - Config schema, testing.cjs module, test counting CLI, framework detection, fix pre-existing failures
+- [ ] **Phase 31: Hard Test Gate** - Post-commit gate in execute-plan, TDD awareness, baseline capture, output summarization
+- [ ] **Phase 32: Acceptance Test Layer** - Discuss-phase AT gathering, CONTEXT.md storage, verify-phase execution, plan-checker coverage, ownership invariant
+- [ ] **Phase 33: Test Steward** - Suite health agent, redundancy detection, consolidation proposals, budget enforcement, planner integration, audit-tests command
+- [ ] **Phase 34: Documentation** - help.md, USER-GUIDE.md, README.md updates for test architecture
+
+## Phase Details
+
+### Phase 30: Foundation
+**Goal**: All test infrastructure has a working data layer -- config is readable, tests are countable, frameworks are detected, and the existing suite passes cleanly
+**Depends on**: Nothing (first phase of v1.6)
+**Requirements**: FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05
+**Success Criteria** (what must be TRUE):
+  1. Running `gsd test-count` reports the number of test cases in the project, and `gsd test-count --phase N` reports per-phase counts
+  2. Config.json accepts `test.*` keys (command, framework, hard_gate, acceptance_tests, budget, steward) with zero-config degradation when absent
+  3. Running the test suite produces zero failures -- the 2 pre-existing failures in codex-config and config are fixed
+  4. Framework auto-detection correctly identifies the test runner from package.json without manual configuration
+  5. All test functions (counting, detection, config reading) are consolidated in a single `testing.cjs` module accessible via the gsd-tools dispatcher
+**Plans**: TBD
+
+### Phase 31: Hard Test Gate
+**Goal**: Every task commit during execute-plan is verified against the full test suite -- regressions are caught immediately, TDD workflows are preserved, and test output does not consume the executor's context window
+**Depends on**: Phase 30 (config schema, testing.cjs, clean baseline)
+**Requirements**: GATE-01, GATE-02, GATE-03, GATE-04, GATE-05
+**Success Criteria** (what must be TRUE):
+  1. After each task commit during execute-plan, the full test suite runs automatically and blocks the next task if any new test fails
+  2. When a test failure is detected, the executor follows existing deviation Rule 1 (debug/fix/retry) and escalates to human after retries exhausted
+  3. A TDD RED commit (intentional test failure) does not trigger the hard gate -- the gate recognizes the commit convention and skips regression checking
+  4. The gate only blocks on NEW failures by comparing against a captured baseline, not on pre-existing known failures
+  5. Test output shown to the executor is summarized to pass/fail counts and failure details only, not the full raw output
+**Plans**: TBD
+
+### Phase 32: Acceptance Test Layer
+**Goal**: Humans define executable acceptance criteria during discuss-phase that the AI works against -- these criteria are stored, tracked, verified, and protected from AI modification throughout the phase lifecycle
+**Depends on**: Phase 30 (config schema for acceptance_tests toggle)
+**Requirements**: AT-01, AT-02, AT-03, AT-04, AT-05
+**Success Criteria** (what must be TRUE):
+  1. During discuss-phase, the user is prompted to define acceptance tests in Given/When/Then/Verify format for each requirement
+  2. Acceptance tests appear in CONTEXT.md inside an `<acceptance_tests>` block with AT-{NN} identifiers that persist through plan and execute phases
+  3. During verify-phase, each acceptance test's Verify command is executed and the result maps to a verification truth (pass/fail with evidence)
+  4. Plan-checker validates that plans cover all acceptance tests from CONTEXT.md -- missing coverage is flagged before execution begins
+  5. AI cannot add, remove, or modify acceptance tests after discuss-phase approval -- the ownership invariant is enforced in plan and execute workflows
+**Plans**: TBD
+
+### Phase 33: Test Steward
+**Goal**: Long-term test suite health is actively managed -- redundancy is detected, budgets are enforced, consolidation is proposed (not auto-applied), and the planner is budget-aware
+**Depends on**: Phase 30 (counting, detection, budget functions), Phase 31 (test data from gate runs)
+**Requirements**: STEW-01, STEW-02, STEW-03, STEW-04, STEW-05, STEW-06
+**Success Criteria** (what must be TRUE):
+  1. Running `/gsd:audit-tests` produces a test health report covering redundancy, staleness, and budget status without requiring a full milestone audit
+  2. During audit-milestone, the gsd-test-steward agent is spawned and its findings appear in the audit results
+  3. The steward identifies duplicate assertions, overlapping test coverage, and stale tests referencing deleted code -- with specific consolidation proposals (parameterize, promote, prune, merge) that require human approval
+  4. Per-phase budget (default: 50) and project budget (default: 800) are tracked, and budget overruns are surfaced as warnings during plan-phase and audit
+  5. During plan-phase, the planner receives current budget status and generates test plans within the remaining budget allocation
+**Plans**: TBD
+
+### Phase 34: Documentation
+**Goal**: All test architecture features are documented for users -- configuration, commands, workflows, and the dual-layer testing model are explained with examples
+**Depends on**: Phase 30, Phase 31, Phase 32, Phase 33 (documents what was built)
+**Requirements**: DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. help.md includes test-count command reference, audit-tests command reference, and test.* configuration keys
+  2. USER-GUIDE.md contains a test architecture usage guide explaining both layers (acceptance tests and unit/regression tests), the hard gate, the steward, and budget management
+  3. README.md includes a test configuration section showing how to enable and configure the dual-layer test system
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -112,3 +181,8 @@ Phases execute in numeric order.
 | 27. GSD Routing Integration | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 28. Documentation | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 29. Close Audit Gaps | v1.5 | 1/1 | Complete | 2026-03-04 |
+| 30. Foundation | v1.6 | 0/0 | Not started | - |
+| 31. Hard Test Gate | v1.6 | 0/0 | Not started | - |
+| 32. Acceptance Test Layer | v1.6 | 0/0 | Not started | - |
+| 33. Test Steward | v1.6 | 0/0 | Not started | - |
+| 34. Documentation | v1.6 | 0/0 | Not started | - |

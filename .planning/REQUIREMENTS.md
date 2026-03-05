@@ -58,27 +58,27 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| FOUND-01 | | |
-| FOUND-02 | | |
-| FOUND-03 | | |
-| FOUND-04 | | |
-| FOUND-05 | | |
-| GATE-01 | | |
-| GATE-02 | | |
-| GATE-03 | | |
-| GATE-04 | | |
-| GATE-05 | | |
-| AT-01 | | |
-| AT-02 | | |
-| AT-03 | | |
-| AT-04 | | |
-| AT-05 | | |
-| STEW-01 | | |
-| STEW-02 | | |
-| STEW-03 | | |
-| STEW-04 | | |
-| STEW-05 | | |
-| STEW-06 | | |
-| DOC-01 | | |
-| DOC-02 | | |
-| DOC-03 | | |
+| FOUND-01 | Phase 30 | Pending |
+| FOUND-02 | Phase 30 | Pending |
+| FOUND-03 | Phase 30 | Pending |
+| FOUND-04 | Phase 30 | Pending |
+| FOUND-05 | Phase 30 | Pending |
+| GATE-01 | Phase 31 | Pending |
+| GATE-02 | Phase 31 | Pending |
+| GATE-03 | Phase 31 | Pending |
+| GATE-04 | Phase 31 | Pending |
+| GATE-05 | Phase 31 | Pending |
+| AT-01 | Phase 32 | Pending |
+| AT-02 | Phase 32 | Pending |
+| AT-03 | Phase 32 | Pending |
+| AT-04 | Phase 32 | Pending |
+| AT-05 | Phase 32 | Pending |
+| STEW-01 | Phase 33 | Pending |
+| STEW-02 | Phase 33 | Pending |
+| STEW-03 | Phase 33 | Pending |
+| STEW-04 | Phase 33 | Pending |
+| STEW-05 | Phase 33 | Pending |
+| STEW-06 | Phase 33 | Pending |
+| DOC-01 | Phase 34 | Pending |
+| DOC-02 | Phase 34 | Pending |
+| DOC-03 | Phase 34 | Pending |
