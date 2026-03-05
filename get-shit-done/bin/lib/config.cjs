@@ -58,11 +58,28 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    test: {
+      hard_gate: true,
+      acceptance_tests: true,
+      budget: {
+        per_phase: 50,
+        project: 800,
+      },
+      steward: true,
+    },
   };
   const defaults = {
     ...hardcoded,
     ...userDefaults,
     workflow: { ...hardcoded.workflow, ...(userDefaults.workflow || {}) },
+    test: {
+      ...hardcoded.test,
+      ...(userDefaults.test || {}),
+      budget: {
+        ...hardcoded.test.budget,
+        ...((userDefaults.test || {}).budget || {}),
+      },
+    },
   };
 
   try {

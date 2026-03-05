@@ -53,6 +53,11 @@
  *     [--name <name>]
  *     [--archive-phases]               Move phase dirs to milestones/vX.Y-phases/
  *
+ * Testing:
+ *   test-count [--phase N]             Count test cases in project (optionally per-phase)
+ *   test-detect-framework              Auto-detect test framework from project files
+ *   test-config                        Return merged test configuration with defaults
+ *
  * Validation:
  *   validate consistency               Check phase numbering, disk/roadmap sync
  *   validate health [--repair]         Check .planning/ integrity, optionally repair
@@ -141,6 +146,7 @@ const milestone = require('./lib/milestone.cjs');
 const commands = require('./lib/commands.cjs');
 const init = require('./lib/init.cjs');
 const frontmatter = require('./lib/frontmatter.cjs');
+const testing = require('./lib/testing.cjs');
 
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
@@ -589,6 +595,23 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'test-count': {
+      const phaseIdx = args.indexOf('--phase');
+      const phaseArg = phaseIdx !== -1 ? args[phaseIdx + 1] : null;
+      testing.cmdTestCount(cwd, { phase: phaseArg }, raw);
+      break;
+    }
+
+    case 'test-detect-framework': {
+      testing.cmdTestDetectFramework(cwd, raw);
+      break;
+    }
+
+    case 'test-config': {
+      testing.cmdTestConfig(cwd, raw);
       break;
     }
 
