@@ -517,6 +517,84 @@ Back to [current area]: [return to current question]"
 Track deferred ideas internally.
 </step>
 
+<step name="gather_acceptance_tests">
+Check if acceptance tests should be gathered:
+
+1. **If `--auto` flag present:** Skip this step entirely (acceptance tests are interactive-only for v1.6).
+
+2. **Check config:**
+```bash
+AT_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get test.acceptance_tests 2>/dev/null || echo "true")
+```
+
+**If `AT_ENABLED` is false:** Skip this step silently. No acceptance test prompts appear.
+
+**If `AT_ENABLED` is true (default):**
+
+3. **Present requirements for AT gathering:**
+
+Extract the phase's requirement IDs from ROADMAP.md (already available from initialize step). For each requirement, present to user:
+
+```
+Now let's define acceptance tests -- observable behaviors that prove this phase works.
+
+Phase requirements:
+- {REQ-ID}: {description}
+- {REQ-ID}: {description}
+```
+
+4. **For each requirement, gather an AT:**
+
+Use AskUserQuestion:
+- header: "Accept test"
+- question: "What observable behavior proves {REQ-ID} works? Describe the Given/When/Then, and I'll suggest a Verify command."
+- options: "Describe behavior" / "Skip this requirement" / "Done with ATs"
+
+For each user response:
+a. Parse the user's description into Given/When/Then format
+b. Suggest a Verify command (a shell command that exits 0 on success, non-zero on failure)
+c. Present the formatted AT for approval:
+   ```
+   ### AT-{NN}: {title derived from description}
+   - Given: {precondition}
+   - When: {action}
+   - Then: {expected outcome}
+   - Verify: `{suggested shell command}`
+   ```
+d. Use AskUserQuestion to confirm:
+   - header: "Confirm AT"
+   - question: "Accept this test, or modify?"
+   - options: "Accept" / "Modify Verify command" / "Rewrite"
+
+If user picks "Done with ATs" at any point, stop gathering and proceed.
+
+5. **After all requirements processed or user says "Done with ATs":**
+
+Present the full acceptance test list:
+```
+## Acceptance Tests Summary
+
+{N} acceptance test(s) defined:
+
+### AT-01: {title}
+- Given: ...
+- When: ...
+- Then: ...
+- Verify: `...`
+
+[repeat for each AT]
+```
+
+Use AskUserQuestion:
+- header: "AT review"
+- question: "Finalize these acceptance tests?"
+- options: "Approve all" / "Add more" / "Remove one"
+
+6. **Store the gathered ATs internally** for use in `write_context` step.
+
+If zero ATs were defined (user skipped all or said "Done" immediately), the `<acceptance_tests>` section is omitted from CONTEXT.md entirely.
+</step>
+
 <step name="write_context">
 Create CONTEXT.md capturing decisions made.
 
@@ -583,6 +661,20 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 [If none: "No specific requirements — open to standard approaches"]
 
 </specifics>
+
+{Include `<acceptance_tests>` section only if ATs were gathered in gather_acceptance_tests step. Omit entirely if no ATs defined or if acceptance tests were skipped.}
+
+<acceptance_tests>
+## Acceptance Tests
+
+{For each gathered AT:}
+### AT-{NN}: {title}
+- Given: {precondition}
+- When: {action}
+- Then: {expected outcome}
+- Verify: `{shell command}`
+
+</acceptance_tests>
 
 <deferred>
 ## Deferred Ideas
