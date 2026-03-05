@@ -266,6 +266,45 @@ UAT_PATH=$(printf '%s\n' "$INIT" | jq -r '.uat_path // empty')
 CONTEXT_PATH=$(printf '%s\n' "$INIT" | jq -r '.context_path // empty')
 ```
 
+## 7.5. Gather Test Budget Status (if available)
+
+Gather test budget data for the planner. This is informational — failures to gather data are silently ignored.
+
+```bash
+# Get project-wide test count
+PROJECT_TEST_COUNT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-count --raw 2>/dev/null || echo "")
+
+# Get phase-specific test count
+PHASE_TEST_COUNT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-count --phase ${PHASE} --raw 2>/dev/null || echo "")
+
+# Get test config (includes budget thresholds)
+TEST_CONFIG_JSON=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-config 2>/dev/null || echo "")
+```
+
+**If `PROJECT_TEST_COUNT` is empty or `TEST_CONFIG_JSON` is empty:** Skip budget injection (no test infrastructure detected). Set `BUDGET_BLOCK=""`.
+
+**If data available:** Parse budget thresholds from TEST_CONFIG_JSON:
+- `project_budget` = test config `.budget.project` (default 800)
+- `phase_budget` = test config `.budget.per_phase` (default 50)
+
+Calculate status:
+- Project usage: `PROJECT_TEST_COUNT / project_budget * 100`
+- Phase usage: `PHASE_TEST_COUNT / phase_budget * 100` (if phase count available)
+- Warning at >= 80%, Over at >= 100%
+
+Build budget block:
+```
+BUDGET_BLOCK="
+<test_budget>
+**Test Budget Status:**
+- Project: ${PROJECT_TEST_COUNT}/${project_budget} tests (${project_pct}%) — ${project_status}
+- Phase ${PHASE}: ${PHASE_TEST_COUNT}/${phase_budget} tests (${phase_pct}%) — ${phase_status}
+
+**Guidance:** Plan tests within remaining budget. Budget overruns trigger warnings during audit, not blockers.
+</test_budget>
+"
+```
+
 ## 8. Spawn gsd-planner Agent
 
 Display banner:
@@ -295,6 +334,8 @@ Planner prompt:
 </files_to_read>
 
 **Phase requirement IDs (every ID MUST appear in a plan's `requirements` field):** {phase_req_ids}
+
+{BUDGET_BLOCK}
 
 **Project instructions:** Read ./CLAUDE.md if exists — follow project-specific guidelines
 **Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists) — read SKILL.md files, plans should account for project skill rules
@@ -406,6 +447,8 @@ Revision prompt:
 </files_to_read>
 
 **Checker issues:** {structured_issues_from_checker}
+
+{BUDGET_BLOCK}
 </revision_context>
 
 <instructions>
