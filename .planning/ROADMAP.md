@@ -79,7 +79,7 @@
 
 ### v1.6 Dual-Layer Test Architecture
 
-- [ ] **Phase 30: Foundation** - Config schema, testing.cjs module, test counting CLI, framework detection, fix pre-existing failures
+- [x] **Phase 30: Foundation** - Config schema, testing.cjs module, test counting CLI, framework detection, fix pre-existing failures (completed 2026-03-05)
 - [ ] **Phase 31: Hard Test Gate** - Post-commit gate in execute-plan, TDD awareness, baseline capture, output summarization
 - [ ] **Phase 32: Acceptance Test Layer** - Discuss-phase AT gathering, CONTEXT.md storage, verify-phase execution, plan-checker coverage, ownership invariant
 - [ ] **Phase 33: Test Steward** - Suite health agent, redundancy detection, consolidation proposals, budget enforcement, planner integration, audit-tests command
@@ -97,7 +97,7 @@
   3. Running the test suite produces zero failures -- the 2 pre-existing failures in codex-config and config are fixed
   4. Framework auto-detection correctly identifies the test runner from package.json without manual configuration
   5. All test functions (counting, detection, config reading) are consolidated in a single `testing.cjs` module accessible via the gsd-tools dispatcher
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 30-01-PLAN.md — Create testing.cjs module, config defaults, dispatcher/CLI wiring, and tests
 - [ ] 30-02-PLAN.md — Fix 2 pre-existing test failures (codex-config agent count, config-get user defaults)
@@ -184,7 +184,7 @@ Phases execute in numeric order.
 | 27. GSD Routing Integration | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 28. Documentation | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 29. Close Audit Gaps | v1.5 | 1/1 | Complete | 2026-03-04 |
-| 30. Foundation | v1.6 | 0/2 | Not started | - |
+| 30. Foundation | 2/2 | Complete   | 2026-03-05 | - |
 | 31. Hard Test Gate | v1.6 | 0/0 | Not started | - |
 | 32. Acceptance Test Layer | v1.6 | 0/0 | Not started | - |
 | 33. Test Steward | v1.6 | 0/0 | Not started | - |
