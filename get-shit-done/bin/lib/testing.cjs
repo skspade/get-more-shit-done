@@ -451,13 +451,6 @@ function cmdTestRun(cwd, options, raw) {
   const parsed = parseTestOutput(testResult.stdout, testResult.stderr, config.framework);
   const rawLength = (testResult.stdout || '').length + (testResult.stderr || '').length;
 
-  // If parsing didn't extract counts but we have an exit code, use exit code
-  if (parsed.total === 0 && testResult.exitCode === 0) {
-    parsed.total = 0;
-    parsed.passed = 0;
-    parsed.failed = 0;
-  }
-
   // 6. Build result
   const result = {
     status: testResult.exitCode === 0 ? 'pass' : 'fail',
