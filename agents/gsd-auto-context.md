@@ -234,6 +234,8 @@ Write to: `{phase_dir}/{padded_phase}-CONTEXT.md`
 
 Use the EXACT template structure below. ALL XML sections are required.
 
+**`<acceptance_tests>` section:** Do NOT generate this section. Acceptance tests are human-defined during interactive discuss-phase only. In auto-context mode (where you operate), the `<acceptance_tests>` block is intentionally omitted. Never fabricate acceptance tests from requirements or success criteria -- this is explicitly deferred per REQUIREMENTS.md ("interactive-only for v1.6").
+
 ```markdown
 # Phase [X]: [Name] - Context
 

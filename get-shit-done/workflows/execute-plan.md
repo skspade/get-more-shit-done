@@ -321,6 +321,25 @@ e. If fix does not resolve after 3 attempts: escalate to human via checkpoint
 
 </test_gate>
 
+<acceptance_test_ownership>
+
+## Acceptance Test Ownership
+
+The `<acceptance_tests>` block in CONTEXT.md is **read-only**. You MUST NOT add, remove, or modify any acceptance test entries (AT-{NN} identifiers, Given/When/Then lines, or Verify commands).
+
+**What you CAN do:**
+- Reference AT-{NN} identifiers in your work to show which acceptance test a task addresses
+- Ensure your implementation satisfies the acceptance test's Then/Verify criteria
+
+**What you MUST NOT do:**
+- Edit the `<acceptance_tests>` block in CONTEXT.md
+- Create new AT entries
+- Change Verify commands to match your implementation (fix your code to match the test, not the reverse)
+
+If an acceptance test's Verify command fails against your implementation, debug your code -- do not modify the acceptance test.
+
+</acceptance_test_ownership>
+
 <step name="checkpoint_protocol">
 On `type="checkpoint:*"`: automate everything possible first. Checkpoints are for verification/decisions only.
 
