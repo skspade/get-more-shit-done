@@ -184,7 +184,7 @@ Phases execute in numeric order.
 | 27. GSD Routing Integration | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 28. Documentation | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 29. Close Audit Gaps | v1.5 | 1/1 | Complete | 2026-03-04 |
-| 30. Foundation | 2/2 | Complete   | 2026-03-05 | - |
+| 30. Foundation | 2/2 | Complete    | 2026-03-05 | - |
 | 31. Hard Test Gate | v1.6 | 0/0 | Not started | - |
 | 32. Acceptance Test Layer | v1.6 | 0/0 | Not started | - |
 | 33. Test Steward | v1.6 | 0/0 | Not started | - |
