@@ -80,7 +80,7 @@
 ### v1.6 Dual-Layer Test Architecture
 
 - [x] **Phase 30: Foundation** - Config schema, testing.cjs module, test counting CLI, framework detection, fix pre-existing failures (completed 2026-03-05)
-- [ ] **Phase 31: Hard Test Gate** - Post-commit gate in execute-plan, TDD awareness, baseline capture, output summarization
+- [x] **Phase 31: Hard Test Gate** - Post-commit gate in execute-plan, TDD awareness, baseline capture, output summarization (completed 2026-03-05)
 - [ ] **Phase 32: Acceptance Test Layer** - Discuss-phase AT gathering, CONTEXT.md storage, verify-phase execution, plan-checker coverage, ownership invariant
 - [ ] **Phase 33: Test Steward** - Suite health agent, redundancy detection, consolidation proposals, budget enforcement, planner integration, audit-tests command
 - [ ] **Phase 34: Documentation** - help.md, USER-GUIDE.md, README.md updates for test architecture
@@ -185,7 +185,7 @@ Phases execute in numeric order.
 | 28. Documentation | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 29. Close Audit Gaps | v1.5 | 1/1 | Complete | 2026-03-04 |
 | 30. Foundation | 2/2 | Complete    | 2026-03-05 | - |
-| 31. Hard Test Gate | 1/2 | In Progress|  | - |
+| 31. Hard Test Gate | 2/2 | Complete   | 2026-03-05 | - |
 | 32. Acceptance Test Layer | v1.6 | 0/0 | Not started | - |
 | 33. Test Steward | v1.6 | 0/0 | Not started | - |
 | 34. Documentation | v1.6 | 0/0 | Not started | - |
