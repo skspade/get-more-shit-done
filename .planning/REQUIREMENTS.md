@@ -18,11 +18,11 @@
 
 ## Acceptance Tests (Layer 1)
 
-- [ ] **AT-01**: Discuss-phase gathers human-defined acceptance tests per requirement in Given/When/Then/Verify format
-- [ ] **AT-02**: Acceptance tests stored as `<acceptance_tests>` block in CONTEXT.md with AT-{NN} identifiers
-- [ ] **AT-03**: Verify-phase executes acceptance test Verify commands and maps results to verification truths
-- [ ] **AT-04**: Plan-checker verifies that plans cover all acceptance tests from CONTEXT.md
-- [ ] **AT-05**: AI cannot add, remove, or modify acceptance tests after discuss-phase approval (ownership invariant)
+- [x] **AT-01**: Discuss-phase gathers human-defined acceptance tests per requirement in Given/When/Then/Verify format
+- [x] **AT-02**: Acceptance tests stored as `<acceptance_tests>` block in CONTEXT.md with AT-{NN} identifiers
+- [x] **AT-03**: Verify-phase executes acceptance test Verify commands and maps results to verification truths
+- [x] **AT-04**: Plan-checker verifies that plans cover all acceptance tests from CONTEXT.md
+- [x] **AT-05**: AI cannot add, remove, or modify acceptance tests after discuss-phase approval (ownership invariant)
 
 ## Test Steward
 
@@ -68,11 +68,11 @@
 | GATE-03 | Phase 31 | Complete |
 | GATE-04 | Phase 31 | Complete |
 | GATE-05 | Phase 31 | Complete |
-| AT-01 | Phase 32 | Pending |
-| AT-02 | Phase 32 | Pending |
-| AT-03 | Phase 32 | Pending |
-| AT-04 | Phase 32 | Pending |
-| AT-05 | Phase 32 | Pending |
+| AT-01 | Phase 32 | Complete |
+| AT-02 | Phase 32 | Complete |
+| AT-03 | Phase 32 | Complete |
+| AT-04 | Phase 32 | Complete |
+| AT-05 | Phase 32 | Complete |
 | STEW-01 | Phase 33 | Pending |
 | STEW-02 | Phase 33 | Pending |
 | STEW-03 | Phase 33 | Pending |
