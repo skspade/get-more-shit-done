@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { getMilestoneInfo, comparePhaseNum } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const testing = require('./testing.cjs');
 
 // ─── Project Discovery ──────────────────────────────────────────────────────
 
@@ -519,7 +520,7 @@ function gatherHealthData(projectRoot) {
 
       const knownKeys = ['model_profile', 'commit_docs', 'search_gitignored', 'branching_strategy',
         'workflow', 'parallelization', 'autopilot', 'mode', 'depth', 'model_overrides',
-        'research', 'plan_checker', 'verifier', 'nyquist_validation'];
+        'research', 'plan_checker', 'verifier', 'nyquist_validation', 'test'];
       for (const key of Object.keys(parsed)) {
         if (!knownKeys.includes(key)) {
           addIssue('info', 'I001', `config.json: unknown key "${key}"`, 'May be a custom extension');
@@ -736,6 +737,9 @@ const KNOWN_SETTINGS_KEYS = [
   'autopilot', 'autopilot.circuit_breaker_threshold',
   'mode', 'depth', 'model_overrides',
   'research', 'plan_checker', 'verifier', 'nyquist_validation',
+  'test', 'test.hard_gate', 'test.acceptance_tests', 'test.budget',
+  'test.budget.per_phase', 'test.budget.project', 'test.steward',
+  'test.command', 'test.framework',
 ];
 
 function handleSettings(projectRoot, args) {
@@ -881,6 +885,20 @@ const COMMAND_DETAILS = {
       'gsd settings set workflow.research false',
     ],
   },
+  'test-count': {
+    usage: 'gsd test-count [--phase N] [--json] [--plain]',
+    description: 'Count test cases in the project. Shows total count and per-file breakdown. Optionally filter by phase to see only tests referenced in that phase\'s plans.',
+    flags: [
+      { flag: '--phase N', description: 'Filter to tests referenced in phase N plans' },
+      { flag: '--json', description: 'Output as JSON' },
+      { flag: '--plain', description: 'Output as plain text (no colors)' },
+    ],
+    examples: [
+      'gsd test-count',
+      'gsd test-count --phase 30',
+      'gsd test-count --json',
+    ],
+  },
   help: {
     usage: 'gsd help [<command>]',
     description: 'Show available commands and usage. Without arguments, lists all commands. With a command name, shows detailed usage information.',
@@ -946,6 +964,59 @@ function handleHelp(projectRoot, args) {
   return { command: 'help', message: lines.join('\n') };
 }
 
+// ─── Test Count Command ─────────────────────────────────────────────────────
+
+function handleTestCount(projectRoot, args) {
+  // Parse --phase flag from process.argv
+  let phaseArg = null;
+  const argv = process.argv;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--phase=')) {
+      phaseArg = argv[i].slice('--phase='.length);
+    } else if (argv[i] === '--phase' && i + 1 < argv.length) {
+      phaseArg = argv[i + 1];
+    }
+  }
+
+  const result = testing.countTestsInProject(projectRoot || '.', { phase: phaseArg || null });
+
+  const BOLD = '\x1b[1m';
+  const RESET = '\x1b[0m';
+  const DIM = '\x1b[2m';
+  const GREEN = '\x1b[32m';
+  const YELLOW = '\x1b[33m';
+
+  const lines = [];
+  const phaseLabel = phaseArg ? ` (Phase ${phaseArg})` : '';
+  lines.push(`${BOLD}Test Count${phaseLabel}${RESET}`);
+  lines.push('');
+
+  if (result.warning) {
+    lines.push(`${YELLOW}${result.warning}${RESET}`);
+    lines.push('');
+  }
+
+  lines.push(`${BOLD}Total: ${GREEN}${result.total}${RESET}${BOLD} test cases${RESET}`);
+  lines.push('');
+
+  if (result.files.length > 0) {
+    lines.push('Files:');
+    for (const f of result.files) {
+      lines.push(`  ${DIM}${f.file}${RESET}  ${f.count} tests`);
+    }
+  }
+
+  const framework = testing.detectFramework(projectRoot || '.');
+  if (framework) {
+    lines.push('');
+    lines.push(`${DIM}Framework: ${framework}${RESET}`);
+  }
+
+  const message = lines.join('\n');
+
+  return { command: 'test-count', ...result, framework, message };
+}
+
 // ─── Command Registry ───────────────────────────────────────────────────────
 
 const COMMANDS = {
@@ -953,6 +1024,7 @@ const COMMANDS = {
   todos: { description: 'List and inspect pending todos', handler: handleTodos },
   health: { description: 'Validate .planning/ directory integrity', handler: handleHealth },
   settings: { description: 'View and update configuration', handler: handleSettings },
+  'test-count': { description: 'Count test cases in project', handler: handleTestCount },
   help: { description: 'Show available commands and usage', handler: handleHelp },
 };
 
