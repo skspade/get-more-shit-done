@@ -2,11 +2,11 @@
 
 ## Foundation
 
-- [ ] **FOUND-01**: Config schema adds `test.*` section with `command`, `framework`, `hard_gate`, `acceptance_tests`, `budget`, and `steward` keys to config.json
-- [ ] **FOUND-02**: `test-count` CLI command counts test cases (individual `it`/`test` blocks) across project, with `--phase` flag for per-phase counts
-- [ ] **FOUND-03**: Test framework auto-detection from package.json or project files (Jest, Vitest, Mocha, node:test)
-- [ ] **FOUND-04**: Fix 2 pre-existing test failures (codex-config, config) so hard gate can activate cleanly
-- [ ] **FOUND-05**: `testing.cjs` module consolidates all test functions (counting, framework detection, config reading) with dispatcher integration
+- [x] **FOUND-01**: Config schema adds `test.*` section with `command`, `framework`, `hard_gate`, `acceptance_tests`, `budget`, and `steward` keys to config.json
+- [x] **FOUND-02**: `test-count` CLI command counts test cases (individual `it`/`test` blocks) across project, with `--phase` flag for per-phase counts
+- [x] **FOUND-03**: Test framework auto-detection from package.json or project files (Jest, Vitest, Mocha, node:test)
+- [x] **FOUND-04**: Fix 2 pre-existing test failures (codex-config, config) so hard gate can activate cleanly
+- [x] **FOUND-05**: `testing.cjs` module consolidates all test functions (counting, framework detection, config reading) with dispatcher integration
 
 ## Hard Gate
 
@@ -26,12 +26,12 @@
 
 ## Test Steward
 
-- [ ] **STEW-01**: `gsd-test-steward` agent analyzes test suite health (redundancy, staleness, budget status) during audit-milestone
-- [ ] **STEW-02**: Redundancy detection identifies duplicate assertions, overlapping coverage, and stale tests referencing deleted code
-- [ ] **STEW-03**: Consolidation proposals with specific actions (parameterize, promote, prune, merge) requiring human approval
-- [ ] **STEW-04**: Per-phase budget (default: 50) and project budget (default: 800) with configurable thresholds
-- [ ] **STEW-05**: Planner receives budget status during plan-phase and plans tests within limits
-- [ ] **STEW-06**: `/gsd:audit-tests` command for on-demand test suite health checks outside milestone audit
+- [x] **STEW-01**: `gsd-test-steward` agent analyzes test suite health (redundancy, staleness, budget status) during audit-milestone
+- [x] **STEW-02**: Redundancy detection identifies duplicate assertions, overlapping coverage, and stale tests referencing deleted code
+- [x] **STEW-03**: Consolidation proposals with specific actions (parameterize, promote, prune, merge) requiring human approval
+- [x] **STEW-04**: Per-phase budget (default: 50) and project budget (default: 800) with configurable thresholds
+- [x] **STEW-05**: Planner receives budget status during plan-phase and plans tests within limits
+- [x] **STEW-06**: `/gsd:audit-tests` command for on-demand test suite health checks outside milestone audit
 
 ## Documentation
 
@@ -58,11 +58,11 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| FOUND-01 | Phase 30 | Pending |
-| FOUND-02 | Phase 30 | Pending |
-| FOUND-03 | Phase 30 | Pending |
-| FOUND-04 | Phase 30 | Pending |
-| FOUND-05 | Phase 30 | Pending |
+| FOUND-01 | Phase 30 | Complete |
+| FOUND-02 | Phase 30 | Complete |
+| FOUND-03 | Phase 30 | Complete |
+| FOUND-04 | Phase 30 | Complete |
+| FOUND-05 | Phase 30 | Complete |
 | GATE-01 | Phase 31 | Complete |
 | GATE-02 | Phase 31 | Complete |
 | GATE-03 | Phase 31 | Complete |
@@ -73,12 +73,12 @@
 | AT-03 | Phase 32 | Complete |
 | AT-04 | Phase 32 | Complete |
 | AT-05 | Phase 32 | Complete |
-| STEW-01 | Phase 33 | Pending |
-| STEW-02 | Phase 33 | Pending |
-| STEW-03 | Phase 33 | Pending |
-| STEW-04 | Phase 33 | Pending |
-| STEW-05 | Phase 33 | Pending |
-| STEW-06 | Phase 33 | Pending |
+| STEW-01 | Phase 33, 35 | Pending |
+| STEW-02 | Phase 33, 35 | Pending |
+| STEW-03 | Phase 33, 35 | Pending |
+| STEW-04 | Phase 33, 35 | Pending |
+| STEW-05 | Phase 33, 35 | Pending |
+| STEW-06 | Phase 33, 35 | Pending |
 | DOC-01 | Phase 34 | Complete |
 | DOC-02 | Phase 34 | Complete |
 | DOC-03 | Phase 34 | Complete |
