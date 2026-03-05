@@ -557,6 +557,7 @@ describe('cmdTestRun', () => {
     fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
       test: {
         hard_gate: true,
+        framework: 'node:test',
         command: 'node -e "console.error(\'not ok 1 - old-test\\nnot ok 2 - new-test\'); process.exit(1)"',
       },
     }));
@@ -582,6 +583,7 @@ describe('cmdTestRun', () => {
     fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({
       test: {
         hard_gate: true,
+        framework: 'node:test',
         command: 'node -e "console.error(\'not ok 1 - old-test\'); process.exit(1)"',
       },
     }));

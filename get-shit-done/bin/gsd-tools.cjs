@@ -57,6 +57,7 @@
  *   test-count [--phase N]             Count test cases in project (optionally per-phase)
  *   test-detect-framework              Auto-detect test framework from project files
  *   test-config                        Return merged test configuration with defaults
+ *   test-run [--baseline] [--baseline-data JSON] [--commit-msg MSG]  Run tests and return structured results
  *
  * Validation:
  *   validate consistency               Check phase numbering, disk/roadmap sync
@@ -612,6 +613,16 @@ async function main() {
 
     case 'test-config': {
       testing.cmdTestConfig(cwd, raw);
+      break;
+    }
+
+    case 'test-run': {
+      const baselineFlag = args.includes('--baseline');
+      const baselineDataIdx = args.indexOf('--baseline-data');
+      const baselineData = baselineDataIdx !== -1 ? JSON.parse(args[baselineDataIdx + 1]) : null;
+      const commitMsgIdx = args.indexOf('--commit-msg');
+      const commitMsg = commitMsgIdx !== -1 ? args[commitMsgIdx + 1] : null;
+      testing.cmdTestRun(cwd, { baseline: baselineFlag, baselineData, commitMsg }, raw);
       break;
     }
 

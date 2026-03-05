@@ -1,9 +1,10 @@
 /**
- * Testing — Test infrastructure: framework detection, test counting, config reading
+ * Testing — Test infrastructure: framework detection, test counting, config reading, test execution
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const { output, error, loadConfig, findPhaseInternal } = require('./core.cjs');
 
 // ─── Framework Detection ────────────────────────────────────────────────────
@@ -273,6 +274,253 @@ function getDefaultCommand(framework) {
   }
 }
 
+// ─── Test Execution ──────────────────────────────────────────────────────────
+
+const DEFAULT_TEST_TIMEOUT = 120000; // 2 minutes
+
+/**
+ * Parse test runner output to extract counts and failing test names.
+ * Framework-specific parsing with fallback to empty results.
+ * Returns: { total, passed, failed, failedTests: string[] }
+ */
+function parseTestOutput(stdout, stderr, framework) {
+  const combined = (stdout || '') + '\n' + (stderr || '');
+  const result = { total: 0, passed: 0, failed: 0, failedTests: [] };
+
+  switch (framework) {
+    case 'node:test': {
+      // TAP format: # tests N, # pass N, # fail N, not ok N - description
+      const totalMatch = combined.match(/#\s*tests\s+(\d+)/);
+      const passMatch = combined.match(/#\s*pass\s+(\d+)/);
+      const failMatch = combined.match(/#\s*fail\s+(\d+)/);
+      if (totalMatch) result.total = parseInt(totalMatch[1], 10);
+      if (passMatch) result.passed = parseInt(passMatch[1], 10);
+      if (failMatch) result.failed = parseInt(failMatch[1], 10);
+
+      // Extract failing test names from "not ok N - description"
+      const failedLines = combined.match(/^not ok \d+ - (.+)$/gm);
+      if (failedLines) {
+        for (const line of failedLines) {
+          const nameMatch = line.match(/^not ok \d+ - (.+)$/);
+          if (nameMatch) result.failedTests.push(nameMatch[1].trim());
+        }
+      }
+      break;
+    }
+
+    case 'jest': {
+      // Jest: Tests:  N failed, N passed, N total
+      const jestMatch = combined.match(/Tests:\s+(?:(\d+)\s+failed,\s+)?(\d+)\s+passed,\s+(\d+)\s+total/);
+      if (jestMatch) {
+        result.failed = jestMatch[1] ? parseInt(jestMatch[1], 10) : 0;
+        result.passed = parseInt(jestMatch[2], 10);
+        result.total = parseInt(jestMatch[3], 10);
+      }
+      break;
+    }
+
+    case 'vitest': {
+      // Vitest: Tests  N failed | N passed (total)
+      const vitestMatch = combined.match(/Tests\s+(?:(\d+)\s+failed\s+\|\s+)?(\d+)\s+passed/);
+      if (vitestMatch) {
+        result.failed = vitestMatch[1] ? parseInt(vitestMatch[1], 10) : 0;
+        result.passed = parseInt(vitestMatch[2], 10);
+        result.total = result.failed + result.passed;
+      }
+      break;
+    }
+
+    case 'mocha': {
+      // Mocha: N passing, N failing
+      const passMatch = combined.match(/(\d+)\s+passing/);
+      const failMatch = combined.match(/(\d+)\s+failing/);
+      if (passMatch) result.passed = parseInt(passMatch[1], 10);
+      if (failMatch) result.failed = parseInt(failMatch[1], 10);
+      result.total = result.passed + result.failed;
+      break;
+    }
+
+    default:
+      // Unknown framework: cannot parse, return zeros
+      break;
+  }
+
+  return result;
+}
+
+/**
+ * Execute a test command and capture output.
+ * Returns: { exitCode, stdout, stderr }
+ */
+function runTestCommand(cwd, command, timeout) {
+  try {
+    const stdout = execSync(command, {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: timeout || DEFAULT_TEST_TIMEOUT,
+      encoding: 'utf-8',
+    });
+    return { exitCode: 0, stdout: stdout || '', stderr: '' };
+  } catch (err) {
+    if (err.killed) {
+      // Timeout
+      return {
+        exitCode: -1,
+        stdout: err.stdout || '',
+        stderr: err.stderr || '',
+        timeout: true,
+      };
+    }
+    return {
+      exitCode: err.status || 1,
+      stdout: err.stdout || '',
+      stderr: err.stderr || '',
+    };
+  }
+}
+
+/**
+ * Run the test suite and return structured results.
+ * Supports baseline capture, baseline comparison, and TDD RED detection.
+ *
+ * Options:
+ *   baseline: boolean — capture baseline data
+ *   baselineData: object — previous baseline for comparison
+ *   commitMsg: string — commit message to check for TDD RED pattern
+ *
+ * Returns JSON via output():
+ *   { status, total, passed, failed, new_failures, baseline_failures, summary, raw_length, baseline? }
+ */
+function cmdTestRun(cwd, options, raw) {
+  const opts = options || {};
+  const config = getTestConfig(cwd);
+
+  // 1. Check hard_gate config
+  if (!config.hard_gate) {
+    output({
+      status: 'skip',
+      total: 0, passed: 0, failed: 0,
+      new_failures: [], baseline_failures: [],
+      summary: 'Hard gate disabled',
+      raw_length: 0,
+    }, raw, 'Hard gate disabled');
+    return; // output() calls process.exit, but return for clarity
+  }
+
+  // 2. Check for TDD RED commit
+  if (opts.commitMsg && /^test\(/.test(opts.commitMsg)) {
+    output({
+      status: 'skip',
+      total: 0, passed: 0, failed: 0,
+      new_failures: [], baseline_failures: [],
+      summary: 'TDD RED commit detected -- gate skipped',
+      raw_length: 0,
+    }, raw, 'TDD RED commit detected -- gate skipped');
+    return;
+  }
+
+  // 3. Check for test command
+  const command = config.command;
+  if (!command) {
+    output({
+      status: 'skip',
+      total: 0, passed: 0, failed: 0,
+      new_failures: [], baseline_failures: [],
+      summary: 'No test command available',
+      raw_length: 0,
+    }, raw, 'No test command available');
+    return;
+  }
+
+  // 4. Run tests
+  const testResult = runTestCommand(cwd, command);
+
+  // Handle timeout
+  if (testResult.timeout) {
+    output({
+      status: 'error',
+      total: 0, passed: 0, failed: 0,
+      new_failures: [], baseline_failures: [],
+      summary: 'Test execution timed out',
+      raw_length: (testResult.stdout || '').length + (testResult.stderr || '').length,
+    }, raw, 'Test execution timed out');
+    return;
+  }
+
+  // 5. Parse output
+  const parsed = parseTestOutput(testResult.stdout, testResult.stderr, config.framework);
+  const rawLength = (testResult.stdout || '').length + (testResult.stderr || '').length;
+
+  // If parsing didn't extract counts but we have an exit code, use exit code
+  if (parsed.total === 0 && testResult.exitCode === 0) {
+    parsed.total = 0;
+    parsed.passed = 0;
+    parsed.failed = 0;
+  }
+
+  // 6. Build result
+  const result = {
+    status: testResult.exitCode === 0 ? 'pass' : 'fail',
+    total: parsed.total,
+    passed: parsed.passed,
+    failed: parsed.failed,
+    new_failures: [],
+    baseline_failures: [],
+    summary: '',
+    raw_length: rawLength,
+  };
+
+  // 7. Handle baseline capture
+  if (opts.baseline) {
+    result.baseline = {
+      exitCode: testResult.exitCode,
+      total: parsed.total,
+      passed: parsed.passed,
+      failed: parsed.failed,
+      failedTests: parsed.failedTests,
+    };
+  }
+
+  // 8. Handle baseline comparison
+  if (opts.baselineData) {
+    const baselineFailedSet = new Set(opts.baselineData.failedTests || []);
+    const currentFailedTests = parsed.failedTests || [];
+
+    const newFailures = currentFailedTests.filter(t => !baselineFailedSet.has(t));
+    const baselineFailures = currentFailedTests.filter(t => baselineFailedSet.has(t));
+
+    result.new_failures = newFailures;
+    result.baseline_failures = baselineFailures;
+
+    // If no new failures, status is pass (pre-existing failures are OK)
+    if (newFailures.length === 0 && testResult.exitCode !== 0) {
+      result.status = 'pass';
+    }
+  }
+
+  // 9. Build summary
+  if (result.status === 'pass') {
+    if (parsed.total > 0) {
+      result.summary = `${parsed.passed}/${parsed.total} tests passed`;
+    } else {
+      result.summary = 'Tests passed';
+    }
+    if (result.baseline_failures.length > 0) {
+      result.summary += ` (${result.baseline_failures.length} pre-existing failure(s) in baseline)`;
+    }
+  } else if (result.status === 'fail') {
+    if (result.new_failures.length > 0) {
+      result.summary = `${result.new_failures.length} new failure(s): ${result.new_failures.join(', ')}`;
+    } else if (parsed.failed > 0) {
+      result.summary = `${parsed.failed} test(s) failed`;
+    } else {
+      result.summary = 'Tests failed (exit code ' + testResult.exitCode + ')';
+    }
+  }
+
+  output(result, raw, result.summary);
+}
+
 // ─── Exported Cmd Functions ─────────────────────────────────────────────────
 
 function cmdTestCount(cwd, options, raw) {
@@ -296,7 +544,9 @@ module.exports = {
   countTestsInFile,
   countTestsInProject,
   getTestConfig,
+  parseTestOutput,
   cmdTestCount,
   cmdTestDetectFramework,
   cmdTestConfig,
+  cmdTestRun,
 };
