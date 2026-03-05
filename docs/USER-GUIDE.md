@@ -7,6 +7,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 ## Table of Contents
 
 - [Workflow Diagrams](#workflow-diagrams)
+- [Test Architecture](#test-architecture)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -154,6 +155,109 @@ rapid prototyping phases where test infrastructure isn't the focus.
 
 ---
 
+## Test Architecture
+
+GSD implements a dual-layer testing model that combines human-defined acceptance criteria with AI-generated unit and regression tests. All test features work with zero configuration -- omit the `test` section from `config.json` to use defaults.
+
+### Dual-Layer Model
+
+**Layer 1: Acceptance Tests (Human-Defined)**
+
+During `/gsd:discuss-phase`, the system prompts you to define acceptance tests for each requirement. These use the Given/When/Then/Verify format:
+
+```
+AT-01: User registration creates account
+  Given: A new email address
+  When: POST /api/auth/register with valid credentials
+  Then: 201 response with user object
+  Verify: curl -X POST localhost:3000/api/auth/register -d '{"email":"test@example.com","password":"valid123"}' returns 201
+```
+
+Acceptance tests are stored in the `<acceptance_tests>` block of CONTEXT.md with AT-{NN} identifiers. The AI cannot add, remove, or modify them after discuss-phase approval -- they are human-owned.
+
+**Layer 2: Unit/Regression Tests (AI-Generated)**
+
+During planning, the planner creates test specifications in PLAN.md tasks. During execution, the executor writes and runs tests as part of implementation. These tests are verified by the hard gate after each commit.
+
+### Hard Gate
+
+The hard gate runs the full test suite after every task commit during `/gsd:execute-phase`. It prevents regressions from accumulating across tasks.
+
+**How it works:**
+
+1. Before execution begins, the gate captures a baseline of existing test results
+2. After each task commit, the full test suite runs automatically
+3. If any NEW test fails (compared to baseline), the executor follows deviation Rule 1: debug, fix, retry
+4. If retries are exhausted, the issue escalates to human review
+5. Pre-existing failures do not block -- only new failures trigger the gate
+
+**TDD Awareness:**
+
+The gate recognizes TDD RED commits (intentional test failures as part of test-driven development). When the executor commits a test before its implementation, the gate skips regression checking for that commit, allowing the RED-GREEN-REFACTOR cycle to proceed normally.
+
+**Output Summarization:**
+
+Test output shown to the executor is condensed to pass/fail counts and failure details only. Raw test output is not passed through, preventing context window bloat in long execution sessions.
+
+### Test Steward
+
+The test steward (`gsd-test-steward` agent) monitors long-term test suite health. It runs during `/gsd:audit-milestone` and can be invoked on-demand with `/gsd:audit-tests`.
+
+**What it analyzes:**
+
+- **Redundancy** -- Duplicate assertions, overlapping test coverage
+- **Staleness** -- Tests referencing deleted or renamed code
+- **Budget status** -- Per-phase and project-wide test counts against configured limits
+
+**Consolidation proposals:**
+
+The steward produces specific recommendations (parameterize, promote, prune, merge) that require human approval. It never modifies test files directly.
+
+### Budget Management
+
+Test budgets prevent unbounded test suite growth. Budgets are informational -- overruns produce warnings, not blockers.
+
+| Budget | Default | Scope | Warning Threshold |
+|--------|---------|-------|-------------------|
+| Per-phase | 50 tests | Tests within a single phase directory | 80% (40 tests) |
+| Project | 800 tests | All tests in the project | 80% (640 tests) |
+
+During `/gsd:plan-phase`, the planner receives current budget status and generates test plans within the remaining allocation. Budget overruns are surfaced during plan-phase and milestone audit.
+
+### Test Workflow
+
+```
+  /gsd:discuss-phase
+         |
+         +-- Layer 1: Gather acceptance tests (AT-01, AT-02, ...)
+         |   Stored in CONTEXT.md <acceptance_tests> block
+         |
+  /gsd:plan-phase
+         |
+         +-- Planner receives test budget status
+         +-- Plan-checker verifies plans cover all acceptance tests
+         |
+  /gsd:execute-phase
+         |
+         +-- Layer 2: Executor writes unit/regression tests per task
+         +-- Hard gate runs full suite after each commit
+         |     +-- NEW failure? -> debug/fix/retry
+         |     +-- TDD RED commit? -> skip gate for this commit
+         |
+  /gsd:verify-phase
+         |
+         +-- Acceptance test Verify commands executed
+         +-- Results mapped to verification truths
+         |
+  /gsd:audit-milestone
+         |
+         +-- Test steward analyzes suite health
+         +-- Redundancy, staleness, budget report
+         +-- Consolidation proposals (human approval required)
+```
+
+---
+
 ## Command Reference
 
 ### Core Workflow
@@ -234,6 +338,15 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}"
+  },
+  "test": {
+    "hard_gate": true,
+    "acceptance_tests": true,
+    "budget": {
+      "per_phase": 50,
+      "project": 800
+    },
+    "steward": true
   }
 }
 ```
@@ -265,6 +378,20 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 | `workflow.nyquist_validation` | `true`, `false` | `true` | Validation architecture research during plan-phase; 8th plan-check dimension |
 
 Disable these to speed up phases in familiar domains or when conserving tokens.
+
+### Test Settings
+
+| Setting | Options | Default | What it Controls |
+|---------|---------|---------|------------------|
+| `test.hard_gate` | `true`, `false` | `true` | Run full test suite after each task commit during execution |
+| `test.acceptance_tests` | `true`, `false` | `true` | Prompt for acceptance tests during discuss-phase |
+| `test.budget.per_phase` | integer | `50` | Per-phase test count limit (warnings at 80%) |
+| `test.budget.project` | integer | `800` | Project-wide test count limit (warnings at 80%) |
+| `test.steward` | `true`, `false` | `true` | Enable test steward during audit-milestone |
+| `test.command` | string | auto-detected | Override test runner command (e.g., `npm test`) |
+| `test.framework` | string | auto-detected | Override framework detection (jest, vitest, mocha, node:test) |
+
+All test settings use zero-config defaults. The `test.command` and `test.framework` values are auto-detected from `package.json` and project files -- set them only to override detection.
 
 ### Git Branching
 
@@ -299,6 +426,7 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | gsd-verifier | Sonnet | Sonnet | Haiku |
 | gsd-plan-checker | Sonnet | Sonnet | Haiku |
 | gsd-integration-checker | Sonnet | Sonnet | Haiku |
+| gsd-test-steward | Sonnet | Sonnet | Haiku |
 
 **Profile philosophy:**
 - **quality** -- Opus for all decision-making agents, Sonnet for read-only verification. Use when quota is available and the work is critical.
@@ -476,6 +604,31 @@ Set `commit_docs: false` during `/gsd:new-project` or via `/gsd:settings`. Add `
 
 Since v1.17, the installer backs up locally modified files to `gsd-local-patches/`. Run `/gsd:reapply-patches` to merge your changes back.
 
+### Tests Fail After Every Commit During Execution
+
+The hard gate runs the full test suite after each task commit. If tests fail:
+
+1. The executor automatically attempts to debug and fix (deviation Rule 1)
+2. If retries are exhausted, it escalates to human review
+3. If the failures are pre-existing (not caused by the current task), they should not trigger the gate -- check that baseline capture is working by reviewing the executor output
+
+To disable the hard gate temporarily: `gsd settings set test.hard_gate false`
+
+### Test Budget Warnings During Planning
+
+Budget warnings appear when test count approaches the configured limit. These are informational -- they do not block planning or execution.
+
+- Per-phase default: 50 tests (warning at 40)
+- Project default: 800 tests (warning at 640)
+
+Adjust limits: `gsd settings set test.budget.per_phase 100` or `gsd settings set test.budget.project 1500`
+
+### Acceptance Tests Not Gathered During Discuss-Phase
+
+Acceptance test gathering only happens in interactive mode (not autopilot/auto-context). If you used `--auto` with discuss-phase, acceptance tests are skipped.
+
+To disable acceptance test gathering entirely: `gsd settings set test.acceptance_tests false`
+
 ### Subagent Appears to Fail but Work Was Done
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
@@ -495,6 +648,9 @@ A known workaround exists for a Claude Code classification bug. GSD's orchestrat
 | Plan doesn't match your vision | `/gsd:discuss-phase [N]` then re-plan |
 | Costs running high | `/gsd:set-profile budget` and `/gsd:settings` to toggle agents off |
 | Update broke local changes | `/gsd:reapply-patches` |
+| Tests blocking execution | `gsd settings set test.hard_gate false` to disable gate temporarily |
+| Test budget warnings | `gsd settings set test.budget.per_phase N` to increase limit |
+| Test suite health concerns | `/gsd:audit-tests` for on-demand health check |
 
 ---
 
