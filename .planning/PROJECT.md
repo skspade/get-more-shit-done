@@ -53,7 +53,13 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- Acceptance test layer in CONTEXT.md with Given/When/Then/Verify format, human-owned — v1.6
+- Unit/regression test layer in PLAN.md with `<tests>` blocks, AI-generated TDD — v1.6
+- Hard test gate in execute-plan: full suite must pass after each task commit — v1.6
+- Test steward agent for suite health: redundancy detection, budget enforcement, consolidation proposals — v1.6
+- Test budget management: per-phase (30) and project (200) limits with configurable thresholds — v1.6
+- Workflow integration: discuss-phase, plan-phase, execute-plan, verify-phase, audit-milestone — v1.6
+- Configuration schema with progressive opt-in and zero-config degradation — v1.6
 
 ### Out of Scope
 
@@ -120,7 +126,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v1.5 with brainstorming command. 6 milestones shipped (v1.0–v1.5) across 29 phases, 38 plans.
+Shipped v1.5 with brainstorming command. 6 milestones shipped (v1.0-v1.5) across 29 phases, 38 plans. Starting v1.6 to add dual-layer test architecture based on agentic engineering patterns.
 
 **Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-routing to GSD creation flows.
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
@@ -128,4 +134,4 @@ Shipped v1.5 with brainstorming command. 6 milestones shipped (v1.0–v1.5) acro
 **Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale
 
 ---
-*Last updated: 2026-03-04 after v1.5 milestone*
+*Last updated: 2026-03-05 after v1.6 milestone start*
