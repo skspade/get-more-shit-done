@@ -331,6 +331,15 @@ Usage: `/gsd:set-profile budget`
 
 ### Utility Commands
 
+**`/gsd:audit-tests`**
+Run an on-demand test suite health check.
+
+- Spawns the gsd-test-steward agent to analyze redundancy, staleness, and budget status
+- Produces a test health report without requiring a full milestone audit
+- Requires `test.steward: true` in config (enabled by default)
+
+Usage: `/gsd:audit-tests`
+
 **`/gsd:cleanup`**
 Archive accumulated phase directories from completed milestones.
 
@@ -441,6 +450,35 @@ Example config:
   "planning": {
     "commit_docs": false,
     "search_gitignored": true
+  }
+}
+```
+
+### Test Configuration
+
+Configure the dual-layer test system in `.planning/config.json` under the `test` key:
+
+| Setting | Options | Default | What it Controls |
+|---------|---------|---------|------------------|
+| `test.hard_gate` | `true`, `false` | `true` | Run test suite after each task commit during execution |
+| `test.acceptance_tests` | `true`, `false` | `true` | Gather acceptance tests during discuss-phase |
+| `test.budget.per_phase` | integer | `50` | Per-phase test count budget (warnings at 80%) |
+| `test.budget.project` | integer | `800` | Project-wide test count budget (warnings at 80%) |
+| `test.steward` | `true`, `false` | `true` | Enable test steward during audit-milestone |
+| `test.command` | string | auto-detected | Override test runner command |
+| `test.framework` | string | auto-detected | Override framework detection (jest, vitest, mocha, node:test) |
+
+All test settings use zero-config defaults. Omitting the entire `test` section is equivalent to enabling all features with default values.
+
+Example config:
+```json
+{
+  "test": {
+    "hard_gate": true,
+    "budget": {
+      "per_phase": 50,
+      "project": 800
+    }
   }
 }
 ```
