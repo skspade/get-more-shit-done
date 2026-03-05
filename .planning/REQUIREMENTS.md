@@ -73,12 +73,12 @@
 | AT-03 | Phase 32 | Complete |
 | AT-04 | Phase 32 | Complete |
 | AT-05 | Phase 32 | Complete |
-| STEW-01 | Phase 33, 35 | Pending |
-| STEW-02 | Phase 33, 35 | Pending |
-| STEW-03 | Phase 33, 35 | Pending |
-| STEW-04 | Phase 33, 35 | Pending |
-| STEW-05 | Phase 33, 35 | Pending |
-| STEW-06 | Phase 33, 35 | Pending |
+| STEW-01 | Phase 33, 35 | Complete |
+| STEW-02 | Phase 33, 35 | Complete |
+| STEW-03 | Phase 33, 35 | Complete |
+| STEW-04 | Phase 33, 35 | Complete |
+| STEW-05 | Phase 33, 35 | Complete |
+| STEW-06 | Phase 33, 35 | Complete |
 | DOC-01 | Phase 34 | Complete |
 | DOC-02 | Phase 34 | Complete |
 | DOC-03 | Phase 34 | Complete |

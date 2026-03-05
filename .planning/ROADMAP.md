@@ -8,7 +8,7 @@
 - ✅ **v1.3 CLI Utilities** — Phases 14-19 (shipped 2026-03-03)
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
 - ✅ **v1.5 GSD Brainstorming Command** — Phases 25-29 (shipped 2026-03-04)
-- [ ] **v1.6 Dual-Layer Test Architecture** — Phases 30-34
+- [ ] **v1.6 Dual-Layer Test Architecture** — Phases 30-35
 
 ## Phases
 
@@ -84,7 +84,7 @@
 - [x] **Phase 32: Acceptance Test Layer** - Discuss-phase AT gathering, CONTEXT.md storage, verify-phase execution, plan-checker coverage, ownership invariant (completed 2026-03-05)
 - [x] **Phase 33: Test Steward** - Suite health agent, redundancy detection, consolidation proposals, budget enforcement, planner integration, audit-tests command (completed 2026-03-05)
 - [x] **Phase 34: Documentation** - help.md, USER-GUIDE.md, README.md updates for test architecture (completed 2026-03-05)
-- [ ] **Phase 35: Close Verification Gaps** - Create missing VERIFICATION.md for phases 31-33, update REQUIREMENTS.md checkboxes (Gap Closure)
+- [x] **Phase 35: Close Verification Gaps** - Create missing VERIFICATION.md for phases 31-33, update REQUIREMENTS.md checkboxes (Gap Closure) (completed 2026-03-05)
 
 ## Phase Details
 
@@ -158,7 +158,10 @@ Plans:
 **Depends on**: Phase 34 (all implementation complete)
 **Requirements**: GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, AT-01, AT-02, AT-03, AT-04, AT-05, STEW-01, STEW-02, STEW-03, STEW-04, STEW-05, STEW-06, FOUND-01, FOUND-02, FOUND-03, FOUND-04, FOUND-05
 **Gap Closure:** Closes gaps from audit
-**Plans**: TBD
+**Plans**: 2/2 plans complete
+Plans:
+- [x] 35-01-PLAN.md -- Create VERIFICATION.md files for phases 31, 32, 33
+- [x] 35-02-PLAN.md -- Update REQUIREMENTS.md traceability table
 
 ## Progress
 
@@ -201,4 +204,4 @@ Phases execute in numeric order.
 | 32. Acceptance Test Layer | 3/3 | Complete    | 2026-03-05 | - |
 | 33. Test Steward | 0/3 | Complete    | 2026-03-05 | - |
 | 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
-| 35. Close Verification Gaps | v1.6 | 0/0 | Pending | - |
+| 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
