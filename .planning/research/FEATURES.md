@@ -1,178 +1,177 @@
-# Feature Research
+# Feature Landscape: Dual-Layer Test Architecture
 
-**Domain:** Autonomous AI coding orchestrator (milestone-to-completion loop)
-**Researched:** 2026-03-01
-**Confidence:** HIGH
+**Domain:** AI agent test orchestration — human-owned acceptance gates + AI-managed unit/regression tests
+**Researched:** 2026-03-05
+**Overall confidence:** HIGH (patterns well-established in BDD/CI literature; agentic testing patterns emerging but directionally clear)
 
-## Feature Landscape
+## Table Stakes
 
-### Table Stakes (Users Expect These)
+Features users expect from a dual-layer test architecture integrated into an autonomous coding orchestrator. Missing any of these makes the test architecture feel incomplete or untrustworthy.
 
-Features that must work or the orchestrator is fundamentally broken. An autopilot that cannot do these is just a fancy alias for running commands manually.
+### Acceptance Test Layer (Layer 1 — Human-Owned)
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Phase loop with state reading | Core value proposition. The orchestrator reads STATE.md, determines the current phase, and drives the next step forward. Without this, there is no autonomy. Every competitor (Ralphy, Devin, Cursor Background Agents, Composio Orchestrator) has an equivalent loop. | MEDIUM | GSD already has `auto_advance` chaining within a session. The gap is surviving context window exhaustion and looping across the full milestone lifecycle. The bash outer loop pattern (reinvoke Claude Code with fresh context per phase) is the proven approach per Anthropic's own harness research. |
-| Cold-start capability | User invokes `/gsd:autopilot` on a new milestone and the orchestrator runs from initialization through completion. If it only works mid-milestone, the entry point is confusing. | LOW | Reads STATE.md to determine position. If no state exists or milestone is fresh, starts at discuss/plan. Routing logic, not new infrastructure. |
-| Resume capability | Context windows exhaust. Sessions crash. The user closes their laptop. The orchestrator must pick up from wherever it stopped. Anthropic's harness research calls this "the core challenge of long-running agents." | MEDIUM | STATE.md + git history + progress files already provide the persistence layer. The challenge is reliable state detection: which sub-step within a phase was the agent on? GSD's existing `Session Continuity` section in STATE.md was designed for this. |
-| Auto-context generation (replacing discuss) | The discuss phase requires interactive human input (gray area identification, multi-select questions, deep-dive Q&A). In autonomous mode, the AI must generate its own CONTEXT.md by reading PROJECT.md, ROADMAP.md, and prior phase artifacts. | HIGH | This is the most novel feature. No competitor does this well because most don't have GSD's structured discuss-then-plan pipeline. The layered approach from PROJECT.md (front-load known decisions, Claude decides remaining ambiguities with documented reasoning) is the right pattern. Must produce a CONTEXT.md identical in structure to the human-generated version so downstream agents work unchanged. |
-| Auto-approval of planning and execution | In autonomous mode, all confirmation gates (confirm_plan, confirm_breakdown, execute_next_plan, confirm_transition) must be bypassed. Without this, the loop halts at every gate waiting for a human who is not there. | LOW | GSD already has `mode: "yolo"` which auto-approves everything and `gates` config which can disable individual confirmation points. Autopilot sets all gates to false and mode to yolo. Config manipulation, not new logic. |
-| Human checkpoint at verification | The one place where human judgment adds irreplaceable value: reviewing what was actually built. Every serious orchestrator maintains this (Devin opens PRs for review, Cursor produces PRs, Composio requires PR review before merge). Fully autonomous verification without any human gate leads to uncaught regressions. | MEDIUM | Modify verify-work workflow to pause and present results when running in autopilot mode. The existing `checkpoint:human-verify` pattern is the mechanism. The challenge is presenting a useful summary of what was built across potentially many plans. |
-| Debug-first failure handling | When execution or verification fails, the orchestrator must attempt self-repair before escalating. Anthropic's harness research identifies "undocumented half-finished work" as a primary failure mode. Every autonomous system (Ralphy, Devin, OpenHands) has retry-with-diagnosis loops. | MEDIUM | GSD already has gsd-debugger agent. The autopilot spawns it on failure, feeds it error context, gets back a diagnosis, and retries. The integration pattern (spawn debugger, apply fix, re-execute) is straightforward. The subtlety is knowing WHEN to retry vs escalate. |
-| Human escalation after retries exhausted | When debug retries fail (default 3), the orchestrator must stop cleanly and surface the problem to the human. An agent that loops forever on an unsolvable error is worse than useless. | LOW | Write progress state, present error summary, exit the loop. The human resumes with `/gsd:resume-work` or manually fixes and re-invokes. |
-| Progress circuit breaker | Detect when the orchestrator is stuck: N consecutive iterations with no state change (no new commits, no phase advancement, no plan completion). This is the primary runaway prevention mechanism. Ralphy uses `--max-iterations`, Anthropic's harness uses feature-list completion tracking. | MEDIUM | Monitor: did the last iteration produce a new SUMMARY.md, advance STATE.md, or create new commits? If 3 consecutive iterations show no progress, pause and escalate. More meaningful than token budgets because it detects semantic stuckness, not just resource consumption. |
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| Given/When/Then acceptance test format in CONTEXT.md | Industry-standard BDD format (Martin Fowler's bliki, Cucumber, SpecFlow). Users already think in this structure. The format directly translates to executable verification. | LOW | `discuss-phase.md` — adds a new question pass after existing decision gathering | The `<acceptance_tests>` block in CONTEXT.md is structurally sound. Given/When/Then + `Verify` shell command is the right format because it bridges human-readable spec to machine-executable check. Confidence: HIGH (BDD is 15+ years mature). |
+| Human ownership rule — AI cannot add/modify/remove acceptance tests | The whole point of Layer 1. Simon Willison's agentic engineering patterns emphasize that tests are the contract the AI works against. If the AI can modify its own acceptance criteria, the contract is meaningless. This is the "spec-driven development" principle: the spec is human-owned, the implementation is AI-owned. | LOW | `discuss-phase.md` ownership boundary; `execute-plan.md` must respect immutability | Enforcement is documentation + workflow design, not runtime enforcement. The AI is instructed never to touch `<acceptance_tests>` blocks after discuss-phase approval. No code-level lock needed — workflow instruction is sufficient for Claude. Confidence: HIGH. |
+| Acceptance test execution during verify-phase | Acceptance tests that are never run are documentation, not tests. The `Verify` line must be executed as a shell command during `verify-phase`, with pass/fail mapped to verification truths. This replaces the current "derive truths from phase goal" fallback with concrete, executable checks. | MEDIUM | `verify-phase.md` — modifies `verify_truths` step to run AT Verify commands and map results | Key integration: each `AT-{NN}` Verify command runs as `eval "$VERIFY_CMD"`. Exit code 0 = VERIFIED, non-zero = FAILED. Results feed directly into existing truth status system (VERIFIED/FAILED/UNCERTAIN). Falls back to current behavior when no `<acceptance_tests>` block exists. Confidence: HIGH. |
+| Graceful degradation when no acceptance tests exist | Phases planned before this architecture, or projects that don't opt in, must continue working. This is a progressive enhancement, not a breaking change. | LOW | All existing workflows — backward compatibility is a hard requirement | When `<acceptance_tests>` is absent from CONTEXT.md, verification falls back to current behavior (grep/file-existence/derived truths). When `test.acceptance_tests` is false in config, skip the acceptance test gathering pass in discuss-phase. Zero-config degradation. Confidence: HIGH. |
 
-### Differentiators (Competitive Advantage)
+### Unit/Regression Test Layer (Layer 2 — AI-Owned)
 
-Features that make GSD Autopilot better than running Ralphy or a bare Claude Code loop. These leverage GSD's unique structured pipeline.
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| `<tests>` blocks in PLAN.md task definitions | The planner needs to specify what tests to write alongside what code to write. TDD is already supported in GSD via `tdd="true"` tasks and `<behavior>`/`<implementation>` blocks. Adding `<tests>` blocks is a natural extension of the existing TDD plan structure. | LOW | `plan-phase.md` (planner generates plans); existing `tdd.md` reference | The `<tests>` block format in the design doc (test name, input, expected) is a lightweight test spec. It supplements, not replaces, the existing `<behavior>` block in TDD plans. For non-TDD tasks that happen to be testable, `<tests>` enables test generation without the full RED-GREEN-REFACTOR cycle. Confidence: HIGH. |
+| Hard test gate after each task commit | Simon Willison's "first run the tests" pattern, applied as a hard gate: after every task commit during execute-plan, run the full project test suite. If any test fails, trigger Rule 1 (Bug) deviation handling. This is the regression prevention mechanism. | MEDIUM | `execute-plan.md` — adds a new step after task commit; `config.json` for `test.command`; existing deviation Rule 1 for failure handling | The gate runs `eval "$TEST_CMD"` after each task commit. Non-zero exit triggers existing deviation handling (debug, fix, retry, escalate). This is the single most impactful feature for code quality in autonomous execution. Without it, the AI can silently break existing tests while implementing new features. Confidence: HIGH (CI/CD hard gates are universal practice). |
+| Test command discovery from config | The system must know how to run tests. `test.command` in config.json (default: null) is the explicit configuration. When null, all test gates degrade gracefully with warnings. | LOW | `config.json` schema; `gsd-tools.cjs config-get` for retrieval | Auto-detection from `package.json` scripts.test is tempting but unreliable (many projects have `"test": "echo 'no tests'"` as a placeholder). Explicit configuration via `test.command` is the right call. The `gsd settings` command surfaces the current value. Confidence: HIGH. |
+| TDD RED-GREEN-REFACTOR preservation | The existing TDD workflow must continue working unchanged. The `<tests>` block is additive — tasks with `tdd="true"` still follow the full RED (write failing test) -> GREEN (implement to pass) -> REFACTOR cycle from `tdd.md`. | LOW | `execute-plan.md` TDD execution flow; `tdd.md` reference | No changes to the existing TDD cycle. The `<tests>` block provides input to the RED phase (what tests to write), but the RED-GREEN-REFACTOR discipline is unchanged. The hard gate (run full suite after GREEN) is the only addition to the TDD flow. Confidence: HIGH. |
+| Regression suite run (not just current test) | Today, TDD tasks only verify their own tests pass. The hard gate runs the FULL project test suite after each task. This catches regressions where new code breaks unrelated tests. | MEDIUM | `execute-plan.md` — extends TDD execution from "run this test" to "run all tests" | This is the key behavioral change. Current flow: write test -> implement -> run test -> pass -> commit. New flow: write test -> implement -> run test -> pass -> run ALL tests -> pass -> commit. The "run ALL tests" step is the regression gate. If it fails, the executor debugs and fixes before proceeding. Confidence: HIGH (standard CI/CD pattern). |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Decision audit trail | When the AI auto-decides (replacing human discuss input), every decision is documented with reasoning in CONTEXT.md. Users can review WHY the AI chose cards over list, infinite scroll over pagination, etc. No competitor provides this level of autonomous decision transparency. | LOW | The auto-context agent writes CONTEXT.md sections with explicit "Claude's Decision: X because Y" entries. Low implementation cost, high trust value. Anthropic's own research emphasizes that audit trails for agent decisions are critical for adoption. |
-| Structured phase pipeline preservation | Unlike Ralphy (flat task list) or bare agent loops (unstructured), GSD Autopilot preserves the full discuss-research-plan-execute-verify pipeline per phase. This means each phase gets proper context gathering, dependency-aware planning, wave-based parallel execution, and structured verification. The AI gets the same quality pipeline that human-driven GSD provides. | LOW | This is architectural -- the autopilot loop calls existing GSD commands/workflows in sequence. The structure already exists; autopilot is a new entry point into it. The key insight: preserving this structure IS the differentiator over flat loops. |
-| Incremental human review (not just end-state) | While competitors produce a PR at the end (Devin, Cursor), GSD Autopilot pauses at each phase's verification checkpoint. The human reviews phase-by-phase, catching drift early rather than reviewing a massive diff at the end. This is the "front-loaded and back-loaded effort" pattern from orchestration research, applied at phase granularity. | LOW | The verify-work workflow already has the checkpoint mechanism. Autopilot just ensures it pauses there in autonomous mode. The user can approve, request fixes (which trigger the debug-retry loop), or abort. |
-| Context window hygiene by design | GSD's thin orchestrator pattern keeps main context at 10-15% usage. Each subagent gets a fresh 200k-token window. Autopilot inherits this: each phase execution is a fresh context window via the bash outer loop. No context rot across phases. Competitors like Cursor's long-running agents fight context degradation over 25-52 hour sessions. GSD avoids the problem architecturally. | LOW | Already built into GSD's subagent pattern. The bash outer loop (reinvoke with fresh context per phase) is the only new piece, and it is a simple shell script. Anthropic's harness research validates this exact approach. |
-| Smart phase-type routing | Auto-context generation adapts to what KIND of phase is being built: visual UI phases get layout/interaction decisions, API phases get contract/error decisions, infrastructure phases might skip discuss entirely. The discuss-phase workflow already has domain-aware gray area identification; the auto-context agent inherits this intelligence. | MEDIUM | The discuss-phase workflow's domain categorization (users SEE/CALL/RUN/READ/ORGANIZE) becomes the routing logic for auto-context. Infrastructure phases produce minimal CONTEXT.md. UI phases produce detailed layout/interaction decisions. This is genuine intelligence, not just skipping the human. |
-| Progress resumption with full state reconstruction | When resuming mid-milestone, the orchestrator reconstructs full context from STATE.md, git history, existing phase artifacts (CONTEXT.md, PLANs, SUMMARYs, UAT.md). This is richer than Ralphy's progress.txt or Anthropic's claude-progress.txt because GSD has structured artifacts at every stage. | MEDIUM | Read STATE.md for position. Check phase directory for which artifacts exist (has_context, has_plans, has_verification from gsd-tools init). Determine exact resumption point. This leverages the existing artifact structure rather than needing a separate progress tracking system. |
-| Configurable autonomy level | Allow users to configure which phases get human checkpoints vs full autonomy. Maybe the user trusts autopilot for infrastructure phases but wants to review UI phases. A single `autopilot.pause_phases: [4, 7]` config could enable selective human-in-the-loop without stopping the whole pipeline. | LOW | Config addition to .planning/config.json. The autopilot loop checks before each phase: is this a pause phase? If yes, present summary and wait. If no, proceed autonomously. |
+### Test Budget and Bloat Management
 
-### Anti-Features (Commonly Requested, Often Problematic)
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| Per-phase and project-level test count limits | AI-generated tests grow without bound. Without a budget, 6 milestones of autonomous execution could produce 500+ tests with significant redundancy. The budget model (30 per phase, 200 total) provides a ceiling that forces consolidation. | LOW | `config.json` schema for `test.budget.*`; `plan-phase.md` receives budget status | The counting mechanism (`grep -r -c "it(\|test("`) is simple and framework-agnostic for Jest/Vitest/Mocha. Budget is advisory during planning, not a hard block during execution (you cannot unwrite tests mid-execution). The planner sees "Warning: 160/200 tests used" and plans within limits. Confidence: MEDIUM (test budgeting is novel — no standard tooling exists, but the concept is sound). |
+| Test count tracking via gsd-tools | A `test-count` subcommand in gsd-tools.cjs that counts test cases (individual `it`/`test` blocks, not files) project-wide and per-phase. | LOW | `gsd-tools.cjs` — new subcommand; `config.json` for framework detection | Counting by grep is sufficient for v1. More sophisticated counting (AST parsing) is over-engineering for the initial implementation. Phase attribution by commit history (`git log --all --oneline -- tests/` filtered by phase tag) enables per-phase counting. Confidence: HIGH (implementation is straightforward). |
+| Budget status visible to planner during plan-phase | The planner must know the current test count and remaining budget before generating `<tests>` blocks. Without this, the planner generates tests blindly and hits the ceiling only at audit time. | LOW | `plan-phase.md` — planner prompt includes budget context | A single line in the planner prompt: "Current test budget: 145/200 (72%). Per-phase max: 30. Plan tests accordingly." The planner adjusts its test generation to stay within limits. Confidence: HIGH. |
 
-Features that seem good but would hurt the system. Deliberately NOT building these.
+### Workflow Integration
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Token/cost budget caps | "I don't want it spending too much on API calls." Seems like responsible resource management. | Token counting is unreliable across sessions (outer loop spawns fresh processes). Cost caps create arbitrary stopping points mid-phase, leaving half-built artifacts. The progress circuit breaker is strictly better: it detects when the agent is stuck (semantically meaningful) rather than when it has spent N tokens (arbitrary). Budget enforcement belongs in the API billing layer, not the orchestrator. | Progress circuit breaker (N iterations with no state change). If users want hard cost limits, set them at the Anthropic API key level. |
-| Interactive discuss in autonomous mode | "What if the AI gets a decision wrong? Let me intervene during discuss." | This defeats the entire purpose of autonomous execution. If the user wants to make discuss decisions, they should use normal GSD (`/gsd:discuss-phase`), not autopilot. Mixing interactive and autonomous modes creates unpredictable pause points. | Auto-context with documented reasoning + human review at verification. If decisions were wrong, the human catches it during phase verification and the debug-retry loop fixes it. Review decisions in CONTEXT.md after generation if desired. |
-| Parallel phase execution | "If phases are independent, run them simultaneously." | GSD phases are sequential by design (each builds on the prior). Parallel phase execution would require dependency analysis, merge conflict resolution, and cross-phase coordination that contradicts the sequential pipeline model. Composio Orchestrator handles this for independent tasks, but GSD phases are NOT independent tasks. | Wave-based parallel execution WITHIN phases (already exists). Plans within a phase can run in parallel when they are independent. Phase-level parallelism adds complexity with no benefit for the sequential milestone model. |
-| Agent teams / peer-to-peer coordination | "Multiple agents discussing and deciding together, like a virtual team." | GSD uses a thin orchestrator with specialized subagents, not a peer-to-peer team model. Multi-agent coordination introduces consensus overhead, message passing complexity, and non-deterministic outcomes. The orchestrator pattern (one coordinator spawning specialists) is simpler, more debuggable, and more reliable. | GSD's existing pattern: thin orchestrator spawns specialized agents (researcher, planner, executor, debugger) in fresh context windows. Each agent has a clear role and returns structured results. No negotiation needed. |
-| Claude Agent SDK harness | "Use the Agent SDK instead of bash outer loop." | The Agent SDK is powerful but adds a dependency layer. GSD's native command/workflow/agent pattern already provides orchestration. A bash outer loop is simpler, more debuggable, and doesn't require SDK versioning concerns. The SDK is a valid future option once the core autopilot pattern is validated, but starting with it adds unnecessary coupling. | Bash helper script for the outer loop (reinvoke Claude Code with `--resume` per phase). Migrate to Agent SDK later if needed, after the pattern is proven. |
-| Automatic scope expansion | "If the AI discovers it needs a new feature during execution, it should add phases to the roadmap." | Scope creep is the enemy of completion. An autonomous agent that expands its own scope will never finish. GSD's scope guardrail (discuss-phase: "that belongs in its own phase") must be preserved in autonomous mode. The agent should note discovered requirements but NOT act on them. | Capture in `Deferred Ideas` section of CONTEXT.md or as pending todos. The human reviews these at the verification checkpoint and can add phases to the roadmap manually for the next milestone. |
-| Real-time streaming dashboard | "Show me live what the agent is doing." | Adds significant infrastructure (WebSocket server, UI frontend) for a CLI-first tool. The value is observability, but simpler approaches achieve this. Cursor provides a dashboard because it is an IDE; GSD is a CLI framework. | Tail the log output. Use tmux split panes (like Ralphy). The progress command (`/gsd:progress`) already shows current state. Add a `--watch` flag to progress for polling if needed. |
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| discuss-phase acceptance test gathering pass | The interactive discuss-phase must gain a new step: after gathering implementation decisions, ask "What observable behavior proves this works?" for each requirement, then structure responses into AT-{NN} format. | MEDIUM | `discuss-phase.md` — new step after existing decision gathering; CONTEXT.md template gains `<acceptance_tests>` block | This is the highest-touch workflow change. The discuss-phase must present requirements, ask for acceptance criteria, suggest Verify commands, and get human approval. In `--auto` mode, the auto-context agent generates acceptance tests from ROADMAP success criteria (no human input). Confidence: MEDIUM (the interactive UX needs careful design). |
+| Auto-context acceptance test generation | When discuss-phase runs with `--auto`, the auto-context agent must generate acceptance tests from ROADMAP.md success criteria and REQUIREMENTS.md. No human input available. | MEDIUM | `gsd-auto-context` agent; ROADMAP.md success criteria | The auto-context agent reads success criteria ("User can create a new project") and generates Given/When/Then + Verify. This is feasible because success criteria are already written as observable behaviors. The Verify commands are AI-generated (no human approval in auto mode), which is a controlled deviation from the ownership rule — acceptable because the auto-context agent IS the discuss-phase replacement. Confidence: MEDIUM. |
+| verify-phase acceptance test execution | verify-phase runs each AT-{NN} Verify command and maps results to truths. This replaces or augments the current truth derivation logic. | MEDIUM | `verify-phase.md` — modifies `verify_truths` step | Acceptance tests become the primary truth source when present. Each AT Verify command runs via `eval`, exit code maps to truth status. Existing artifact/wiring verification continues alongside. When ATs are absent, current behavior is unchanged. Confidence: HIGH. |
+| audit-milestone test steward integration | The test steward agent runs during audit-milestone, after phase verifications and before the final audit report. It produces a test health section for the audit report. | MEDIUM | `audit-milestone.md` — new step to spawn test steward | The steward is a read-only analysis agent. It counts tests, detects redundancy, identifies stale tests, and produces a consolidation proposal. It does NOT modify any files. The audit report gains a "Test Suite Health" section. Confidence: HIGH (analysis-only is low risk). |
+| Configuration schema with zero-config degradation | The `test` key in config.json with sensible defaults. Every feature degrades gracefully when config is absent or `test.command` is null. | LOW | `config.json` schema; `gsd-tools.cjs config-get/config-set`; `gsd settings` display | The design doc's config schema is complete and well-reasoned. `test.command: null` means all test gates skip with warnings. `test.hard_gate: true` is the right default (strict by default, loosen per-project). `test.steward.auto_consolidate: false` enforces human approval. Confidence: HIGH. |
+
+## Differentiators
+
+Features that set this test architecture apart from standard CI/CD test gates or other AI coding agent test approaches.
+
+| Feature | Value Proposition | Complexity | Existing GSD Dependency | Notes |
+|---------|-------------------|------------|------------------------|-------|
+| Dual ownership model (human specs, AI implementation) | No other AI coding orchestrator cleanly separates "what to test" (human) from "how to test" (AI). Spec-driven development literature (TestCollab, GitHub Spec Kit) validates this pattern: the spec is the contract, the AI implements against it. This prevents the "AI tests its own work" trust problem. | LOW | Entire dual-layer architecture enforces this | The ownership boundary is the core innovation. Acceptance tests (Layer 1) are the human's contract. Unit tests (Layer 2) are the AI's implementation verification. Neither layer can modify the other. This is not just a testing pattern — it is a governance pattern for autonomous AI execution. Confidence: HIGH. |
+| Test steward agent with consolidation proposals | No standard CI/CD tool provides an AI agent that analyzes test suite health and proposes specific consolidation actions. Tools like Stryker detect redundancy via mutation testing, but they do not propose fixes. The steward bridges detection and action while keeping human approval in the loop. | HIGH | New `gsd-test-steward` agent; `audit-milestone.md` integration | The steward combines multiple analysis techniques: grep-based duplicate detection, stale test identification (references to deleted functions), and budget tracking. The consolidation proposal format (specific file:line references, specific merge/delete recommendations) is actionable, not just a report. Confidence: MEDIUM (the analysis is feasible; the quality of proposals depends on implementation). |
+| Progressive opt-in across project lifecycle | Projects can adopt the test architecture incrementally: start with no test command (gates skip), add test command (hard gate activates), start writing acceptance tests (Layer 1 activates), let the planner generate test specs (Layer 2 activates), enable the steward (audit-time analysis activates). No big-bang adoption required. | LOW | Config schema with null defaults; workflow fallbacks at every integration point | This is a design property, not a feature to build. Every integration point has a "when absent" fallback. The design doc explicitly documents each fallback. Confidence: HIGH. |
+| Acceptance tests as verification truths | Acceptance tests do double duty: they are human-defined specs AND they are the verification criteria for verify-phase. This eliminates the disconnect between "what should we verify?" and "what did the user say they want?" — they are the same thing. | MEDIUM | `verify-phase.md` truth derivation system | Currently, verify-phase derives truths from phase goals or must_haves in PLAN frontmatter. With acceptance tests, truths come directly from the human's own words. This is strictly better because it eliminates the AI's interpretation of what the human wanted. Confidence: HIGH. |
+| Budget-aware planning | The planner sees test budget status before generating tests. No other AI coding tool plans tests with awareness of suite-wide constraints. This is proactive bloat prevention rather than reactive cleanup. | LOW | `plan-phase.md` prompt enrichment | A single context line changes planner behavior. When the planner knows "145/200 tests used, 30 max per phase", it generates fewer, more targeted tests. This is the "shift left" principle applied to test bloat. Confidence: MEDIUM (depends on planner actually respecting the budget — needs testing). |
+
+## Anti-Features
+
+Features to explicitly NOT build. These are tempting but would hurt the architecture.
+
+| Anti-Feature | Why Tempting | Why Avoid | What to Do Instead |
+|--------------|-------------|-----------|-------------------|
+| Coverage percentage targets | "We should aim for 80% code coverage." Feels like a measurable quality goal. | Coverage is a vanity metric for AI-generated code. An AI can trivially generate tests that hit 100% coverage without testing meaningful behavior. Coverage incentivizes quantity over quality. The budget model (count tests, not coverage) combined with the steward (detect redundancy) is strictly better. | Use test budgets (count-based) + steward redundancy detection. Quality comes from the acceptance test layer (human-defined behavior) not from coverage percentages. |
+| Auto-consolidation of tests without human approval | "The steward should automatically merge redundant tests." Reduces manual overhead. | Tests are a trust artifact. If the AI deletes or modifies tests without human approval, the human loses confidence in the test suite. The "never auto-delete" principle is critical for trust. Even if the consolidation is correct, the human needs to see and approve it. | Steward produces proposals. Human reviews during milestone audit. "Approve all" / "Cherry-pick" / "Reject" flow. Config key `test.steward.auto_consolidate: false` (default) enforces this. |
+| Runtime test isolation / sandboxing | "Tests should run in isolated containers to prevent side effects." Adds reliability. | Over-engineering for a CLI-based coding orchestrator. GSD runs in the developer's local environment. Adding container orchestration for test isolation introduces Docker/Podman dependencies, startup overhead, and environment parity issues. The target users are running `npm test` locally. | Run tests in the developer's existing environment. If tests have side effects, that is a test quality issue (fix the test), not an infrastructure issue (add containers). |
+| AI-generated acceptance tests (Layer 1) | "Let the AI write acceptance tests too, then the human just approves." Reduces discuss-phase friction. | This inverts the ownership model. If the AI writes the acceptance criteria and the human just rubber-stamps them, the human is not actually defining what "done" means. The whole point of Layer 1 is that the HUMAN specifies observable behavior. The AI may SUGGEST Verify commands, but the Given/When/Then is human-authored. | In `--auto` mode, the auto-context agent generates acceptance tests from ROADMAP success criteria. This is acceptable because success criteria are human-authored (in ROADMAP.md). The auto-context agent translates human-authored criteria into AT format, not inventing new criteria. |
+| Flaky test detection and quarantine | "Detect flaky tests and quarantine them automatically." Standard in enterprise CI/CD. | Flaky test detection requires running each test multiple times and tracking pass/fail rates over time. GSD runs tests once per task commit — there is no historical pass/fail data to analyze. Flaky test management is a CI/CD infrastructure concern, not an orchestrator concern. | If a test is flaky, the hard gate will catch it (test fails -> debug -> fix). The fix is to fix the flaky test, not to quarantine it. The steward can flag tests that failed once and passed on retry as potentially flaky, but this is advisory, not automated quarantine. |
+| Visual test reports / dashboards | "Generate an HTML test report with charts and trends." Looks professional. | GSD is markdown-native. All artifacts are .md files in .planning/. Adding HTML report generation introduces a rendering dependency and breaks the "everything is readable in a text editor" principle. | Test results go into VERIFICATION.md (markdown) and MILESTONE-AUDIT.md (markdown). The `gsd progress` command can show test budget status in the terminal. No HTML needed. |
+| Per-file or per-function test mapping | "Map each source file to its test file(s) for precise test selection." Enables targeted test runs. | Maintaining a source-to-test mapping is brittle and high-maintenance. File renames, refactors, and test reorganization break the mapping. Running the full suite is simpler and catches cross-file regressions that targeted runs miss. | Run the full test suite via `test.command`. If the suite is slow, the developer can configure a faster subset command. The steward can recommend test file consolidation to reduce suite runtime. |
+| Mandatory test generation for all tasks | "Every task should have tests, not just TDD tasks." Maximizes coverage. | Many tasks are not meaningfully testable (UI styling, config changes, documentation, migrations). Forcing test generation for these tasks produces low-value tests that consume budget. The existing TDD heuristic ("Can you write `expect(fn(input)).toBe(output)` before writing `fn`?") is the right filter. | Tasks with `tdd="true"` or `<tests>` blocks get test generation. Tasks without are executed normally. The `add-tests` command fills gaps post-hoc for phases that need additional coverage. |
 
 ## Feature Dependencies
 
 ```
-[Phase Loop with State Reading]
-    |-- requires --> [Resume Capability] (must read state to know where to resume)
-    |-- requires --> [Progress Circuit Breaker] (loop needs stuck detection)
-    |-- requires --> [Auto-Approval of Gates] (loop cannot halt at confirmations)
-    |
-    |-- drives --> [Auto-Context Generation] (loop invokes auto-context when discuss is next)
-    |-- drives --> [Debug-First Failure Handling] (loop invokes debugger on failures)
-    |-- drives --> [Human Checkpoint at Verification] (loop pauses at verify)
+[discuss-phase acceptance test gathering]
+    |-- produces --> <acceptance_tests> in CONTEXT.md
+    |-- consumed by --> [verify-phase AT execution]
+    |-- consumed by --> [execute-plan hard gate] (AT Verify commands as regression checks)
 
-[Auto-Context Generation]
-    |-- requires --> [Phase Loop] (triggered by the loop, not standalone)
-    |-- produces --> CONTEXT.md (consumed by existing research/plan pipeline)
-    |-- enables --> [Decision Audit Trail] (decisions are documented in CONTEXT.md)
+[plan-phase <tests> block generation]
+    |-- requires --> test budget status (gsd-tools test-count)
+    |-- produces --> <tests> blocks in PLAN.md
+    |-- consumed by --> [execute-plan TDD execution]
 
-[Debug-First Failure Handling]
-    |-- requires --> [Phase Loop] (triggered by execution/verification failures)
-    |-- requires --> gsd-debugger agent (already exists)
-    |-- feeds into --> [Human Escalation] (after retries exhausted)
+[execute-plan hard test gate]
+    |-- requires --> test.command in config.json
+    |-- requires --> existing deviation Rule 1 (Bug) handling
+    |-- produces --> test pass/fail per task commit
+    |-- feeds into --> SUMMARY.md test results
 
-[Human Checkpoint at Verification]
-    |-- requires --> verify-work workflow modifications
-    |-- enables --> [Incremental Human Review] (per-phase, not end-state)
+[verify-phase acceptance test execution]
+    |-- requires --> <acceptance_tests> in CONTEXT.md
+    |-- produces --> truth statuses in VERIFICATION.md
+    |-- falls back to --> current verify_truths behavior when ATs absent
 
-[Resume Capability]
-    |-- requires --> STATE.md (already exists)
-    |-- requires --> Phase artifact detection (gsd-tools init already provides has_context, has_plans, etc.)
+[test steward agent]
+    |-- requires --> test.command (to count tests)
+    |-- requires --> test files on disk (to analyze)
+    |-- produces --> consolidation proposals in audit report
+    |-- triggered by --> audit-milestone.md
+    |-- depends on --> test budget config
 
-[Auto-Approval of Gates]
-    |-- requires --> config.json gate manipulation (already exists)
-    |-- conflicts with --> [Interactive Discuss] (anti-feature -- these are mutually exclusive modes)
+[config schema]
+    |-- consumed by --> all features above
+    |-- managed by --> gsd settings command
+    |-- zero-config default --> all gates skip with warnings
+
+[gsd-tools test-count]
+    |-- consumed by --> plan-phase (budget display)
+    |-- consumed by --> test steward (budget analysis)
+    |-- consumed by --> gsd settings (test budget display)
 ```
 
-### Dependency Notes
+### Critical Path
 
-- **Phase Loop requires Resume Capability:** The outer loop must detect where to resume after each fresh context window. Without resume, the loop restarts from the beginning every time.
-- **Auto-Context requires Phase Loop:** Auto-context is not a standalone feature. It is triggered when the loop reaches the discuss step for a phase. Running auto-context outside the loop is just regular discuss-phase with `--auto`.
-- **Debug-First requires Phase Loop:** The loop detects failures and routes to the debugger. Without the loop, debug-retry is manual (which GSD already supports via verify-work's diagnose_issues step).
-- **Auto-Approval conflicts with Interactive Discuss:** These are mutually exclusive modes. Autopilot means auto-approve everything. If you want interactive discuss, use normal GSD commands.
-- **Decision Audit Trail is enhanced by Auto-Context:** The audit trail is most valuable when AI is making decisions autonomously. In human-driven mode, the decisions are already documented because the human made them interactively.
+1. **Config schema** (everything else reads from it)
+2. **gsd-tools test-count** (budget features need counting)
+3. **discuss-phase AT gathering** + **plan-phase `<tests>` blocks** (can be parallel — independent workflow changes)
+4. **execute-plan hard gate** (depends on config, consumes both layers)
+5. **verify-phase AT execution** (depends on discuss-phase producing ATs)
+6. **test steward** (depends on everything else being in place; runs at audit time)
 
-## MVP Definition
+## MVP Recommendation
 
-### Launch With (v1)
+### Phase 1: Foundation (Config + Counting + Hard Gate)
 
-Minimum viable autopilot -- what is needed to validate the core loop concept.
+Build the infrastructure that all other features depend on.
 
-- [ ] **Phase loop with state reading** -- The core loop: read STATE.md, determine next step, execute, update state, repeat. Without this, there is no product.
-- [ ] **Auto-context generation** -- Replace interactive discuss with AI-generated CONTEXT.md. Without this, the loop halts at the first discuss step.
-- [ ] **Auto-approval of gates** -- Set all gates to false, mode to yolo. Without this, the loop halts at every confirmation prompt.
-- [ ] **Resume capability** -- Detect current position from STATE.md and phase artifacts. Without this, context window exhaustion kills the loop.
-- [ ] **Bash outer loop script** -- Shell script that reinvokes Claude Code with fresh context per phase. Without this, a single context window must hold the entire milestone.
-- [ ] **Human checkpoint at verification** -- Pause at verify-work for human review. Without this, there is no quality gate.
-- [ ] **Progress circuit breaker** -- Detect stuck state (N iterations with no progress). Without this, failures loop forever.
-- [ ] **Human escalation after retries** -- Stop cleanly when debug retries are exhausted. Without this, unrecoverable errors loop forever.
+1. **Config schema addition** — Add `test.*` keys to config.json with defaults. Integrate with `gsd settings` display.
+2. **gsd-tools test-count** — New subcommand for counting test cases.
+3. **Execute-plan hard test gate** — Run `test.command` after each task commit. Fail -> Rule 1 deviation.
 
-### Add After Validation (v1.x)
+Rationale: The hard gate is the single highest-value feature. It prevents regressions during autonomous execution. Everything else is enhancement.
 
-Features to add once the core loop is proven to work end-to-end.
+### Phase 2: Acceptance Layer (discuss + verify integration)
 
-- [ ] **Debug-first failure handling** -- Spawn gsd-debugger on execution failures, apply fixes, retry. Trigger: first failed autopilot run where manual debugging would have been avoidable.
-- [ ] **Decision audit trail** -- Enrich auto-context CONTEXT.md with explicit "Claude's Decision: X because Y" entries. Trigger: user feedback that autonomous decisions are opaque.
-- [ ] **Smart phase-type routing** -- Adapt auto-context behavior based on phase domain (UI vs API vs infrastructure). Trigger: auto-context producing irrelevant decisions for non-UI phases.
-- [ ] **Configurable autonomy level** -- Per-phase pause configuration. Trigger: users wanting selective human review for certain phase types.
+Build the human-owned acceptance test lifecycle.
 
-### Future Consideration (v2+)
+4. **discuss-phase acceptance test gathering** — New question pass in interactive mode. Auto-context generation in auto mode.
+5. **verify-phase acceptance test execution** — Run AT Verify commands, map to truths.
+6. **plan-phase budget awareness** — Planner sees test count in prompt.
 
-Features to defer until the core pattern is battle-tested.
+Rationale: The acceptance layer is the governance innovation. It gives humans a concrete, executable spec for what "done" means.
 
-- [ ] **Claude Agent SDK migration** -- Replace bash outer loop with SDK harness for richer session management. Why defer: bash loop is simpler and more debuggable; migrate once the pattern is stable.
-- [ ] **Cross-milestone learning** -- Autopilot learns from prior milestones (which decisions worked, which caused rework). Why defer: requires a feedback mechanism that does not exist yet.
-- [ ] **Automated verification (no human gate)** -- AI-only verification using browser automation (Puppeteer MCP) and test suites. Why defer: trust must be established first; human checkpoint is the quality guarantee.
+### Phase 3: Stewardship (test health + audit integration)
 
-## Feature Prioritization Matrix
+Build the long-term health management.
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Phase loop with state reading | HIGH | MEDIUM | P1 |
-| Auto-context generation | HIGH | HIGH | P1 |
-| Auto-approval of gates | HIGH | LOW | P1 |
-| Resume capability | HIGH | MEDIUM | P1 |
-| Bash outer loop script | HIGH | LOW | P1 |
-| Human checkpoint at verification | HIGH | MEDIUM | P1 |
-| Progress circuit breaker | HIGH | MEDIUM | P1 |
-| Human escalation after retries | MEDIUM | LOW | P1 |
-| Debug-first failure handling | HIGH | MEDIUM | P2 |
-| Decision audit trail | MEDIUM | LOW | P2 |
-| Smart phase-type routing | MEDIUM | MEDIUM | P2 |
-| Configurable autonomy level | LOW | LOW | P3 |
-| Agent SDK migration | LOW | HIGH | P3 |
+7. **Test steward agent** — Redundancy detection, stale test identification, consolidation proposals.
+8. **audit-milestone integration** — Steward runs during audit, produces test health section.
+9. **add-tests evolution** — Becomes "fill gaps" command for pre-existing phases.
 
-**Priority key:**
-- P1: Must have for launch -- autopilot is broken without these
-- P2: Should have, add after core loop is validated
-- P3: Nice to have, future consideration
+Rationale: The steward is valuable but not urgent. It matters at milestone audit time, not during day-to-day execution.
 
-## Competitor Feature Analysis
-
-| Feature | Ralphy | Devin | Cursor Background Agent | Composio Orchestrator | GSD Autopilot (planned) |
-|---------|--------|-------|------------------------|----------------------|------------------------|
-| Autonomous loop | Bash loop with PRD checkboxes | Cloud-hosted persistent agent | IDE-integrated background task | Parallel agent spawner | Bash outer loop with GSD phase pipeline |
-| State persistence | .ralphy/progress.txt + PRD checkboxes | Cloud state (opaque) | Git + Memories feature | Git worktrees + PR tracking | STATE.md + structured phase artifacts (CONTEXT, PLAN, SUMMARY, UAT) |
-| Context window management | Fresh context per task | Managed by Cognition's infra | Fresh agent per task (long-running mode) | Fresh agent per worktree | Fresh context per phase via bash reinvocation |
-| Stuck detection | --max-iterations, fatal error detection | Unknown (cloud managed) | Unknown | CI failure detection | Progress circuit breaker (N iterations, no state change) |
-| Failure recovery | Retry with backoff, fallback to sandbox | Self-healing code (iterates on errors) | Unknown | CI fix agents, review comment agents | gsd-debugger agent, retry loop, human escalation |
-| Human checkpoints | None (fully autonomous) | PR review, Slack notifications | PR review | PR review | Per-phase verification checkpoint |
-| Decision documentation | None | PR descriptions | None | None | CONTEXT.md with decision reasoning (audit trail) |
-| Structured pipeline | Flat task list | Opaque internal planning | Single task at a time | Parallel independent tasks | Full discuss-research-plan-execute-verify pipeline per phase |
-| Multi-agent | Single engine per task (parallel tasks) | Single agent | Single agent per background task | Multiple parallel agents | Thin orchestrator spawning specialized subagents |
+**Defer:** Coverage tracking, visual reports, per-file mapping, flaky test detection.
 
 ## Sources
 
-- [Anthropic: Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) -- PRIMARY. Validates bash outer loop, progress file pattern, fresh context per session, artifact-based memory. HIGH confidence.
-- [Addy Osmani: Conductors to Orchestrators: The Future of Agentic Coding](https://addyosmani.com/blog/future-agentic-coding/) -- Defines conductor vs orchestrator spectrum, table stakes features, failure modes. MEDIUM confidence.
-- [Ralphy: Autonomous AI Coding Loop](https://github.com/michaelshimeles/ralphy) -- Real-world implementation of bash outer loop with PRD tracking, circuit breakers, retry logic. HIGH confidence (open source, code verified).
-- [Composio Agent Orchestrator](https://github.com/ComposioHQ/agent-orchestrator) -- Parallel agent spawning, CI fix automation, PR-based workflow. MEDIUM confidence.
-- [Devin AI Guide 2026](https://aitoolsdevpro.com/ai-tools/devin-guide/) -- Self-healing code, PR workflow, multi-modal context. MEDIUM confidence (marketing material).
-- [Cursor Long-Running Agents](https://www.adwaitx.com/cursor-long-running-agents-autonomous-coding/) -- 25-52 hour autonomous sessions, Memories feature, PR-based output. MEDIUM confidence.
-- [Mike Mason: AI Coding Agents 2026](https://mikemason.ca/writing/ai-coding-agents-jan-2026/) -- Coherence through orchestration, not raw autonomy. MEDIUM confidence.
-- Existing GSD codebase (commands, workflows, agents, config) -- PRIMARY. Direct code analysis of discuss-phase.md, verify-work.md, transition.md, execute-phase.md, state template, checkpoints reference, config template. HIGH confidence.
+- [Simon Willison: First Run the Tests (Agentic Engineering Patterns)](https://simonwillison.net/guides/agentic-engineering-patterns/first-run-the-tests/) — PRIMARY. Validates "tests are non-negotiable for AI-generated code" and "first run the tests puts the agent in a testing mindset." HIGH confidence.
+- [Simon Willison: Agentic Engineering Patterns](https://simonwillison.net/guides/agentic-engineering-patterns/) — Broader context on coding agent patterns. HIGH confidence.
+- [Martin Fowler: Given When Then (bliki)](https://martinfowler.com/bliki/GivenWhenThen.html) — Canonical reference for BDD format. HIGH confidence.
+- [TestCollab: From Vibe Coding to Spec-Driven Development](https://testcollab.com/blog/from-vibe-coding-to-spec-driven-development) — Validates spec-driven approach: specification as contract, tests from spec, AI implements against spec. MEDIUM confidence.
+- [Stryker Mutator](https://stryker-mutator.io/) — JavaScript mutation testing framework. Detects redundant/ineffective tests via mutant analysis. HIGH confidence (established tool).
+- [Sander van Beek: Automatically Detecting Redundant Tests](https://lakitna.medium.com/automatically-detecting-redundant-tests-be9151fdd855) — Techniques for automated redundancy detection using mutation analysis. MEDIUM confidence.
+- [Semaphore: Accelerate CI/CD with BDD and Acceptance Testing](https://semaphore.io/blog/bdd-acceptance-testing) — BDD scenarios as automated gates in CI/CD pipelines. HIGH confidence.
+- [Permit.io: Human-in-the-Loop for AI Agents](https://www.permit.io/blog/human-in-the-loop-for-ai-agents-best-practices-frameworks-use-cases-and-demo) — HITL patterns: approve/edit/reject middleware for agent tool calls. MEDIUM confidence.
+- [GitHub: Accelerate TDD with AI (Copilot at Automattic)](https://github.com/readme/guides/github-copilot-automattic) — AI-assisted TDD workflow patterns. MEDIUM confidence.
+- [Testrig: Reducing Redundant Tests Using AI-Powered Analysis](https://testrig.medium.com/reducing-redundant-tests-using-ai-powered-test-analysis-81bacf32db37) — Clustering and cosine similarity for test overlap detection. LOW confidence (single source).
+- [Arxiv: Fine-Grained Approach for Detecting Redundant Test Cases](https://arxiv.org/pdf/2210.01661) — Tscope approach achieving 91.8% precision on NL test redundancy. MEDIUM confidence (academic).
+- Existing GSD codebase analysis (execute-plan.md, verify-phase.md, discuss-phase.md, add-tests.md, tdd.md, audit-milestone.md, config.json) — PRIMARY. Direct code inspection of all integration points. HIGH confidence.
 
 ---
-*Feature research for: Autonomous AI coding orchestrator (GSD Autopilot)*
-*Researched: 2026-03-01*
+*Feature research for: Dual-Layer Test Architecture (GSD v1.6)*
+*Researched: 2026-03-05*

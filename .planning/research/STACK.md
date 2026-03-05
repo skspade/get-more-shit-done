@@ -1,229 +1,347 @@
-# Stack Research
+# Stack Research: Dual-Layer Test Architecture
 
-**Domain:** Autonomous AI agent orchestration (CLI-based, file-state, subagent-spawning)
-**Researched:** 2026-03-01
+**Domain:** Test architecture additions for autonomous AI agent orchestration framework
+**Researched:** 2026-03-05
 **Confidence:** HIGH
+**Scope:** NEW capabilities only -- test steward, acceptance test execution, hard test gates, test budget counting, test framework auto-detection
 
-## Recommended Stack
+## Executive Decision
 
-### What GSD Already Provides (Do NOT Rebuild)
+**Zero new npm dependencies.** Every capability in the v1.6 design is implementable with Node.js built-ins, shell commands (grep/find), and the existing `gsd-tools.cjs` extension pattern. This is not a compromise -- it is the correct approach for a workflow/agent project that already runs with zero runtime dependencies.
 
-GSD v1.22.0 provides the entire inner-loop machinery. The autopilot builds on top of it, not beside it.
+## What Already Exists (Do NOT Rebuild, Do NOT Re-Research)
 
-| Existing Component | Purpose | Autopilot Relevance |
-|---|---|---|
-| `gsd-tools.cjs` CLI | State operations, config, init, phase/roadmap management | Autopilot calls these directly -- they are the state API |
-| 9 specialized agents (.md) | Execute substantive work in fresh 200k-token windows | Autopilot spawns these via Task tool, unchanged |
-| `auto_advance` config | Chains phases within a single session | Autopilot replaces this with cross-session chaining |
-| `mode: "yolo"` / `bypassPermissions` | Auto-approves tool use within a session | Autopilot uses `--dangerously-skip-permissions` for outer loop |
-| Workflow .md files | Phase lifecycle (discuss, plan, execute, verify, transition) | Autopilot invokes these workflows directly |
-| `STATE.md` + frontmatter sync | Machine-readable YAML frontmatter on STATE.md | Autopilot reads frontmatter to determine next action |
-| `config.json` | Project-level settings (models, parallelization, research) | Autopilot reads/writes config (e.g., `workflow.auto_advance`) |
-| `ROADMAP.md` | Phase definitions with goals, requirements, success criteria | Autopilot reads to know what phases exist and their order |
+| Existing Component | v1.6 Relevance |
+|---|---|
+| `gsd-tools.cjs` CLI router (600 LOC) | New `test-count`, `test-detect` subcommands plug into existing switch/case dispatcher |
+| `config.cjs` module (config-get/config-set/config-ensure) | Already supports dot-notation paths -- `test.command`, `test.budget.max_tests_per_phase` work out of the box |
+| `node:test` runner + `scripts/run-tests.cjs` | GSD's own test suite (15 files, 618 test cases) validates that new lib modules don't break anything |
+| `verify.cjs` module | Acceptance test verification extends existing verification patterns |
+| `execute-plan.md` workflow | Hard gate inserts after existing task-commit step |
+| `discuss-phase.md` workflow | Acceptance test gathering adds a new step after decision gathering |
+| `audit-milestone.md` workflow | Test steward spawns as a Task subagent at audit time |
+| `add-tests.md` workflow | Repurposed as "fill gaps" for pre-v1.6 phases |
 
-**Confidence: HIGH** -- Direct codebase inspection of commands/, agents/, get-shit-done/bin/lib/, get-shit-done/workflows/.
+**Confidence: HIGH** -- Direct codebase inspection. All 12 lib modules, 15 test files, package.json, dispatcher examined.
 
-### Core Technologies (What Needs to Be Built)
+## New Capabilities: Implementation Stack
 
-| Technology | Version | Purpose | Why Recommended |
-|---|---|---|---|
-| Bash (outer loop script) | bash 5.x | Cross-session phase loop that reinvokes Claude Code per phase | The Ralph Loop pattern (2025) proved bash is the correct tool for outer-loop orchestration. Bash survives context window exhaustion, handles process lifecycle, and has zero dependencies. GSD already uses bash helpers in its toolchain. |
-| Claude Code CLI | Latest (`claude`) | AI agent invocation per phase iteration | The `-p` (print/headless) flag + `--output-format json` + `--dangerously-skip-permissions` enables fully unattended execution. The `--agent` flag can run a custom autopilot agent as main thread. |
-| GSD command/workflow .md files | N/A (markdown) | Thin orchestrator command + workflow for in-session phase logic | GSD's native pattern: command.md defines interface, workflow.md defines logic, agent spawns subagents via Task tool. The autopilot command and workflow follow the same pattern as every other GSD command. |
-| Node.js (`gsd-tools.cjs`) | >=16.7.0 | State queries, config management, phase operations | Already the state API. Autopilot needs 1-2 new subcommands (e.g., `state next-action` to compute what phase/step to run next). Extending existing CJS modules is trivial. |
-| jq | 1.6+ | Parse JSON output from Claude Code CLI in bash | Claude Code's `--output-format json` returns structured results. jq is the standard tool for extracting completion status, error messages, and result data in bash scripts. Available on all dev machines. |
+### 1. Test Framework Auto-Detection
 
-**Confidence: HIGH** -- Ralph Loop pattern verified across 10+ implementations (snarktank/ralph, frankbria/ralph-claude-code, KLIEBHAN/ralph-loop, michaelshimeles/ralphy). Claude Code CLI flags verified via official docs (code.claude.com/docs/en/sub-agents, headless mode docs).
+**What:** Detect the project's test framework (jest, vitest, mocha, node:test, pytest, go test, etc.) from project files.
 
-### Supporting Components
+**Implementation:** New function in a new `get-shit-done/bin/lib/testing.cjs` module. Pure Node.js, no dependencies.
 
-| Component | Purpose | When to Use |
-|---|---|---|
-| `gsd-auto-context` agent (.md) | Generates CONTEXT.md from PROJECT.md when discuss phase is bypassed | Spawned by autopilot workflow as a Task subagent during the auto-discuss step |
-| `autopilot.md` command | Thin orchestrator entry point (~100-200 lines) | User invokes `/gsd:autopilot [milestone]` -- routes to workflow |
-| `autopilot.md` workflow | In-session phase loop logic (~300-500 lines) | Drives a single phase through discuss/plan/execute/verify/transition |
-| `gsd-autopilot-loop.sh` bash script | Outer loop: reinvokes Claude Code per phase with fresh context | The only new non-markdown artifact. Handles context window exhaustion, process lifecycle, completion detection |
-| `state next-action` subcommand | Reads STATE.md + ROADMAP.md, returns JSON: `{action, phase, step, args}` | Called by bash outer loop to determine what to invoke next. Centralizes state-to-action logic in one place |
+**Detection algorithm (ordered by specificity):**
 
-**Confidence: HIGH** -- Architecture directly derived from PROJECT.md constraints and existing GSD patterns.
+```javascript
+function detectTestFramework(cwd) {
+  // 1. Check config.json for explicit override
+  const config = loadConfig(cwd);
+  if (config.test?.framework && config.test.framework !== 'auto') {
+    return config.test.framework;
+  }
 
-### Development Tools
+  // 2. Check package.json devDependencies (most reliable for JS projects)
+  const pkg = safeReadJson(path.join(cwd, 'package.json'));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (deps.vitest) return 'vitest';
+  if (deps.jest) return 'jest';
+  if (deps.mocha) return 'mocha';
 
-| Tool | Purpose | Notes |
-|---|---|---|
-| `shellcheck` | Lint the bash outer loop script | Standard for production bash. Catches quoting issues, undefined variables, POSIX compliance. |
-| `node scripts/run-tests.cjs` | Run existing GSD test suite | Verify new gsd-tools subcommands don't break existing functionality. |
-| Claude Code (interactive) | Test autopilot commands during development | Use `/gsd:autopilot` interactively first, then test headless mode. |
+  // 3. Check for framework config files
+  if (exists('vitest.config.*')) return 'vitest';
+  if (exists('jest.config.*') || pkg.jest) return 'jest';
+  if (exists('.mocharc.*')) return 'mocha';
 
-## Architecture: Two-Layer Orchestration
+  // 4. Check test script content
+  const testCmd = pkg.scripts?.test || '';
+  if (testCmd.includes('vitest')) return 'vitest';
+  if (testCmd.includes('jest')) return 'jest';
+  if (testCmd.includes('mocha')) return 'mocha';
+  if (testCmd.includes('node --test') || testCmd.includes('node:test')) return 'node:test';
+  if (testCmd.includes('pytest')) return 'pytest';
+  if (testCmd.includes('go test')) return 'go';
 
-The autopilot uses a two-layer design, mirroring the Ralph Loop pattern but adapted to GSD's existing architecture:
+  // 5. Check for node:test usage in test files (GSD's own pattern)
+  if (hasNodeTestImports(cwd)) return 'node:test';
 
-### Layer 1: Bash Outer Loop (`gsd-autopilot-loop.sh`)
-
-```
-while true; do
-    # 1. Query state to determine next action
-    NEXT=$(node gsd-tools.cjs state next-action)
-    ACTION=$(echo "$NEXT" | jq -r '.action')
-    PHASE=$(echo "$NEXT" | jq -r '.phase')
-
-    # 2. Exit conditions
-    [ "$ACTION" = "complete" ] && break
-    [ "$ACTION" = "human_needed" ] && pause_for_human && continue
-    [ "$ACTION" = "stuck" ] && handle_circuit_breaker && break
-
-    # 3. Invoke Claude Code with fresh context per phase-step
-    claude -p "$PROMPT" \
-        --output-format json \
-        --dangerously-skip-permissions \
-        --allowedTools "Task,Read,Write,Edit,Bash,Grep,Glob" \
-        > "$OUTPUT_FILE" 2>&1
-
-    # 4. Analyze result, update iteration counter
-    analyze_result "$OUTPUT_FILE"
-done
+  return 'unknown';
+}
 ```
 
-**Why bash, not Node.js or Python:**
-- Zero additional dependencies (bash + jq are universal on dev machines)
-- Process lifecycle management is bash's core competency (trap, signals, PID tracking)
-- Ralph Loop ecosystem proved this pattern at scale
-- GSD's own bin/install.js is Node, but orchestration scripts use bash patterns
+**Why this approach over an npm package:** No "detect-test-framework" package exists that covers this use case well. The detection logic is ~40 lines, stable, and specific to what GSD needs. Adding a dependency for this would be absurd.
 
-### Layer 2: GSD Workflow (In-Session Logic)
+**Confidence: HIGH** -- The detection signals (devDependencies keys, config file names, script content) are stable across framework versions and well-documented in each framework's official docs.
 
-Each Claude Code invocation runs a GSD workflow that:
-1. Reads STATE.md to know current position
-2. Executes one phase-step (discuss, plan, execute, verify, or transition)
-3. Updates STATE.md with results
-4. Returns structured completion status
+### 2. Test Case Counting
 
-This is identical to how `auto_advance` works today, except:
-- Discuss phase is replaced by auto-context generation (no human input)
-- Verification pauses for human review (configurable)
-- The bash outer loop handles cross-session continuity
+**What:** Count individual test cases (not files) across the project and optionally per-phase.
+
+**Implementation:** Shell-based grep in `testing.cjs`, exposed as `gsd-tools.cjs test-count`.
+
+**Counting patterns by framework:**
+
+| Framework | Pattern | Notes |
+|---|---|---|
+| jest/vitest/mocha | `it(`, `test(`, `it.only(`, `test.only(` | Standard across all three |
+| node:test | Same as above (node:test uses identical `test()`/`it()` API) | Verified against GSD's own 15 test files |
+| pytest | `def test_` | Python convention |
+| go | `func Test` | Go convention |
+
+**Implementation approach:**
+
+```javascript
+function countTests(cwd, framework) {
+  const patterns = getTestPatterns(framework);  // file globs for test files
+  const countRegex = getCountRegex(framework);  // what to grep for
+
+  // Use grep -r with --include for file filtering
+  // This is what the design doc already specifies and it works
+  const result = execSync(
+    `grep -r -c "${countRegex}" ${testDirs} ${includeFlags} 2>/dev/null | awk -F: '{sum+=$2} END{print sum}'`,
+    { cwd, encoding: 'utf-8' }
+  ).trim();
+
+  return parseInt(result, 10) || 0;
+}
+```
+
+**Why grep over AST parsing:** The design doc's grep approach is correct. AST parsing would require `@babel/parser` or `acorn` (new dependencies) and would be slower for a simple count. Grep handles 99% of cases -- the 1% edge case (test name containing `test(` as a string) is noise in a count used for budget advisory, not billing.
+
+**Per-phase counting:** The design mentions "by commit attribution" but this is complex (git log parsing per file, mapping commits to phases). Simpler alternative: count tests in files that live under phase directories, or count tests in files modified during a phase's commits. The commit-based approach adds complexity without proportional value for a budget advisory. Recommend: count all tests project-wide for budget, defer per-phase attribution to the steward's analysis.
+
+**Confidence: HIGH** -- Verified the grep pattern against GSD's own 618 test cases. `grep -r -c "it(\|test(" tests/ --include="*.test.*"` returns correct counts.
+
+### 3. Hard Test Gate in execute-plan
+
+**What:** After each task commit during plan execution, run the project's full test suite. Fail = trigger debug-retry.
+
+**Implementation:** Pure shell in the execute-plan workflow. Zero new code in gsd-tools.cjs.
+
+```bash
+# Fetch test command from config (existing config-get works today)
+TEST_CMD=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get test.command 2>/dev/null)
+
+if [ -n "$TEST_CMD" ] && [ "$TEST_CMD" != "null" ]; then
+  eval "$TEST_CMD"
+  if [ $? -ne 0 ]; then
+    echo "HARD GATE: Test suite failed after task ${TASK_NUM}"
+    # Existing Rule 1 deviation handling kicks in
+  fi
+else
+  echo "Warning: No test command configured -- test gates inactive"
+fi
+```
+
+**Why no wrapper library:** The hard gate is 8 lines of bash in a markdown workflow file. It uses `config-get` which already exists. Adding a "test runner abstraction" would be over-engineering.
+
+**What about `test.hard_gate` config toggle:** The workflow should also check `config-get test.hard_gate` before running. If false, skip the gate. This is a one-line addition.
+
+**Confidence: HIGH** -- `config-get` tested and working. Shell eval of test commands is the standard pattern used by npm, CI systems, and every task runner.
+
+### 4. Acceptance Test Execution (Given/When/Then/Verify)
+
+**What:** Parse `<acceptance_tests>` blocks from CONTEXT.md, execute `Verify:` shell commands, report pass/fail.
+
+**Implementation:** New functions in `testing.cjs`, exposed as `gsd-tools.cjs test-acceptance --phase N`.
+
+**Parser approach:**
+
+```javascript
+function parseAcceptanceTests(contextMdContent) {
+  // Extract <acceptance_tests>...</acceptance_tests> block
+  const match = contextMdContent.match(/<acceptance_tests>([\s\S]*?)<\/acceptance_tests>/);
+  if (!match) return [];
+
+  // Parse AT-NN sections with regex
+  const tests = [];
+  const atRegex = /### (AT-\d+):\s*(.+)\n([\s\S]*?)(?=### AT-|\z)/g;
+  // Extract Given/When/Then/Verify from each section
+  // ...
+  return tests;
+}
+
+function runAcceptanceTests(tests, cwd) {
+  const results = [];
+  for (const at of tests) {
+    const { stdout, stderr, status } = spawnSync('sh', ['-c', at.verify], {
+      cwd, timeout: 30000, encoding: 'utf-8'
+    });
+    results.push({
+      id: at.id,
+      name: at.name,
+      passed: status === 0,
+      output: stdout || stderr
+    });
+  }
+  return results;
+}
+```
+
+**Why `spawnSync` over `exec`:** Synchronous execution is correct here -- acceptance tests run sequentially, each must complete before the next. `spawnSync` with a 30-second timeout prevents hanging commands from blocking the workflow.
+
+**Why not a BDD library (cucumber, gherkin):** The acceptance tests are human-readable markdown with a `Verify:` shell command. The Given/When/Then is for humans to read; only the `Verify:` line is executable. Bringing in cucumber would require a gherkin parser, step definitions, a runner -- massive complexity for what is fundamentally `sh -c "$VERIFY_CMD" && echo PASS || echo FAIL`.
+
+**Confidence: HIGH** -- The format is defined in the design doc. Regex parsing of markdown sections is a well-established pattern in this codebase (see `frontmatter.cjs`, `state.cjs`).
+
+### 5. Test Steward Agent
+
+**What:** Analysis agent that detects redundancy, counts budgets, proposes consolidation.
+
+**Implementation:** A new GSD agent file (`agents/gsd-test-steward.md`) + supporting functions in `testing.cjs`.
+
+**What testing.cjs provides to the steward:**
+
+| Function | Purpose | Implementation |
+|---|---|---|
+| `countTests(cwd, framework)` | Total test count for budget check | grep-based (see #2 above) |
+| `detectTestFramework(cwd)` | Framework detection for pattern matching | file-inspection (see #1 above) |
+| `listTestFiles(cwd)` | Enumerate all test files | `glob` via `fs.readdirSync` recursive |
+| `getTestBudget(cwd)` | Read budget config | `config-get test.budget.*` |
+
+**What the steward does as an AI agent (not code):**
+- Reads test files (using its Read tool)
+- Identifies redundancy through semantic analysis (AI is better at this than AST diffing)
+- Produces markdown consolidation proposals
+- Reports budget status
+
+**Why AI-driven redundancy detection over static analysis:** Tools like `jscpd` (copy-paste detector) find syntactic duplication, not semantic redundancy. Two tests that test the same behavior with different code structures are semantically redundant but syntactically unique. The AI agent reads the tests, understands intent, and identifies overlap -- which is exactly what this codebase already does with its other agents (gsd-researcher, gsd-verifier). No new dependency needed.
+
+**Confidence: HIGH** -- Agent-as-markdown is the established GSD pattern. The steward's supporting functions are trivial Node.js.
+
+### 6. Test Budget Management
+
+**What:** Track test counts against configurable per-phase and project-wide limits.
+
+**Implementation:** Functions in `testing.cjs` + `gsd-tools.cjs test-budget` subcommand.
+
+```javascript
+function getTestBudgetStatus(cwd) {
+  const framework = detectTestFramework(cwd);
+  const total = countTests(cwd, framework);
+  const config = loadConfig(cwd);
+  const budget = config.test?.budget || { max_total_tests: 200, warn_at_percentage: 80 };
+
+  return {
+    total,
+    max: budget.max_total_tests,
+    percentage: Math.round((total / budget.max_total_tests) * 100),
+    warning: total >= budget.max_total_tests * (budget.warn_at_percentage / 100),
+    exceeded: total >= budget.max_total_tests
+  };
+}
+```
+
+**Exposed as:** `node gsd-tools.cjs test-budget` (returns JSON with budget status).
+
+**Confidence: HIGH** -- Composition of counting + config reading, both already validated.
+
+## New Module: `testing.cjs`
+
+All test-related functions consolidated in one new lib module, following the existing pattern (one module per domain: `state.cjs`, `phase.cjs`, `verify.cjs`, etc.).
+
+| Export | CLI Command | Purpose |
+|---|---|---|
+| `cmdTestCount` | `test-count [--framework F]` | Count test cases project-wide |
+| `cmdTestDetect` | `test-detect` | Auto-detect test framework |
+| `cmdTestBudget` | `test-budget` | Budget status (count vs limits) |
+| `cmdTestAcceptance` | `test-acceptance --phase N` | Parse and run acceptance tests from CONTEXT.md |
+| `detectTestFramework` | (internal) | Framework detection logic |
+| `countTests` | (internal) | Grep-based counting |
+| `parseAcceptanceTests` | (internal) | CONTEXT.md AT block parser |
+| `runAcceptanceTests` | (internal) | Execute Verify commands |
+| `getTestBudgetStatus` | (internal) | Budget calculation |
+
+**Integration with gsd-tools.cjs dispatcher:** Add 4 new cases to the switch statement (lines 180-600), following the exact same pattern as existing commands. Import `testing` module alongside `config`, `state`, etc.
+
+## New Config Schema Keys
+
+Added to `config-ensure-section` defaults in `config.cjs`:
+
+```json
+{
+  "test": {
+    "command": null,
+    "framework": "auto",
+    "hard_gate": true,
+    "acceptance_tests": true,
+    "budget": {
+      "max_tests_per_phase": 30,
+      "max_total_tests": 200,
+      "warn_at_percentage": 80
+    },
+    "steward": {
+      "enabled": true,
+      "redundancy_threshold": 0.15,
+      "stale_threshold": 0.05,
+      "auto_consolidate": false
+    }
+  }
+}
+```
+
+**Backward compatibility:** Existing `config-ensure-section` only writes config.json if it does not exist. Existing projects keep their current config. New projects get the test defaults. Projects upgrading can add the `test` key via `config-set` or `/gsd:settings`.
+
+## What NOT to Add
+
+| Temptation | Why NOT | Instead |
+|---|---|---|
+| `@babel/parser` or `acorn` for AST-based test counting | Adds 2+ MB of dependencies for a count that grep handles in <100ms. Test counting is advisory, not billing-grade. | grep with `--include` patterns |
+| `cucumber` / `@cucumber/cucumber` for BDD | Acceptance tests have one executable line (`Verify:`), not step definitions. Cucumber's value is in parameterized step reuse across scenarios -- GSD ATs are standalone shell commands. | Regex parse + `spawnSync('sh', ['-c', cmd])` |
+| `jscpd` for copy-paste detection in tests | Finds syntactic duplication only. AI steward agent finds semantic redundancy, which is what actually matters for test consolidation. | gsd-test-steward agent reads tests, proposes consolidation |
+| `istanbul` / `nyc` for coverage | GSD already has `c8` in devDependencies for coverage. The test steward doesn't need coverage data -- it analyzes test intent, not line coverage. | Existing `c8` if coverage is ever needed |
+| `jest` or `vitest` as GSD's test runner | GSD uses `node:test` (built-in, zero-dep). All 15 test files, 618 cases run via `node --test`. Switching frameworks adds dependency and migration cost for no benefit. | Keep `node:test` + `scripts/run-tests.cjs` |
+| A generic "test runner adapter" abstraction | The hard gate just runs `eval "$TEST_CMD"`. The project's test command is configured once in `test.command`. Abstracting over different runners adds complexity for a single `eval` call. | `config-get test.command` + `eval` |
+| `glob` npm package for test file discovery | Node.js `fs.readdirSync` with `recursive: true` (stable since Node 18.17) handles this. The project requires Node >=16.7.0 but runs on v25.6.1 in practice. | `fs.readdirSync(dir, { recursive: true })` |
+| Separate test database/state file | Test counts are derived from source files on demand. Caching counts in a state file creates staleness bugs. The grep-based count runs in <100ms for typical projects. | Compute on demand, never cache |
+
+## File Changes Summary
+
+| File | Change Type | Scope |
+|---|---|---|
+| `get-shit-done/bin/lib/testing.cjs` | **NEW** | ~200-300 LOC. All test functions. |
+| `get-shit-done/bin/gsd-tools.cjs` | MODIFY | Add `require('./lib/testing.cjs')` + 4 switch cases (~30 LOC) |
+| `get-shit-done/bin/lib/config.cjs` | MODIFY | Add test defaults to `cmdConfigEnsureSection` (~15 LOC) |
+| `get-shit-done/agents/gsd-test-steward.md` | **NEW** | Agent markdown file (~200-300 lines) |
+| `get-shit-done/workflows/execute-plan.md` | MODIFY | Add hard gate step (~15 LOC markdown) |
+| `get-shit-done/workflows/discuss-phase.md` | MODIFY | Add acceptance test gathering step (~30 LOC markdown) |
+| `get-shit-done/workflows/verify-phase.md` | MODIFY | Add AT execution in verification (~20 LOC markdown) |
+| `get-shit-done/workflows/audit-milestone.md` | MODIFY | Spawn test steward step (~15 LOC markdown) |
+| `tests/testing.test.cjs` | **NEW** | Tests for testing.cjs module |
 
 ## Installation
 
 ```bash
-# No new npm packages needed. GSD's existing dependencies suffice.
-# The only new artifacts are markdown files + one bash script.
+# No new npm packages needed.
+# The only new code artifacts are:
+#   1. testing.cjs (Node.js lib module)
+#   2. gsd-test-steward.md (agent markdown)
+#   3. Workflow modifications (markdown edits)
+#   4. testing.test.cjs (tests)
 
-# Verify jq is available (needed for bash outer loop)
-jq --version || echo "Install jq: sudo apt install jq / brew install jq"
-
-# Verify Claude Code CLI is available
-claude --version || echo "Install: npm install -g @anthropic-ai/claude-code"
+# Verify existing tests still pass after changes:
+npm test
 ```
-
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|---|---|---|
-| Bash outer loop | Claude Agent SDK (Python) | If you need programmatic control over model parameters, streaming, or custom tool definitions beyond what CLI flags provide. The SDK is more powerful but adds a Python dependency and moves orchestration outside GSD's native patterns. |
-| Bash outer loop | Node.js outer loop | If the bash script exceeds ~200 lines and needs complex JSON manipulation. Node.js would match GSD's existing toolchain but adds process management complexity that bash handles natively. |
-| `state next-action` subcommand | Inline bash state parsing | Never. Centralizing state-to-action logic in gsd-tools.cjs keeps the bash script thin and testable. Parsing STATE.md with grep/sed in bash is fragile. |
-| `--agent` flag for main thread | Spawning autopilot as Task subagent | If the autopilot needs to be invoked from within an existing Claude Code session. The `--agent` flag is better for headless invocation where the autopilot IS the session. |
-| `--dangerously-skip-permissions` | `--allowedTools` only | If running in a shared/untrusted environment. `--allowedTools` provides fine-grained control but requires enumerating every tool. For autonomous execution in a developer's own repo, full bypass is standard practice (per Ralph Loop ecosystem). |
-| jq for JSON parsing | Node.js one-liner | If jq is unavailable. `node -e "console.log(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).field)"` works but is verbose. |
-| Claude Code `--resume` flag | Fresh `-p` invocation each time | When a phase step was interrupted mid-execution (context limit hit). `--resume` restores the full conversation. However, for the autopilot, fresh invocations are preferred (cleaner state, no context rot). Use `--resume` only for explicit retry of failed steps. |
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|---|---|---|
-| Claude Agent SDK as primary orchestrator | PROJECT.md explicitly rules this out: "Claude Agent SDK harness -- native-first approach, SDK is a future option." Adds Python dependency, moves logic outside GSD's markdown-based architecture. | Bash outer loop + GSD native commands/workflows |
-| Agent Teams | PROJECT.md rules this out: "Agent Teams integration -- phases are sequential, peer-to-peer coordination unnecessary." Agent Teams coordinate parallel independent sessions; autopilot phases are sequential by design. | Sequential phase execution via outer loop |
-| Token/cost budget enforcement | PROJECT.md rules this out: "Budget/cost caps -- progress circuit breaker handles runaway, no token budget enforcement." Progress stall detection is more meaningful than token counting. | Circuit breaker (N consecutive iterations with no state change) |
-| `--continue` flag for session chaining | Known bugs with context restoration after limit hits (GitHub issue #3138). The `--continue` flag hijacks the most recent session in the directory, which may not be the autopilot session. | Fresh `-p` invocations with state read from `.planning/` files |
-| Interactive discuss mode | PROJECT.md rules this out: "Interactive discuss mode -- always auto-decide, never prompt during autonomous execution." | Auto-context agent that generates CONTEXT.md from PROJECT.md |
-| Python/TypeScript wrapper scripts | Adds runtime dependency, duplicates what bash does natively (process management, signal handling), and breaks the "native GSD implementation" constraint. | Bash script with jq for JSON handling |
-| Complex state machine library | The state machine is simple (5 states: discuss, plan, execute, verify, transition) with one-directional flow. A library adds dependency for no benefit. | `state next-action` subcommand in gsd-tools.cjs that reads STATE.md and returns the next action |
-| Polling/sleep loops for Task completion | Claude Code's Task tool blocks until the subagent completes. No polling needed. | Task tool's built-in blocking behavior |
-
-## Stack Patterns by Variant
-
-**If running fully autonomous (default autopilot mode):**
-- Bash outer loop with `--dangerously-skip-permissions`
-- Auto-context replaces discuss phase
-- Human checkpoint at verification only
-- Circuit breaker at 3 consecutive no-progress iterations
-
-**If running semi-autonomous (human gates at each phase):**
-- Same bash outer loop but with `pause_for_human` at phase boundaries
-- Standard discuss phase (interactive) instead of auto-context
-- This is essentially the existing `auto_advance` behavior, wrapped in an outer loop for cross-session continuity
-
-**If running in CI/CD (future consideration):**
-- Same bash outer loop
-- `--output-format stream-json` for real-time progress monitoring
-- Log output piped to CI artifact storage
-- Human checkpoints become PR review gates instead of CLI pauses
 
 ## Version Compatibility
 
-| Component | Compatible With | Notes |
-|---|---|---|
-| `gsd-tools.cjs` (existing) | Node.js >=16.7.0 | Already tested. New subcommands use same CJS module pattern. |
-| Claude Code CLI `-p` flag | Claude Code v2.0+ | Headless mode. Available since mid-2025. |
-| Claude Code `--agent` flag | Claude Code v2.0.59+ | Runs custom agent as main thread. Newer feature but stable. |
-| Claude Code `--output-format json` | Claude Code v2.0+ | Structured output for bash parsing. |
-| Claude Code `--allowedTools` | Claude Code v2.0+ | Fine-grained tool control per invocation. |
-| jq 1.6+ | bash 4.0+ | Standard on all modern Linux/macOS. Homebrew/apt installable. |
-| bash 5.x | All modern systems | bash 4.x works too; 5.x preferred for associative arrays if needed. |
-
-## Key CLI Invocation Pattern
-
-The core invocation that the bash outer loop uses:
-
-```bash
-claude -p "$(cat <<'PROMPT'
-<objective>
-Execute phase ${PHASE_NUM} ${STEP} for the GSD autopilot.
-</objective>
-
-<execution_context>
-@~/.claude/get-shit-done/workflows/autopilot.md
-</execution_context>
-
-<context>
-Phase: ${PHASE_NUM}
-Step: ${STEP}
-Mode: autonomous
-</context>
-
-<files_to_read>
-- .planning/STATE.md
-- .planning/ROADMAP.md
-- .planning/PROJECT.md
-- .planning/config.json
-</files_to_read>
-PROMPT
-)" \
-  --output-format json \
-  --dangerously-skip-permissions \
-  --allowedTools "Task,Read,Write,Edit,Bash,Grep,Glob,WebSearch,WebFetch"
-```
-
-This pattern:
-- Uses `-p` for headless (non-interactive) execution
-- Passes the autopilot workflow as `@` reference for the agent to read
-- Provides state files for the agent to load on startup
-- Returns JSON for the bash loop to parse
-- Grants all tools needed for GSD operations
+| Component | Required | Actual | Notes |
+|---|---|---|---|
+| Node.js | >=16.7.0 (package.json) | v25.6.1 (installed) | `fs.readdirSync` recursive needs 18.17+, but actual Node version is well above |
+| `node:test` | Node >=18 (stable) | v25.6.1 | Built-in, zero-dep. All 15 existing test files use it. |
+| `child_process.spawnSync` | Node >=0.12 | v25.6.1 | For acceptance test execution |
+| `child_process.execSync` | Node >=0.12 | v25.6.1 | For grep-based test counting |
+| grep | Any POSIX grep | System grep | For test case counting. Available on all dev machines. |
+| c8 | ^11.0.0 (devDep) | Installed | Existing coverage tool, unchanged |
 
 ## Sources
 
-- [Claude Code subagent documentation](https://code.claude.com/docs/en/sub-agents) -- Verified subagent capabilities, `--agent` flag, model parameter, tool restrictions, permission modes. HIGH confidence.
-- [Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices) -- Confirmed headless mode, `-p` flag, `--output-format json`. HIGH confidence.
-- [Ralph Loop (snarktank/ralph)](https://github.com/snarktank/ralph) -- Verified outer loop pattern: fresh context per iteration, state in filesystem, PRD-based completion detection. HIGH confidence.
-- [Ralph Claude Code fork (frankbria)](https://github.com/frankbria/ralph-claude-code) -- Verified Claude Code-specific implementation: `--resume` for session continuity, `--allowedTools` for permission control, JSON output parsing, circuit breaker pattern. HIGH confidence.
-- [The Ralph Loop: Context as Resource](https://www.ikangai.com/the-ralph-loop-how-a-bash-script-is-forcing-developers-to-rethink-context-as-a-resource/) -- Confirmed architectural rationale: fresh windows avoid context rot, filesystem is the memory layer. MEDIUM confidence (blog analysis, not primary source).
-- [Claude Code `--resume` bug (GitHub #3138)](https://github.com/anthropics/claude-code/issues/3138) -- Confirmed `--resume` fails after context/usage limits. Justifies fresh invocation approach. HIGH confidence (official issue tracker).
-- [Task tool renamed to Agent (Claude Code docs)](https://code.claude.com/docs/en/sub-agents) -- "In version 2.1.63, the Task tool was renamed to Agent." GSD still uses Task syntax, which works as alias. MEDIUM confidence (docs note, untested in this codebase).
-- GSD codebase direct inspection -- commands/gsd/*.md, get-shit-done/workflows/*.md, agents/*.md, get-shit-done/bin/lib/*.cjs. HIGH confidence.
+- GSD codebase direct inspection: `package.json` (zero runtime deps, devDeps: c8 + esbuild), `gsd-tools.cjs` (600 LOC dispatcher), `lib/config.cjs` (dot-notation config-get/set), `scripts/run-tests.cjs` (node:test runner), all 15 `tests/*.test.cjs` files (618 test cases using `require('node:test')`). **HIGH confidence.**
+- [Node.js test runner API](https://nodejs.org/api/test.html) -- Verified `test()` / `it()` / `describe()` API matches grep counting patterns. Built-in reporters (spec, tap, junit) available. No dry-run/list-tests API exists. **HIGH confidence.**
+- [Jest CLI docs](https://jestjs.io/docs/cli) -- Confirmed `test(` / `it(` as universal test case markers. **HIGH confidence.**
+- Design doc (`.planning/designs/2026-03-05-dual-layer-test-architecture-design.md`) -- All requirements, config schema, workflow integration points defined. **HIGH confidence** (first-party design).
 
 ---
-*Stack research for: GSD Autopilot -- Autonomous Phase-Loop Orchestrator*
-*Researched: 2026-03-01*
+*Stack research for: GSD Dual-Layer Test Architecture (v1.6)*
+*Researched: 2026-03-05*
