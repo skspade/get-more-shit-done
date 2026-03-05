@@ -454,6 +454,17 @@ Example config:
 }
 ```
 
+### Test Suite Management
+
+**`gsd test-count [--phase N] [--json] [--plain]`**
+Count test cases across the project (standalone CLI command).
+
+- Counts individual `it`/`test` blocks in test files
+- Filter by phase with `--phase N`
+- JSON output with `--json` for scripting
+
+Usage: `gsd test-count` or `gsd test-count --phase 30`
+
 ### Test Configuration
 
 Configure the dual-layer test system in `.planning/config.json` under the `test` key:
