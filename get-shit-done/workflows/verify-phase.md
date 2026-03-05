@@ -165,6 +165,90 @@ grep -E "Phase ${PHASE_NUM}" .planning/REQUIREMENTS.md 2>/dev/null
 For each requirement: parse description → identify supporting truths/artifacts → status: ✓ SATISFIED / ✗ BLOCKED / ? NEEDS HUMAN.
 </step>
 
+<step name="verify_acceptance_tests">
+Check if CONTEXT.md contains an `<acceptance_tests>` block:
+
+```bash
+CONTEXT_FILE=$(ls "$PHASE_DIR"/*-CONTEXT.md 2>/dev/null | head -1)
+if [ -n "$CONTEXT_FILE" ]; then
+  grep -q "<acceptance_tests>" "$CONTEXT_FILE" 2>/dev/null
+fi
+```
+
+**If no CONTEXT.md or no `<acceptance_tests>` block:** Skip this step. Log: "Acceptance tests: SKIPPED (none defined)". This is normal -- phases without interactive discuss-phase or with test.acceptance_tests disabled will not have acceptance tests.
+
+**If `<acceptance_tests>` block exists:**
+
+1. **Parse acceptance tests:** Read the `<acceptance_tests>` block from CONTEXT.md. Extract each AT entry:
+   - Identifier (AT-{NN})
+   - Title (from ### heading)
+   - Given, When, Then lines
+   - Verify command (the shell command inside backticks on the Verify: line)
+
+2. **Execute each Verify command:**
+
+For each AT entry:
+```bash
+# Execute the Verify command, capture exit code and output
+VERIFY_OUTPUT=$(eval "{verify_command}" 2>&1)
+VERIFY_EXIT=$?
+```
+
+**Map result:**
+| Exit Code | Status | Meaning |
+|-----------|--------|---------|
+| 0 | PASS | Acceptance test satisfied |
+| Non-zero | FAIL | Acceptance test not satisfied |
+
+Capture both stdout and stderr as evidence. If the command times out (>120s), treat as FAIL with evidence "Command timed out after 120 seconds".
+
+3. **Record results:**
+
+Build an acceptance test results table:
+```
+| AT ID | Title | Status | Evidence |
+|-------|-------|--------|----------|
+| AT-01 | {title} | PASS | {first line of output or "exit 0"} |
+| AT-02 | {title} | FAIL | {error output or exit code} |
+```
+
+4. **Determine impact on overall status:**
+
+- If ANY acceptance test FAILs: this is a **blocker**. Set overall verification status to `gaps_found`.
+- Acceptance test failures are equivalent to truth failures -- the human's contract was not met.
+- Include failing ATs in the fix plan generation (same as other gaps).
+
+5. **Write to VERIFICATION.md report:**
+
+Add a dedicated `## Acceptance Test Results` section to the verification report, positioned after `## Requirements Coverage` and before `## Anti-Patterns`. The section contains:
+
+```markdown
+## Acceptance Test Results
+
+**Source:** {CONTEXT.md path}
+**Tests:** {total} | **Passed:** {pass_count} | **Failed:** {fail_count}
+
+| AT ID | Title | Status | Evidence |
+|-------|-------|--------|----------|
+| AT-01 | {title} | PASS | {evidence} |
+| AT-02 | {title} | FAIL | {evidence} |
+
+{If any failures:}
+### Failing Acceptance Tests
+
+**AT-{NN}: {title}**
+- Expected: {Then line}
+- Verify command: `{command}`
+- Exit code: {code}
+- Output:
+  ```
+  {stdout + stderr, truncated to 20 lines}
+  ```
+```
+
+If all acceptance tests pass, the section shows the summary table only (no failure details needed).
+</step>
+
 <step name="scan_antipatterns">
 Extract files modified in this phase from SUMMARY.md, scan each:
 
@@ -189,7 +273,7 @@ Format each as: Test Name → What to do → Expected result → Why can't verif
 <step name="determine_status">
 **passed:** All truths VERIFIED, all artifacts pass levels 1-3, all key links WIRED, no blocker anti-patterns.
 
-**gaps_found:** Any truth FAILED, artifact MISSING/STUB, key link NOT_WIRED, or blocker found.
+**gaps_found:** Any truth FAILED, artifact MISSING/STUB, key link NOT_WIRED, any acceptance test FAIL, or blocker found.
 
 **human_needed:** All automated checks pass but human verification items remain.
 
@@ -233,6 +317,7 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 - [ ] All artifacts checked at all three levels
 - [ ] All key links verified
 - [ ] Requirements coverage assessed (if applicable)
+- [ ] Acceptance tests executed (if `<acceptance_tests>` block exists in CONTEXT.md)
 - [ ] Anti-patterns scanned and categorized
 - [ ] Human verification items identified
 - [ ] Overall status determined
