@@ -78,11 +78,58 @@ Verify cross-phase wiring and E2E user flows.",
 )
 ```
 
+## 3.5. Spawn Test Steward (if enabled)
+
+**Skip if:** `test.steward` config is false, or no test files exist in the project.
+
+```bash
+# Check steward config
+STEWARD_ENABLED=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get test.steward 2>/dev/null || echo "true")
+
+# Check for test files
+TEST_COUNT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-count --raw 2>/dev/null || echo "0")
+```
+
+**If `STEWARD_ENABLED` is "false" or `TEST_COUNT` is "0":** Skip silently, proceed to step 4.
+
+**If enabled and test files exist:**
+
+```bash
+steward_model=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" resolve-model gsd-test-steward --raw 2>/dev/null || echo "sonnet")
+TEST_CONFIG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-config 2>/dev/null)
+```
+
+```
+Task(
+  prompt="First, read /home/seans/.claude/agents/gsd-test-steward.md for your role and instructions.
+
+<files_to_read>
+- ./CLAUDE.md (if exists -- project instructions)
+</files_to_read>
+
+<steward_input>
+**Mode:** milestone-audit
+**Milestone:** {milestone_version}
+**Test count:** {TEST_COUNT}
+**Test config:** {TEST_CONFIG}
+**Phase directories:** {phase_dirs from step 1}
+</steward_input>
+
+Analyze the test suite and produce a health report for the milestone audit.",
+  subagent_type="gsd-test-steward",
+  model="{steward_model}",
+  description="Audit test suite health for milestone"
+)
+```
+
+Store steward output as `steward_report` for use in step 4 and step 6.
+
 ## 4. Collect Results
 
 Combine:
 - Phase-level gaps and tech debt (from step 2)
 - Integration checker's report (wiring gaps, broken flows)
+- Test steward's health report (from step 3.5, if available)
 
 ## 5. Check Requirements Coverage (3-Source Cross-Reference)
 
@@ -160,10 +207,25 @@ tech_debt:  # Non-critical, deferred
   - phase: 03-dashboard
     items:
       - "Deferred: mobile responsive layout"
+test_health:  # From test steward (if enabled)
+  budget_status: "{OK | Warning | Over Budget}"
+  redundant_tests: N
+  stale_tests: N
+  consolidation_proposals: N
 ---
 ```
 
-Plus full markdown report with tables for requirements, phases, integration, tech debt.
+Plus full markdown report with tables for requirements, phases, integration, tech debt, and test suite health.
+
+**Test Suite Health section (if steward ran):**
+
+```markdown
+## Test Suite Health
+
+{If steward was skipped: "Test steward skipped (disabled or no test files)."}
+
+{If steward ran: include the steward's full report here}
+```
 
 **Status values:**
 - `passed` — all requirements met, no critical gaps, minimal tech debt
@@ -291,6 +353,8 @@ All requirements met. No critical blockers. Accumulated tech debt needs review.
 - [ ] Orphaned requirements detected (in traceability but absent from all VERIFICATIONs)
 - [ ] Tech debt and deferred gaps aggregated
 - [ ] Integration checker spawned with milestone requirement IDs
+- [ ] Test steward spawned (if test.steward enabled and test files exist)
+- [ ] Test steward findings included in MILESTONE-AUDIT.md as "Test Suite Health" section
 - [ ] v{version}-MILESTONE-AUDIT.md created with structured requirement gap objects
 - [ ] FAIL gate enforced — any unsatisfied requirement forces gaps_found status
 - [ ] Results presented with actionable next steps
