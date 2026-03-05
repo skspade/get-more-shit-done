@@ -224,6 +224,53 @@ Warnings:
 
 ---
 
+### gsd test-count
+
+Count test cases across the project.
+
+```
+gsd test-count [--phase <N>] [--json] [--plain]
+```
+
+Counts individual test cases (`it`/`test` blocks) in the project's test files. Supports filtering by phase to see per-phase test counts.
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--phase <N>` | Count tests only for the specified phase number |
+| `--json` | Output as structured JSON |
+| `--plain` | Output as plain text with ANSI color codes stripped |
+
+**Example (rich mode):**
+
+```
+gsd test-count
+```
+
+```
+606 tests
+```
+
+**Example (per-phase):**
+
+```
+gsd test-count --phase 30
+```
+
+```
+12 tests (phase 30)
+```
+
+**JSON output fields:**
+
+| Field | Description |
+|-------|-------------|
+| `count` | Total number of test cases |
+| `phase` | Phase number filter (if `--phase` used), or `null` |
+
+---
+
 ### gsd settings
 
 View and update project configuration.
@@ -303,6 +350,7 @@ Commands:
   progress    Show milestone progress and status
   todos       List and inspect pending todos
   health      Validate .planning/ directory integrity
+  test-count  Count test cases in project
   settings    View and update configuration
   help        Show available commands and usage
 

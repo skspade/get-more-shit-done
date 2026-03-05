@@ -520,6 +520,7 @@ You're never locked in. The system adapts.
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
 | `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone |
 | `/gsd:brainstorm [topic]` | Collaborative brainstorming that produces a design doc and routes into GSD creation |
+| `/gsd:audit-tests` | Run on-demand test suite health check |
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
 
@@ -531,6 +532,7 @@ GSD also provides a standalone `gsd` command for use outside of Claude Code sess
 gsd progress    # Show milestone progress
 gsd todos       # List pending todos
 gsd health      # Validate project integrity
+gsd test-count  # Count test cases in project
 gsd settings    # View/update configuration
 gsd help        # Show available commands
 ```
@@ -579,6 +581,31 @@ These spawn additional agents during planning/execution. They improve quality bu
 Use `/gsd:settings` to toggle these, or override per-invocation:
 - `/gsd:plan-phase --skip-research`
 - `/gsd:plan-phase --skip-verify`
+
+### Test Configuration
+
+GSD includes a dual-layer test system: human-defined acceptance tests and AI-managed unit/regression tests with a hard gate. All features work with zero configuration.
+
+| Setting | Default | What it controls |
+|---------|---------|------------------|
+| `test.hard_gate` | `true` | Run test suite after each task commit |
+| `test.acceptance_tests` | `true` | Gather acceptance tests during discuss-phase |
+| `test.budget.per_phase` | `50` | Per-phase test count limit |
+| `test.budget.project` | `800` | Project-wide test count limit |
+| `test.steward` | `true` | Enable test steward during audit-milestone |
+| `test.command` | auto-detected | Override test runner command |
+| `test.framework` | auto-detected | Override framework detection |
+
+```json
+{
+  "test": {
+    "hard_gate": true,
+    "budget": { "per_phase": 50, "project": 800 }
+  }
+}
+```
+
+See the [User Guide](docs/USER-GUIDE.md#test-architecture) for the full test architecture documentation.
 
 ### Execution
 
