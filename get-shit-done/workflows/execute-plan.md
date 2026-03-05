@@ -130,6 +130,24 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phases list --type summarie
 If previous SUMMARY has unresolved "Issues Encountered" or "Next Phase Readiness" blockers: AskUserQuestion(header="Previous Issues", options: "Proceed anyway" | "Address first" | "Review previous").
 </step>
 
+<test_gate_baseline>
+## Test Gate Baseline
+
+Before executing the first task, capture the test baseline for regression comparison:
+
+```bash
+BASELINE_JSON=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-run --baseline 2>/dev/null)
+```
+
+Parse the JSON result:
+- If `status` is `"skip"`: no test command or hard_gate disabled. Set `TEST_GATE_ACTIVE=false`. All subsequent test gate checks are silently skipped.
+- If `status` is `"pass"` or `"fail"`: Set `TEST_GATE_ACTIVE=true`. Store the `baseline` object from the response for use in post-commit checks.
+- If `status` is `"error"`: Set `TEST_GATE_ACTIVE=false` with warning. Gate disabled for this plan.
+
+The baseline captures pre-existing test failures so the gate only blocks on NEW failures introduced by plan tasks.
+
+</test_gate_baseline>
+
 <step name="execute">
 Deviations are normal — handle via rules below.
 
@@ -260,6 +278,48 @@ TASK_COMMITS+=("Task ${TASK_NUM}: ${TASK_COMMIT}")
 ```
 
 </task_commit>
+
+<test_gate>
+## Post-Commit Test Gate
+
+After each task commit (step 5 of task_commit), if `TEST_GATE_ACTIVE` is true, run the test gate:
+
+**1. Check for TDD RED commit:**
+```bash
+COMMIT_MSG=$(git log -1 --format="%s")
+```
+
+**2. Run test gate:**
+```bash
+GATE_RESULT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-run --commit-msg "$COMMIT_MSG" --baseline-data "$BASELINE_JSON" 2>/dev/null)
+```
+
+**3. Evaluate result:**
+
+Parse the JSON `GATE_RESULT`:
+
+| `status` | Action |
+|-----------|--------|
+| `"pass"` | Gate passed. Log `Test gate: PASSED ({passed}/{total})`. Proceed to next task. |
+| `"skip"` | Gate skipped (TDD RED or no tests). Log reason from `summary`. Proceed to next task. |
+| `"fail"` | NEW test failures detected. See failure protocol below. |
+| `"error"` | Gate error (timeout, crash). Log warning. Proceed to next task (gate is advisory on errors). |
+
+**4. Failure protocol (status = "fail"):**
+
+When `new_failures` is non-empty:
+
+a. Log: `Test gate: FAILED -- {new_failures.length} new failure(s) detected`
+b. Display the `summary` field (contains pass/fail counts and failure names)
+c. Follow deviation Rule 1 (Bug): debug the failures, fix the code, run `git add` + `git commit` for the fix
+d. After fix commit, re-run the test gate (step 2) to verify the fix resolved the new failures
+e. If fix does not resolve after 3 attempts: escalate to human via checkpoint
+
+**Important:** The gate only blocks on NEW failures (tests in `new_failures` array). Pre-existing failures from the baseline are expected and do not block.
+
+**5. Context budget:** The gate result `summary` is a short string (1-3 lines). Never request or display raw test output. The `raw_length` field tells you how much output was suppressed.
+
+</test_gate>
 
 <step name="checkpoint_protocol">
 On `type="checkpoint:*"`: automate everything possible first. Checkpoints are for verification/decisions only.
