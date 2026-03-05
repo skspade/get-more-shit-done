@@ -9,6 +9,7 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 **Downstream consumers:**
 - `gsd-phase-researcher` — Reads decisions to focus research (e.g., "card layout" → research card component patterns)
 - `gsd-planner` — Reads decisions to create specific tasks (e.g., "infinite scroll" → task includes virtualization)
+- `gsd-verifier` — Executes acceptance test Verify commands during verify-phase to confirm pass/fail
 
 ---
 
@@ -67,6 +68,27 @@ Template for `.planning/phases/XX-name/{phase_num}-CONTEXT.md` - captures implem
 - [Where new code connects to existing system]
 
 </code_context>
+
+<acceptance_tests>
+## Acceptance Tests
+
+[Human-defined acceptance tests in Given/When/Then/Verify format. Each test has an AT-{NN} identifier that persists through the phase lifecycle. Only present when gathered during interactive discuss-phase with test.acceptance_tests config enabled.]
+
+### AT-01: [Description of what is being tested]
+- Given: [precondition or setup state]
+- When: [action or trigger]
+- Then: [expected observable outcome]
+- Verify: `[shell command that exits 0 on pass, non-zero on fail]`
+
+### AT-02: [Description]
+- Given: [precondition]
+- When: [action]
+- Then: [expected outcome]
+- Verify: `[shell command]`
+
+[If no acceptance tests were gathered: section omitted entirely]
+
+</acceptance_tests>
 
 <deferred>
 ## Deferred Ideas
