@@ -1,5 +1,22 @@
 # Milestones
 
+## v1.6 Dual-Layer Test Architecture (Shipped: 2026-03-05)
+
+**Phases completed:** 6 phases, 15 plans
+**Timeline:** 1 day (2026-03-05)
+**Git range:** 4d1b94d → fca40c5 (16 feat commits)
+**Files modified:** 57 (6,978 insertions, 44 deletions)
+
+**Key accomplishments:**
+- Built `testing.cjs` module with framework detection (node:test, Jest, Vitest, Mocha), test counting (regex-based `it`/`test` block counting), and 4 CLI commands (`test-count`, `test-detect-framework`, `test-config`, `test-run`)
+- Implemented post-commit hard test gate in `execute-plan` with baseline comparison (Set difference on failed test names), TDD RED commit detection, and output summarization to pass/fail counts
+- Added acceptance test layer: discuss-phase gathering in Given/When/Then/Verify format, CONTEXT.md `<acceptance_tests>` storage, plan-checker Dimension 9 coverage validation, ownership invariant enforcement, and verify-phase execution
+- Created `gsd-test-steward` agent for suite health analysis: redundancy detection, staleness detection, budget enforcement (per-phase 50, project 800), and consolidation proposals (parameterize, promote, prune, merge) requiring human approval
+- Comprehensive documentation across help.md (commands + config), USER-GUIDE.md (test architecture guide), README.md (test config section), and CLI.md (`test-count` command docs)
+- 606+ tests pass, 0 failures — milestone audit: 24/24 requirements satisfied, 24/24 integrations wired, 5/5 E2E flows verified
+
+---
+
 ## v1.5 GSD Brainstorming Command (Shipped: 2026-03-04)
 
 **Phases completed:** 5 phases, 5 plans, 14 tasks

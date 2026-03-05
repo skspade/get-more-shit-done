@@ -250,6 +250,52 @@
 
 ---
 
+## Milestone: v1.6 — Dual-Layer Test Architecture
+
+**Shipped:** 2026-03-05
+**Phases:** 6 | **Plans:** 15 | **Commits:** 16 feat
+
+### What Was Built
+- `testing.cjs` module — framework detection (node:test, Jest, Vitest, Mocha), regex-based test counting, config reading, 4 CLI commands
+- Hard test gate in `execute-plan` — baseline capture, Set-difference regression detection, TDD RED commit awareness, output summarization
+- Acceptance test layer — discuss-phase gathering (Given/When/Then/Verify), CONTEXT.md `<acceptance_tests>` storage, plan-checker Dimension 9, ownership invariant, verify-phase execution
+- `gsd-test-steward` agent — redundancy/staleness detection, budget enforcement (per-phase 50, project 800), consolidation proposals (parameterize, promote, prune, merge)
+- Comprehensive documentation — help.md, USER-GUIDE.md, README.md, CLI.md all updated
+- 606+ tests pass, 0 failures
+
+### What Worked
+- Well-scoped phases: 6 phases each with clear boundaries (foundation, gate, acceptance, steward, docs, gaps)
+- Clean baseline from Phase 30: fixing 2 pre-existing test failures first enabled clean hard gate activation
+- Config-gated features: all test features degrade gracefully when config keys absent (zero-config fallback)
+- Agent pattern reuse: gsd-test-steward follows exact same pattern as other agents (gsd-verifier, gsd-debugger)
+- Gap closure (Phase 35) was minimal: only missing VERIFICATION.md files and checkbox updates
+- Milestone audit passed clean: 24/24 requirements, 24/24 integrations, 5/5 E2E flows
+
+### What Was Inefficient
+- Phases 31-33 did not create VERIFICATION.md files during execution — same recurring gap requiring Phase 35 gap closure (5th milestone in a row)
+- ROADMAP progress table had formatting inconsistencies for phases 30-33 (missing milestone column, inconsistent column counts)
+- Phase 33 ROADMAP showed "0/3" plans despite all 3 being complete — checkbox/count not updated during execution
+
+### Patterns Established
+- Dual-layer test model: human-owned acceptance tests (Layer 1) + AI-managed unit/regression tests (Layer 2)
+- Config-gated feature pattern: check `test.*` config with default fallback, silently skip when disabled
+- Budget injection pattern: `<test_budget>` XML tag injected into planner prompt for test-aware planning
+- Baseline comparison pattern: capture existing test failures before gate activation, only block on NEW failures
+- TDD RED detection: commit message regex `/^test\(/` skips regression check for intentional failures
+
+### Key Lessons
+1. SUMMARY/VERIFICATION.md gap continues to be the #1 audit finding — 5th consecutive milestone (enforcement at execution time is overdue)
+2. Config-gated features with zero-config degradation enable progressive adoption without breaking existing projects
+3. Agent-based analysis (steward) with read-only constraint is safe and effective — never modifies code
+4. Budget system should be informational (warnings), not blocking (enforcement) — advisory approach prevents false positives
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for plan checker/verifier/test steward)
+- Sessions: 15 plan executions across 6 phases
+- Notable: largest milestone by plan count (15 plans), completed in 1 day — established patterns from v1.0-v1.5 made execution mechanical
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -262,12 +308,14 @@
 | v1.3 | 49 | 6 | First feature milestone post-automation — CLI tooling with consistent handler pattern |
 | v1.4 | 29 | 5 | First MCP integration milestone — Linear issue-driven workflows with complexity routing |
 | v1.5 | ~25 | 5 | First interactive workflow milestone — brainstorm command with design-to-execution bridging |
+| v1.6 | 16 | 6 | Largest milestone (15 plans) — dual-layer test architecture with config-gated progressive adoption |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in v1.0 (3 phases), v1.1 (1 phase), v1.2 (1 phase), v1.3 (1 phase), v1.4 (1 phase), v1.5 (1 phase)
-2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — needs execution-time enforcement (v1.0, v1.2, v1.3, v1.4, v1.5 all hit this)
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 5 of 6 milestones)
+1. Gap closure phases are consistently valuable — found real issues in all 7 milestones (v1.0: 3 phases, v1.1-v1.6: 1 phase each)
+2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — hit in 6 of 7 milestones, still needs execution-time enforcement
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 6 of 7 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
-6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 (5 → 10 steps)
+6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 and v1.6
+7. Config-gated features with zero-config degradation enable progressive adoption without breaking existing projects (v1.6)

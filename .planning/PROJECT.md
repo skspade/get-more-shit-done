@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals).
 
 ## Core Value
 
@@ -50,16 +50,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Auto-detect routing: PROJECT.md exists → new-milestone, else → new-project — v1.5
 - ✓ Design context seeding into milestone/project creation via MILESTONE-CONTEXT.md — v1.5
 - ✓ Documentation in help.md, USER-GUIDE.md, README.md — v1.5
+- ✓ Acceptance test layer in CONTEXT.md with Given/When/Then/Verify format, human-owned — v1.6
+- ✓ Hard test gate in execute-plan: full suite must pass after each task commit — v1.6
+- ✓ Test steward agent for suite health: redundancy detection, budget enforcement, consolidation proposals — v1.6
+- ✓ Test budget management: per-phase (50) and project (800) limits with configurable thresholds — v1.6
+- ✓ Workflow integration: discuss-phase, plan-phase, execute-plan, verify-phase, audit-milestone — v1.6
+- ✓ Configuration schema with progressive opt-in and zero-config degradation — v1.6
+- ✓ Documentation in help.md, USER-GUIDE.md, README.md, CLI.md for test architecture — v1.6
 
 ### Active
 
-- Acceptance test layer in CONTEXT.md with Given/When/Then/Verify format, human-owned — v1.6
-- Unit/regression test layer in PLAN.md with `<tests>` blocks, AI-generated TDD — v1.6
-- Hard test gate in execute-plan: full suite must pass after each task commit — v1.6
-- Test steward agent for suite health: redundancy detection, budget enforcement, consolidation proposals — v1.6
-- Test budget management: per-phase (30) and project (200) limits with configurable thresholds — v1.6
-- Workflow integration: discuss-phase, plan-phase, execute-plan, verify-phase, audit-milestone — v1.6
-- Configuration schema with progressive opt-in and zero-config degradation — v1.6
+(None yet — next milestone will define active requirements)
 
 ### Out of Scope
 
@@ -80,6 +81,11 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Resume previous brainstorming sessions — design docs are markdown; re-run or edit manually
 - Design templates per domain — single design format is sufficient
 - Modifying upstream superpowers:brainstorming skill — fork maintains its own commands independently
+- Auto-consolidation without human approval — steward.auto_consolidate remains false
+- Code coverage percentage targets — budget system handles growth; coverage % is a different concern
+- Visual test reports (HTML/dashboard) — CLI output is sufficient
+- Test mutation analysis (Stryker) — AI-driven redundancy detection is simpler and sufficient
+- Flaky test quarantine — retry-before-debug handles transient failures
 
 ## Constraints
 
@@ -123,15 +129,23 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | MILESTONE-CONTEXT.md for design-to-milestone bridge | Maps approved design sections as milestone features, replaces questioning phase | Good — seamless handoff |
 | New-project route delegates to user command | Cannot execute new-project inline due to command context requirements | Good — honest about constraints |
 | PROJECT.md existence as routing signal | Simple file test determines milestone vs project route | Good — stateless, deterministic |
+| Framework-specific output parsing with exit-code fallback | Different test runners produce different output formats | Good — supports node:test, Jest, Vitest, Mocha |
+| Baseline comparison via Set difference on failed test names | Only blocks on NEW failures, not pre-existing | Good — enables progressive adoption |
+| TDD RED detection via commit message regex | Gate recognizes intentional test failures and skips check | Good — preserves TDD workflows |
+| Gate advisory on errors (timeout/crash) | Non-test errors should not block execution | Good — resilient to infrastructure issues |
+| AT ownership invariant enforced in execute-plan | AI cannot modify human-defined acceptance tests | Good — preserves human control |
+| Test steward is read-only | Agent analyzes but never modifies test files | Good — safe analysis without side effects |
+| Budget is informational (warnings, not blockers) | Budgets guide planning, not prevent execution | Good — advisory over enforcement |
+| `<test_budget>` XML tag for planner injection | Planner receives budget context without modifying prompt structure | Good — clean integration |
 
 ## Context
 
-Shipped v1.5 with brainstorming command. 6 milestones shipped (v1.0-v1.5) across 29 phases, 38 plans. Starting v1.6 to add dual-layer test architecture based on agentic engineering patterns.
+Shipped v1.6 with dual-layer test architecture. 7 milestones shipped (v1.0-v1.6) across 35 phases, 53 plans. 606+ tests pass, 0 failures.
 
-**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 5 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-routing to GSD creation flows.
+**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~21,058 LOC JavaScript/CJS
-**Known tech debt:** 2 pre-existing test failures in unrelated modules (codex-config, config); handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale
+**Codebase:** ~22,464 LOC JavaScript/CJS
+**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs)
 
 ---
-*Last updated: 2026-03-05 after v1.6 milestone start*
+*Last updated: 2026-03-05 after v1.6 milestone*
