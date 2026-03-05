@@ -10,11 +10,11 @@
 
 ## Hard Gate
 
-- [ ] **GATE-01**: Post-commit test gate in execute-plan runs full test suite after each task commit
+- [x] **GATE-01**: Post-commit test gate in execute-plan runs full test suite after each task commit
 - [ ] **GATE-02**: Test failure triggers existing deviation Rule 1 (debug/fix/retry) with human escalation after retries exhausted
-- [ ] **GATE-03**: TDD awareness: gate recognizes TDD RED commits (intentional failures) and skips regression check for that commit
-- [ ] **GATE-04**: Baseline capture: snapshot existing test state so hard gate only blocks on NEW failures, not pre-existing ones
-- [ ] **GATE-05**: Output summarization: test results condensed to pass/fail counts + failure details only, preventing context window bloat in executor
+- [x] **GATE-03**: TDD awareness: gate recognizes TDD RED commits (intentional failures) and skips regression check for that commit
+- [x] **GATE-04**: Baseline capture: snapshot existing test state so hard gate only blocks on NEW failures, not pre-existing ones
+- [x] **GATE-05**: Output summarization: test results condensed to pass/fail counts + failure details only, preventing context window bloat in executor
 
 ## Acceptance Tests (Layer 1)
 
@@ -63,11 +63,11 @@
 | FOUND-03 | Phase 30 | Pending |
 | FOUND-04 | Phase 30 | Pending |
 | FOUND-05 | Phase 30 | Pending |
-| GATE-01 | Phase 31 | Pending |
+| GATE-01 | Phase 31 | Complete |
 | GATE-02 | Phase 31 | Pending |
-| GATE-03 | Phase 31 | Pending |
-| GATE-04 | Phase 31 | Pending |
-| GATE-05 | Phase 31 | Pending |
+| GATE-03 | Phase 31 | Complete |
+| GATE-04 | Phase 31 | Complete |
+| GATE-05 | Phase 31 | Complete |
 | AT-01 | Phase 32 | Pending |
 | AT-02 | Phase 32 | Pending |
 | AT-03 | Phase 32 | Pending |
