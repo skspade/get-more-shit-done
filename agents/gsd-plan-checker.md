@@ -357,6 +357,36 @@ Overall: ✅ PASS / ❌ FAIL
 
 If FAIL: return to planner with specific fixes. Same revision loop as other dimensions (max 3 loops).
 
+## Dimension 9: Acceptance Test Coverage
+
+**Skip if:** CONTEXT.md has no `<acceptance_tests>` block. Output: "Dimension 9: SKIPPED (no acceptance tests defined)"
+
+**Question:** Does every acceptance test from CONTEXT.md have covering task(s) in the plans?
+
+**Process:**
+1. Parse the `<acceptance_tests>` block from CONTEXT.md
+2. Extract all AT-{NN} identifiers (e.g., AT-01, AT-02, ...)
+3. For each AT-{NN}, search all plan task `<action>` and `<done>` elements for the identifier string
+4. Flag any AT-{NN} with zero references across all plans
+
+**Red flags:**
+- AT-{NN} identifier appears in zero plan tasks (no coverage)
+- AT-{NN} is referenced but only in a verification section, not in task action/done (no implementation)
+
+**CRITICAL:** Missing coverage for any acceptance test is a **blocking** issue. Acceptance tests represent the human's contract -- uncovered tests mean the contract will not be fulfilled.
+
+**Example issue:**
+```yaml
+issue:
+  dimension: acceptance_test_coverage
+  severity: blocker
+  description: "AT-03 (verify commands map to pass/fail) has no covering task"
+  acceptance_test: "AT-03"
+  fix_hint: "Add AT-03 reference in a task action or done criteria that implements the verify command execution"
+```
+
+**Note:** Plans must NOT add, remove, or modify acceptance tests. Dimension 9 only checks coverage -- it verifies that plans reference existing ATs, not that plans create or change them.
+
 </verification_dimensions>
 
 <verification_process>
@@ -685,6 +715,7 @@ Plan verification complete when:
   - [ ] Locked decisions have implementing tasks
   - [ ] No tasks contradict locked decisions
   - [ ] Deferred ideas not included in plans
+- [ ] Acceptance test coverage checked (if `<acceptance_tests>` block exists in CONTEXT.md)
 - [ ] Overall status determined (passed | issues_found)
 - [ ] Structured issues returned (if any found)
 - [ ] Result returned to orchestrator
