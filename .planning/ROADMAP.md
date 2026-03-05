@@ -83,7 +83,7 @@
 - [x] **Phase 31: Hard Test Gate** - Post-commit gate in execute-plan, TDD awareness, baseline capture, output summarization (completed 2026-03-05)
 - [x] **Phase 32: Acceptance Test Layer** - Discuss-phase AT gathering, CONTEXT.md storage, verify-phase execution, plan-checker coverage, ownership invariant (completed 2026-03-05)
 - [x] **Phase 33: Test Steward** - Suite health agent, redundancy detection, consolidation proposals, budget enforcement, planner integration, audit-tests command (completed 2026-03-05)
-- [ ] **Phase 34: Documentation** - help.md, USER-GUIDE.md, README.md updates for test architecture
+- [x] **Phase 34: Documentation** - help.md, USER-GUIDE.md, README.md updates for test architecture (completed 2026-03-05)
 
 ## Phase Details
 
@@ -146,7 +146,11 @@ Plans:
   1. help.md includes test-count command reference, audit-tests command reference, and test.* configuration keys
   2. USER-GUIDE.md contains a test architecture usage guide explaining both layers (acceptance tests and unit/regression tests), the hard gate, the steward, and budget management
   3. README.md includes a test configuration section showing how to enable and configure the dual-layer test system
-**Plans**: TBD
+**Plans**: 3/3 plans complete
+Plans:
+- [x] 34-01-PLAN.md -- Update help.md with test commands and configuration
+- [x] 34-02-PLAN.md -- Add test architecture guide to USER-GUIDE.md
+- [x] 34-03-PLAN.md -- Add test config to README.md and test-count to CLI.md
 
 ## Progress
 
@@ -188,4 +192,4 @@ Phases execute in numeric order.
 | 31. Hard Test Gate | 2/2 | Complete   | 2026-03-05 | - |
 | 32. Acceptance Test Layer | 3/3 | Complete    | 2026-03-05 | - |
 | 33. Test Steward | 0/3 | Complete    | 2026-03-05 | - |
-| 34. Documentation | v1.6 | 0/0 | Not started | - |
+| 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
