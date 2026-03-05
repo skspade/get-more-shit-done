@@ -292,8 +292,14 @@ describe('config-get command', () => {
 
   beforeEach(() => {
     tmpDir = createTempProject();
-    // Create config with known values
-    runGsdTools('config-ensure-section', tmpDir);
+    // Write explicit config with known values to avoid ~/.gsd/defaults.json interference
+    const configDir = path.join(tmpDir, '.planning');
+    fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({
+      model_profile: 'balanced',
+      workflow: { research: true, plan_check: true, verifier: true, nyquist_validation: false },
+      commit_docs: true,
+      branching_strategy: 'none',
+    }, null, 2));
   });
 
   afterEach(() => {

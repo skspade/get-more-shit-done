@@ -169,9 +169,9 @@ tools: Read, Grep, Glob
 // ─── CODEX_AGENT_SANDBOX mapping ────────────────────────────────────────────────
 
 describe('CODEX_AGENT_SANDBOX', () => {
-  test('has all 11 agents mapped', () => {
+  test('has all 12 agents mapped', () => {
     const agentNames = Object.keys(CODEX_AGENT_SANDBOX);
-    assert.strictEqual(agentNames.length, 11, 'has 11 agents');
+    assert.strictEqual(agentNames.length, 12, 'has 12 agents');
   });
 
   test('workspace-write agents have write tools', () => {
