@@ -3,29 +3,29 @@
 ## v2.0 Requirements
 
 ### Identity
-- [ ] **ID-01**: README header uses "GET MORE SHIT DONE" title (not upstream "GET SHIT DONE")
-- [ ] **ID-02**: README includes only npm version and license badges (no token, Discord, stars, Twitter, test status)
-- [ ] **ID-03**: README contains no upstream branding (TÂCHES, $GSD token, star history, community ports)
+- [x] **ID-01**: README header uses "GET MORE SHIT DONE" title (not upstream "GET SHIT DONE")
+- [x] **ID-02**: README includes only npm version and license badges (no token, Discord, stars, Twitter, test status)
+- [x] **ID-03**: README contains no upstream branding (TÂCHES, $GSD token, star history, community ports)
 
 ### Content
-- [ ] **CON-01**: README opens with one-sentence description of what GSD does
-- [ ] **CON-02**: README includes 5 value-prop bullets covering structured planning, fresh context, autonomous execution, standalone CLI, and multi-runtime
-- [ ] **CON-03**: README links to User Guide and CLI Reference docs
+- [x] **CON-01**: README opens with one-sentence description of what GSD does
+- [x] **CON-02**: README includes 5 value-prop bullets covering structured planning, fresh context, autonomous execution, standalone CLI, and multi-runtime
+- [x] **CON-03**: README links to User Guide and CLI Reference docs
 
 ### Quick Start
-- [ ] **QS-01**: README shows install command (`npx get-more-shit-done-cc@latest`)
-- [ ] **QS-02**: README shows `/gsd:new-project` as project initialization step
-- [ ] **QS-03**: README shows core loop (discuss-phase, plan-phase, execute-phase, verify-work) with one-line descriptions
-- [ ] **QS-04**: README shows `/gsd:complete-milestone` as capstone
-- [ ] **QS-05**: README shows `/gsd:quick` as quick task option
+- [x] **QS-01**: README shows install command (`npx get-more-shit-done-cc@latest`)
+- [x] **QS-02**: README shows `/gsd:new-project` as project initialization step
+- [x] **QS-03**: README shows core loop (discuss-phase, plan-phase, execute-phase, verify-work) with one-line descriptions
+- [x] **QS-04**: README shows `/gsd:complete-milestone` as capstone
+- [x] **QS-05**: README shows `/gsd:quick` as quick task option
 
 ### Commands
-- [ ] **CMD-01**: README includes command table with 10 core commands (new-project, discuss-phase, plan-phase, execute-phase, verify-work, complete-milestone, new-milestone, quick, progress, help)
-- [ ] **CMD-02**: README omits phase management, session, utility, and integration commands from table (discoverable via `/gsd:help`)
+- [x] **CMD-01**: README includes command table with 10 core commands (new-project, discuss-phase, plan-phase, execute-phase, verify-work, complete-milestone, new-milestone, quick, progress, help)
+- [x] **CMD-02**: README omits phase management, session, utility, and integration commands from table (discoverable via `/gsd:help`)
 
 ### Cleanup
-- [ ] **CLN-01**: README total length is under 150 lines (target ~120-150)
-- [ ] **CLN-02**: README contains no upstream-specific sections (Why I Built This, Who This Is For, wave diagrams, XML examples, config tables, security, troubleshooting, testimonials)
+- [x] **CLN-01**: README total length is under 150 lines (target ~120-150)
+- [x] **CLN-02**: README contains no upstream-specific sections (Why I Built This, Who This Is For, wave diagrams, XML examples, config tables, security, troubleshooting, testimonials)
 
 ## Traceability
 
