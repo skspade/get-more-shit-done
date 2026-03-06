@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: README Rewrite
-status: shipped
+milestone: v2.1
+milestone_name: Autopilot Result Parsing
+status: active
 last_updated: "2026-03-06"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-06)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** v2.1 Autopilot Result Parsing
 
 ## Current Position
 
-Milestone: v2.0 README Rewrite — SHIPPED 2026-03-06
-Last activity: 2026-03-06 — v2.0 milestone archived
+Milestone: v2.1 Autopilot Result Parsing
+Last activity: 2026-03-06 — Milestone v2.1 started
 
-Progress: [██████████] 100% — COMPLETE
+Progress: Not started (defining requirements)
 
 ## Performance Metrics
 
@@ -79,5 +79,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-06
-Stopped at: v2.0 milestone shipped — archived to milestones/
+Stopped at: Defining requirements for v2.1
 Resume file: None

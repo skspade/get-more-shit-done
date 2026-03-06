@@ -64,7 +64,9 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(No active requirements — next milestone not yet defined)
+- Pretty-print JSON output from Claude CLI invocations in autopilot.sh — v2.1
+- Add `format_json_output()` helper function with jq + cat fallback — v2.1
+- Apply formatting to all 5 direct Claude invocation sites — v2.1
 
 ### Out of Scope
 
@@ -146,7 +148,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v2.0 with README rewrite. 8 milestones shipped (v1.0-v2.0) across 37 phases, 55 plans. 678 tests pass, 0 failures.
+Shipped v2.0 with README rewrite. 8 milestones shipped (v1.0-v2.0) across 37 phases, 55 plans. 678 tests pass, 0 failures. Starting v2.1: autopilot result parsing.
 
 **Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
