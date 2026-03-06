@@ -1,0 +1,61 @@
+# Requirements — v2.0 README Rewrite
+
+## v2.0 Requirements
+
+### Identity
+- [ ] **ID-01**: README header uses "GET MORE SHIT DONE" title (not upstream "GET SHIT DONE")
+- [ ] **ID-02**: README includes only npm version and license badges (no token, Discord, stars, Twitter, test status)
+- [ ] **ID-03**: README contains no upstream branding (TÂCHES, $GSD token, star history, community ports)
+
+### Content
+- [ ] **CON-01**: README opens with one-sentence description of what GSD does
+- [ ] **CON-02**: README includes 5 value-prop bullets covering structured planning, fresh context, autonomous execution, standalone CLI, and multi-runtime
+- [ ] **CON-03**: README links to User Guide and CLI Reference docs
+
+### Quick Start
+- [ ] **QS-01**: README shows install command (`npx get-more-shit-done-cc@latest`)
+- [ ] **QS-02**: README shows `/gsd:new-project` as project initialization step
+- [ ] **QS-03**: README shows core loop (discuss-phase, plan-phase, execute-phase, verify-work) with one-line descriptions
+- [ ] **QS-04**: README shows `/gsd:complete-milestone` as capstone
+- [ ] **QS-05**: README shows `/gsd:quick` as quick task option
+
+### Commands
+- [ ] **CMD-01**: README includes command table with 10 core commands (new-project, discuss-phase, plan-phase, execute-phase, verify-work, complete-milestone, new-milestone, quick, progress, help)
+- [ ] **CMD-02**: README omits phase management, session, utility, and integration commands from table (discoverable via `/gsd:help`)
+
+### Cleanup
+- [ ] **CLN-01**: README total length is under 150 lines (target ~120-150)
+- [ ] **CLN-02**: README contains no upstream-specific sections (Why I Built This, Who This Is For, wave diagrams, XML examples, config tables, security, troubleshooting, testimonials)
+
+## Traceability
+
+| REQ | Phase |
+|-----|-------|
+| ID-01 | — |
+| ID-02 | — |
+| ID-03 | — |
+| CON-01 | — |
+| CON-02 | — |
+| CON-03 | — |
+| QS-01 | — |
+| QS-02 | — |
+| QS-03 | — |
+| QS-04 | — |
+| QS-05 | — |
+| CMD-01 | — |
+| CMD-02 | — |
+| CLN-01 | — |
+| CLN-02 | — |
+
+## Future Requirements
+
+(None — single-milestone scope)
+
+## Out of Scope
+
+- Configuration reference in README — lives in User Guide
+- Troubleshooting section — lives in User Guide
+- Security guidance — lives in User Guide
+- Wave execution diagrams — removed, too detailed for quick start
+- Model profile documentation — lives in User Guide
+- Non-interactive install flags — defer to User Guide or inline help
