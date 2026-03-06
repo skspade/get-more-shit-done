@@ -26,7 +26,7 @@ Milestone: v2.1 Autopilot Result Parsing — SHIPPED 2026-03-06
 Phase: 39 of 39 (Apply Formatting to Invocation Sites)
 Plan: 1 of 1 in current phase
 Status: Milestone complete
-Last activity: 2026-03-06 — Milestone v2.1 archived
+Last activity: 2026-03-06 - Completed quick task 6: Fix brainstorming skill commit inconsistency
 
 Progress: [██████████] 100%
 
