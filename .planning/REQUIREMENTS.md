@@ -15,11 +15,11 @@
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| FMT-01 | — | — | — |
-| FMT-02 | — | — | — |
-| FMT-03 | — | — | — |
-| INT-01 | — | — | — |
-| INT-02 | — | — | — |
+| FMT-01 | 38 | — | Pending |
+| FMT-02 | 38 | — | Pending |
+| FMT-03 | 39 | — | Pending |
+| INT-01 | 38 | — | Pending |
+| INT-02 | 39 | — | Pending |
 
 ## Out of Scope
 
