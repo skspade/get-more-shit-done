@@ -31,21 +31,21 @@
 
 | REQ | Phase |
 |-----|-------|
-| ID-01 | — |
-| ID-02 | — |
-| ID-03 | — |
-| CON-01 | — |
-| CON-02 | — |
-| CON-03 | — |
-| QS-01 | — |
-| QS-02 | — |
-| QS-03 | — |
-| QS-04 | — |
-| QS-05 | — |
-| CMD-01 | — |
-| CMD-02 | — |
-| CLN-01 | — |
-| CLN-02 | — |
+| ID-01 | Phase 36 |
+| ID-02 | Phase 36 |
+| ID-03 | Phase 36 |
+| CON-01 | Phase 36 |
+| CON-02 | Phase 36 |
+| CON-03 | Phase 36 |
+| QS-01 | Phase 36 |
+| QS-02 | Phase 36 |
+| QS-03 | Phase 36 |
+| QS-04 | Phase 36 |
+| QS-05 | Phase 36 |
+| CMD-01 | Phase 36 |
+| CMD-02 | Phase 36 |
+| CLN-01 | Phase 36 |
+| CLN-02 | Phase 36 |
 
 ## Future Requirements
 

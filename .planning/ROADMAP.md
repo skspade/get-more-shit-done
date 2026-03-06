@@ -9,6 +9,7 @@
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
 - ✅ **v1.5 GSD Brainstorming Command** — Phases 25-29 (shipped 2026-03-04)
 - ✅ **v1.6 Dual-Layer Test Architecture** — Phases 30-35 (shipped 2026-03-05)
+- 🚧 **v2.0 README Rewrite** — Phase 36
 
 ## Phases
 
@@ -89,6 +90,29 @@
 
 </details>
 
+### v2.0 README Rewrite (In Progress)
+
+**Milestone Goal:** Replace upstream README with a minimal quick start guide reflecting the fork's identity and features.
+
+- [ ] **Phase 36: README Rewrite** - Replace upstream README with fork-branded minimal quick start guide
+
+## Phase Details
+
+### Phase 36: README Rewrite
+**Goal**: Users landing on the repo see a clear, concise README that communicates what the fork does, how to install it, and how to use it — with no upstream branding residue
+**Depends on**: Nothing (first phase of v2.0, no code dependencies)
+**Requirements**: ID-01, ID-02, ID-03, CON-01, CON-02, CON-03, QS-01, QS-02, QS-03, QS-04, QS-05, CMD-01, CMD-02, CLN-01, CLN-02
+**Success Criteria** (what must be TRUE):
+  1. README opens with "GET MORE SHIT DONE" header, npm/license badges, and a one-sentence description — no upstream branding remains anywhere in the file
+  2. A new user can follow the Quick Start section from install through project init, core loop, and milestone completion without needing any other documentation
+  3. README includes a command table with exactly 10 core commands and links to User Guide and CLI Reference for discovery of the full command set
+  4. README contains no upstream-specific content (no TACHES, $GSD token, star history, Discord, wave diagrams, XML examples, config tables, security, troubleshooting, testimonials, community ports, Who This Is For, Why I Built This)
+  5. README total length is under 150 lines
+**Plans**: TBD
+
+Plans:
+- [ ] 36-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -131,3 +155,4 @@ Phases execute in numeric order.
 | 33. Test Steward | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
+| 36. README Rewrite | v2.0 | 0/1 | Not started | - |
