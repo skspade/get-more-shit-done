@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Dual-Layer Test Architecture
-status: complete
-last_updated: "2026-03-05"
+milestone: v2.0
+milestone_name: README Rewrite
+status: active
+last_updated: "2026-03-06"
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** README rewrite — minimal quick start guide
 
 ## Current Position
 
-Phase: 35 of 35 (Close Verification Gaps)
-Plan: 2 of 2
-Status: Complete — v1.6 milestone shipped
-Last activity: 2026-03-05 — v1.6 Dual-Layer Test Architecture archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-06 — Milestone v2.0 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
