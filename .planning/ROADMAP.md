@@ -90,11 +90,11 @@
 
 </details>
 
-### v2.0 README Rewrite (In Progress)
+### v2.0 README Rewrite (Complete)
 
 **Milestone Goal:** Replace upstream README with a minimal quick start guide reflecting the fork's identity and features.
 
-- [ ] **Phase 36: README Rewrite** - Replace upstream README with fork-branded minimal quick start guide
+- [x] **Phase 36: README Rewrite** (1/1 plan) — completed 2026-03-06
 
 ## Phase Details
 
@@ -108,10 +108,10 @@
   3. README includes a command table with exactly 10 core commands and links to User Guide and CLI Reference for discovery of the full command set
   4. README contains no upstream-specific content (no TACHES, $GSD token, star history, Discord, wave diagrams, XML examples, config tables, security, troubleshooting, testimonials, community ports, Who This Is For, Why I Built This)
   5. README total length is under 150 lines
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 36-01: TBD
+- [x] 36-01: Replace README with fork-branded quick start guide — completed 2026-03-06
 
 ## Progress
 
@@ -155,4 +155,4 @@ Phases execute in numeric order.
 | 33. Test Steward | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
-| 36. README Rewrite | v2.0 | 0/1 | Not started | - |
+| 36. README Rewrite | v2.0 | 1/1 | Complete | 2026-03-06 |
