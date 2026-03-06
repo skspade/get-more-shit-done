@@ -1,5 +1,21 @@
 # Milestones
 
+## v2.0 README Rewrite (Shipped: 2026-03-06)
+
+**Phases completed:** 2 phases, 2 plans, 4 tasks
+**Timeline:** 1 day (2026-03-06)
+**Git range:** 9941c7e → ee3cf8c (14 commits)
+**Files modified:** 14 (973 insertions, 719 deletions)
+
+**Key accomplishments:**
+- Replaced 746-line upstream README with 97-line fork-branded quick start guide — zero upstream branding residue
+- Added complete quick start flow: install, new-project, 4-command core loop, complete-milestone, quick tasks
+- Added 10-command reference table with links to User Guide and CLI Reference
+- Created Phase 36 formal verification artifact confirming all 15 requirements pass
+- Milestone audit passed: 15/15 requirements satisfied, 15/15 integrations wired, 4/4 E2E flows verified
+
+---
+
 ## v1.6 Dual-Layer Test Architecture (Shipped: 2026-03-05)
 
 **Phases completed:** 6 phases, 15 plans

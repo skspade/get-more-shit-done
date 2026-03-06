@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: README Rewrite
-status: complete
+status: shipped
 last_updated: "2026-03-06"
 progress:
   total_phases: 2
@@ -18,16 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-06)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Phase 37 — Close Verification Gaps (Complete)
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 37 of 37 (Close Verification Gaps)
-Plan: 1 of 1 in current phase
-Status: Complete
-Last activity: 2026-03-06 — Phase 37 Close Verification Gaps executed
+Milestone: v2.0 README Rewrite — SHIPPED 2026-03-06
+Last activity: 2026-03-06 — v2.0 milestone archived
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% — COMPLETE
 
 ## Performance Metrics
 
@@ -50,7 +48,7 @@ Progress: [██████████] 100%
 | 36-37 (v2.0) | 2 | — | — |
 
 **Recent Trend:**
-- Trend: Consistent — v2.0 completed 2 plans (README rewrite + gap closure)
+- Trend: Consistent — v2.0 shipped (2 plans, docs-only scope)
 
 *Updated after each plan completion*
 
@@ -81,5 +79,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-06
-Stopped at: Phase 37 complete — all v2.0 verification gaps closed, milestone ready for completion
+Stopped at: v2.0 milestone shipped — archived to milestones/
 Resume file: None

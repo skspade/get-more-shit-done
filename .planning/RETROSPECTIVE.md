@@ -296,6 +296,43 @@
 
 ---
 
+## Milestone: v2.0 — README Rewrite
+
+**Shipped:** 2026-03-06
+**Phases:** 2 | **Plans:** 2 | **Commits:** 14
+
+### What Was Built
+- Replaced 746-line upstream README with 97-line fork-branded quick start guide
+- Added core workflow quick start (install, new-project, 4-command loop, complete-milestone, quick tasks)
+- Added 10-command reference table with links to User Guide and CLI Reference
+- Created formal verification artifact for Phase 36 and checked all 15 requirement checkboxes
+
+### What Worked
+- Brainstorm-first approach: design doc provided exact section content, reducing execution to mechanical copy
+- Complete rewrite (not edit) guaranteed zero upstream residue — no partial branding cleanup needed
+- Smallest milestone yet (2 phases, 2 plans) — well-defined scope with clear deliverable
+- Gap closure (Phase 37) was trivially fast — only VERIFICATION.md creation and checkbox updates
+
+### What Was Inefficient
+- Phase 36 did not create VERIFICATION.md during execution — same recurring gap requiring Phase 37 (6th milestone in a row with this pattern)
+- Audit found 15 orphaned requirements due to missing verification artifact — could have been avoided entirely
+
+### Patterns Established
+- Brainstorm-to-README pipeline: design doc sections map directly to README sections
+- Docs-only phases produce no tests (appropriate — confirmed by audit)
+
+### Key Lessons
+1. VERIFICATION.md gap persists through v2.0 — 6th consecutive milestone; this pattern is now a known systemic issue rather than an oversight
+2. Brainstorm design docs are effective content blueprints — execution becomes mechanical when design is complete
+3. Complete rewrites are faster than incremental edits for branding changes — no risk of residual content
+
+### Cost Observations
+- Model mix: quality profile (opus primary)
+- Sessions: 2 plan executions across 2 phases
+- Notable: fastest milestone ever — docs-only scope with brainstorm design doc as blueprint
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -309,13 +346,15 @@
 | v1.4 | 29 | 5 | First MCP integration milestone — Linear issue-driven workflows with complexity routing |
 | v1.5 | ~25 | 5 | First interactive workflow milestone — brainstorm command with design-to-execution bridging |
 | v1.6 | 16 | 6 | Largest milestone (15 plans) — dual-layer test architecture with config-gated progressive adoption |
+| v2.0 | 14 | 2 | First docs-only milestone — brainstorm-to-README pipeline, smallest scope yet |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in all 7 milestones (v1.0: 3 phases, v1.1-v1.6: 1 phase each)
-2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — hit in 6 of 7 milestones, still needs execution-time enforcement
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 6 of 7 milestones)
+1. Gap closure phases are consistently valuable — found real issues in all 8 milestones (v1.0: 3 phases, v1.1-v2.0: 1 phase each)
+2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — hit in 7 of 8 milestones, still needs execution-time enforcement
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 7 of 8 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 and v1.6
 7. Config-gated features with zero-config degradation enable progressive adoption without breaking existing projects (v1.6)
+8. Brainstorm design docs serve as effective content blueprints — execution becomes mechanical when design is pre-approved (v2.0)

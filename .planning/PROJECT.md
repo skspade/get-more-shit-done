@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals).
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference.
 
 ## Core Value
 
@@ -57,13 +57,14 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Workflow integration: discuss-phase, plan-phase, execute-plan, verify-phase, audit-milestone — v1.6
 - ✓ Configuration schema with progressive opt-in and zero-config degradation — v1.6
 - ✓ Documentation in help.md, USER-GUIDE.md, README.md, CLI.md for test architecture — v1.6
+- ✓ Replace upstream README with minimal quick start guide reflecting fork identity — v2.0
+- ✓ Strip upstream branding (TÂCHES, $GSD token, star history, Discord) — v2.0
+- ✓ Present core workflow (discuss → plan → execute → verify) as quick start — v2.0
+- ✓ Include minimal command table (10 core commands) with links to User Guide and CLI Reference — v2.0
 
 ### Active
 
-- Replace upstream README with minimal quick start guide reflecting fork identity — v2.0
-- Strip upstream branding (TÂCHES, $GSD token, star history, Discord) — v2.0
-- Present core workflow (discuss → plan → execute → verify) as quick start — v2.0
-- Include minimal command table (10 core commands) with links to User Guide and CLI Reference — v2.0
+(No active requirements — next milestone not yet defined)
 
 ### Out of Scope
 
@@ -140,25 +141,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Test steward is read-only | Agent analyzes but never modifies test files | Good — safe analysis without side effects |
 | Budget is informational (warnings, not blockers) | Budgets guide planning, not prevent execution | Good — advisory over enforcement |
 | `<test_budget>` XML tag for planner injection | Planner receives budget context without modifying prompt structure | Good — clean integration |
-
-## Current Milestone: v2.0 README Rewrite
-
-**Goal:** Rewrite README from upstream template to a minimal quick start guide reflecting the fork's identity and features.
-
-**Target features:**
-- Header with "GET MORE SHIT DONE" branding, 2 badges (npm + license), install command
-- "What This Does" section with 5 value prop bullets
-- Quick Start: install → new-project → core loop → complete-milestone
-- Minimal command table (10 commands) + links to User Guide and CLI Reference
+| Complete README rewrite over incremental edit | Ensures zero upstream residue — no partial branding cleanup needed | Good — clean slate, 97 lines vs 746 |
+| Brainstorm design doc as content blueprint | Design doc provided exact section content, reducing execution to mechanical copy | Good — seamless brainstorm-to-execution |
 
 ## Context
 
-Shipped v1.6 with dual-layer test architecture. 7 milestones shipped (v1.0-v1.6) across 35 phases, 53 plans. 606+ tests pass, 0 failures.
+Shipped v2.0 with README rewrite. 8 milestones shipped (v1.0-v2.0) across 37 phases, 55 plans. 678 tests pass, 0 failures.
 
 **Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~22,464 LOC JavaScript/CJS
-**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs)
+**Codebase:** ~23,984 LOC JavaScript/CJS/Bash
+**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs); `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-06 after v2.0 milestone started*
+*Last updated: 2026-03-06 after v2.0 milestone*
