@@ -106,6 +106,17 @@ get_config() {
   fi
 }
 
+# Pretty-print JSON output; pass through non-JSON unchanged
+format_json_output() {
+  local input
+  input=$(cat)
+  if echo "$input" | jq . >/dev/null 2>&1; then
+    echo "$input" | jq .
+  else
+    echo "$input"
+  fi
+}
+
 # ─── Progress Tracking (Circuit Breaker) ──────────────────────────────────────
 
 NO_PROGRESS_COUNT=0
