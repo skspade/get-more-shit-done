@@ -79,9 +79,10 @@ None.
 | 3 | Fix phase regex in verify.cjs to match colon format | 2026-03-03 | dde55ee | [3-fix-phase-regex-in-verify-cjs-to-match-c](./quick/3-fix-phase-regex-in-verify-cjs-to-match-c/) |
 | 4 | Remove GitHub Actions and NPM publishing configuration | 2026-03-04 | cdf2ff3 | [4-remove-github-actions-and-npm-publishing](./quick/4-remove-github-actions-and-npm-publishing/) |
 | 5 | Replace the GSDC CLI alias with GMSD | 2026-03-04 | c353318 | [5-replace-the-gsdc-cli-alias-with-gmsd](./quick/5-replace-the-gsdc-cli-alias-with-gmsd/) |
+| 6 | Fix brainstorm.md commit inconsistency — use gsd-tools CLI | 2026-03-06 | e98b78f | [6-fix-brainstorming-skill-commit-inconsist](./quick/6-fix-brainstorming-skill-commit-inconsist/) |
 
 ## Session Continuity
 
 Last session: 2026-03-06
-Stopped at: Milestone v2.1 archived
+Stopped at: Completed quick task 6
 Resume file: None
