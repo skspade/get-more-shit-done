@@ -170,5 +170,5 @@ Phases execute in numeric order.
 | 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
 | 36. README Rewrite | v2.0 | 1/1 | Complete | 2026-03-06 |
 | 37. Close Verification Gaps | v2.0 | 1/1 | Complete | 2026-03-06 |
-| 38. JSON Output Formatter | 1/1 | Complete   | 2026-03-06 | - |
+| 38. JSON Output Formatter | 1/1 | Complete    | 2026-03-06 | - |
 | 39. Apply Formatting to Invocation Sites | v2.1 | 0/0 | Not started | - |

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Autopilot Result Parsing
-status: active
-last_updated: "2026-03-06"
+status: unknown
+last_updated: "2026-03-06T14:54:16.485Z"
 progress:
-  total_phases: 2
-  completed_phases: 0
+  total_phases: 1
+  completed_phases: 1
   total_plans: 1
   completed_plans: 1
 ---
