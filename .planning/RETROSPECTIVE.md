@@ -333,6 +333,42 @@
 
 ---
 
+## Milestone: v2.1 — Autopilot Result Parsing
+
+**Shipped:** 2026-03-06
+**Phases:** 2 | **Plans:** 2 | **Commits:** 16
+
+### What Was Built
+- `format_json_output()` bash function with jq pretty-printing and raw fallback for non-JSON
+- All 5 Claude CLI invocation sites in autopilot.sh piped through formatter
+- 14 tests covering JSON pretty-printing, non-JSON passthrough, structural wiring, and output capture integration
+
+### What Worked
+- TDD approach: failing tests written first, then implementation — both plans executed in 3 minutes each
+- sed-based function extraction for testing: avoids sourcing entire autopilot.sh with its env var dependencies
+- Structural grep tests for wiring verification: confirms all 5 call sites without requiring live Claude CLI invocations
+- No gap closure needed — first milestone where the audit passed clean on first attempt (no missing VERIFICATION.md, no missing frontmatter)
+- Brainstorm-first approach carried over from v2.0 — design doc provided exact function specification
+
+### What Was Inefficient
+- Nothing significant — smallest feature scope yet (single function + 5 pipe insertions)
+
+### Patterns Established
+- Bash function testing pattern: sed extraction + env var passing + stdin-based script injection via execSync
+- Pipe-chain formatting: all Claude CLI output flows through format_json_output before reaching tee or error handlers
+
+### Key Lessons
+1. Clean audit pass is achievable — v2.1 is the first milestone with zero gap closure phases, likely due to well-scoped 2-phase design
+2. sed-based function extraction is a viable pattern for testing individual bash functions in isolation
+3. Structural grep tests provide strong wiring verification without integration test overhead
+
+### Cost Observations
+- Model mix: quality profile (opus primary)
+- Sessions: 2 plan executions across 2 phases
+- Notable: fastest milestone — 6 minutes total execution time for both plans, zero gap closure
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -347,14 +383,16 @@
 | v1.5 | ~25 | 5 | First interactive workflow milestone — brainstorm command with design-to-execution bridging |
 | v1.6 | 16 | 6 | Largest milestone (15 plans) — dual-layer test architecture with config-gated progressive adoption |
 | v2.0 | 14 | 2 | First docs-only milestone — brainstorm-to-README pipeline, smallest scope yet |
+| v2.1 | 16 | 2 | First zero-gap-closure milestone — clean audit pass, TDD + sed-based bash testing |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in all 8 milestones (v1.0: 3 phases, v1.1-v2.0: 1 phase each)
-2. SUMMARY/VERIFICATION.md completeness is the #1 recurring audit gap — hit in 7 of 8 milestones, still needs execution-time enforcement
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 7 of 8 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 8 of 9 milestones (v2.1 is first clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 7 of 9 milestones; v2.1 shows well-scoped milestones can avoid this
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 7 of 9 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 and v1.6
 7. Config-gated features with zero-config degradation enable progressive adoption without breaking existing projects (v1.6)
-8. Brainstorm design docs serve as effective content blueprints — execution becomes mechanical when design is pre-approved (v2.0)
+8. Brainstorm design docs serve as effective content blueprints — execution becomes mechanical when design is pre-approved (v2.0, v2.1)
+9. TDD + structural grep tests provide strong verification for bash function wiring without requiring live CLI invocations (v2.1)

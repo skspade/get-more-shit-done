@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Autopilot Result Parsing
-status: unknown
-last_updated: "2026-03-06T15:04:37.209Z"
+status: complete
+last_updated: "2026-03-06"
 progress:
   total_phases: 2
   completed_phases: 2
@@ -18,22 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-06)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** v2.1 Autopilot Result Parsing — Phase 38
+**Current focus:** v2.1 complete — planning next milestone
 
 ## Current Position
 
-Milestone: v2.1 Autopilot Result Parsing
-Phase: 38 of 39 (JSON Output Formatter)
+Milestone: v2.1 Autopilot Result Parsing — SHIPPED 2026-03-06
+Phase: 39 of 39 (Apply Formatting to Invocation Sites)
 Plan: 1 of 1 in current phase
-Status: Phase 38 complete, ready for verification
-Last activity: 2026-03-06 — Phase 38 plan 01 executed (format_json_output)
+Status: Milestone complete
+Last activity: 2026-03-06 — Milestone v2.1 archived
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 56 (v1.0: 12, v1.1: 3, v1.2: 4, v1.3: 9, v1.4: 5, v1.5: 5, v1.6: 15, v2.0: 2, v2.1: 1)
+- Total plans completed: 57 (v1.0: 12, v1.1: 3, v1.2: 4, v1.3: 9, v1.4: 5, v1.5: 5, v1.6: 15, v2.0: 2, v2.1: 2)
 - Average duration: ---
 - Total execution time: ---
 
@@ -49,10 +49,10 @@ Progress: [█████░░░░░] 50%
 | 25-29 (v1.5) | 5 | --- | --- |
 | 30-35 (v1.6) | 15 | --- | --- |
 | 36-37 (v2.0) | 2 | --- | --- |
-| 38 (v2.1) | 1 | 3min | 3min |
+| 38-39 (v2.1) | 2 | 6min | 3min |
 
 **Recent Trend:**
-- Trend: Consistent --- v2.1 Phase 38 complete (1 plan, format_json_output)
+- Trend: Consistent --- v2.1 complete (2 phases, 2 plans, 4 tasks)
 
 *Updated after each plan completion*
 
@@ -83,5 +83,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-06
-Stopped at: Completed 38-01-PLAN.md (format_json_output)
+Stopped at: Milestone v2.1 archived
 Resume file: None

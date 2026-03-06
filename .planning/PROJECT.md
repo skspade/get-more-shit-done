@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
 
 ## Core Value
 
@@ -61,12 +61,13 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Strip upstream branding (TÂCHES, $GSD token, star history, Discord) — v2.0
 - ✓ Present core workflow (discuss → plan → execute → verify) as quick start — v2.0
 - ✓ Include minimal command table (10 core commands) with links to User Guide and CLI Reference — v2.0
+- ✓ Pretty-print JSON output from Claude CLI invocations in autopilot.sh — v2.1
+- ✓ Add `format_json_output()` helper function with jq + cat fallback — v2.1
+- ✓ Apply formatting to all 5 direct Claude invocation sites — v2.1
 
 ### Active
 
-- Pretty-print JSON output from Claude CLI invocations in autopilot.sh — v2.1
-- Add `format_json_output()` helper function with jq + cat fallback — v2.1
-- Apply formatting to all 5 direct Claude invocation sites — v2.1
+(None — define in next milestone)
 
 ### Out of Scope
 
@@ -145,15 +146,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | `<test_budget>` XML tag for planner injection | Planner receives budget context without modifying prompt structure | Good — clean integration |
 | Complete README rewrite over incremental edit | Ensures zero upstream residue — no partial branding cleanup needed | Good — clean slate, 97 lines vs 746 |
 | Brainstorm design doc as content blueprint | Design doc provided exact section content, reducing execution to mechanical copy | Good — seamless brainstorm-to-execution |
+| sed extraction for bash function testing | Avoids sourcing entire autopilot.sh (which requires env vars); tests function in isolation | Good — reliable, no dependency leakage |
+| Structural grep tests for wiring verification | Verifies all 5 call sites without requiring live Claude CLI invocations | Good — fast, deterministic |
 
 ## Context
 
-Shipped v2.0 with README rewrite. 8 milestones shipped (v1.0-v2.0) across 37 phases, 55 plans. 678 tests pass, 0 failures. Starting v2.1: autopilot result parsing.
+Shipped v2.1 with autopilot result parsing. 9 milestones shipped (v1.0-v2.1) across 39 phases, 57 plans. 692 tests pass, 0 failures.
 
-**Architecture:** Core autopilot loop unchanged. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
+**Architecture:** Core autopilot loop with `format_json_output()` pipe on all 5 Claude CLI invocation sites. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~23,984 LOC JavaScript/CJS/Bash
-**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs); `docs/CLI.md` line 14 contains upstream package name (pre-existing)
+**Codebase:** ~24,202 LOC JavaScript/CJS/Bash
+**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs); `docs/CLI.md` line 14 contains upstream package name (pre-existing); test budget at 86.5% (692/800) — consider consolidating health check overlap if future milestones add significant tests
 
 ---
-*Last updated: 2026-03-06 after v2.0 milestone*
+*Last updated: 2026-03-06 after v2.1 milestone*

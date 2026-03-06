@@ -1,5 +1,20 @@
 # Milestones
 
+## v2.1 Autopilot Result Parsing (Shipped: 2026-03-06)
+
+**Phases completed:** 2 phases, 2 plans, 4 tasks
+**Timeline:** 1 day (2026-03-06)
+**Git range:** b5d6639 → d8362a3 (16 commits)
+**Files modified:** 2 code files (+223/-5 lines)
+
+**Key accomplishments:**
+- Added `format_json_output()` function to autopilot.sh with jq pretty-printing and raw fallback for non-JSON
+- Wired formatting into all 5 Claude CLI invocation sites with exit code propagation via pipefail
+- 14 new tests covering JSON formatting, non-JSON passthrough, structural wiring, and output capture integration
+- Milestone audit passed: 5/5 requirements satisfied, 5/5 integrations wired, 3/3 E2E flows verified
+
+---
+
 ## v2.0 README Rewrite (Shipped: 2026-03-06)
 
 **Phases completed:** 2 phases, 2 plans, 4 tasks
