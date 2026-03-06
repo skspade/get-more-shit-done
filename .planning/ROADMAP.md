@@ -95,7 +95,7 @@
 **Milestone Goal:** Replace upstream README with a minimal quick start guide reflecting the fork's identity and features.
 
 - [x] **Phase 36: README Rewrite** (1/1 plan) — completed 2026-03-06
-- [ ] **Phase 37: Close Verification Gaps** — Gap Closure
+- [x] **Phase 37: Close Verification Gaps** (1/1 plan) — completed 2026-03-06 (Gap Closure)
 
 ## Phase Details
 
@@ -123,6 +123,9 @@ Plans:
   1. VERIFICATION.md exists for Phase 36 confirming all 15 requirements
   2. All 15 requirement checkboxes in REQUIREMENTS.md are checked
 **Plans**: 1
+
+Plans:
+- [x] 37-01: Close Verification Gaps — completed 2026-03-06
 
 ## Progress
 
@@ -167,4 +170,4 @@ Phases execute in numeric order.
 | 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
 | 36. README Rewrite | v2.0 | 1/1 | Complete | 2026-03-06 |
-| 37. Close Verification Gaps | v2.0 | 0/1 | Pending | — |
+| 37. Close Verification Gaps | v2.0 | 1/1 | Complete | 2026-03-06 |
