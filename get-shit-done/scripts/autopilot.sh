@@ -658,7 +658,7 @@ run_step_captured() {
   # Execute Claude Code with output capture via tee
   # pipefail (set at top of script) ensures we get claude's exit code, not tee's
   local exit_code=0
-  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") 2>&1 | tee -a "$output_file" || exit_code=$?
+  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") 2>&1 | format_json_output | tee -a "$output_file" || exit_code=$?
 
   local snapshot_after
   snapshot_after=$(take_progress_snapshot)
@@ -718,7 +718,7 @@ run_step_with_retry() {
     echo ""
 
     # Spawn fresh debugger (failure of debugger itself is NOT fatal)
-    (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") || {
+    (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") | format_json_output || {
       echo "WARNING: Debugger itself returned non-zero. Continuing to next retry." >&2
     }
 
@@ -763,7 +763,7 @@ run_verify_with_debug_retry() {
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       echo ""
 
-      (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") || true
+      (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") | format_json_output || true
       continue
     fi
 
@@ -809,7 +809,7 @@ $gaps_summary"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
-    (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") || true
+    (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$debug_prompt") | format_json_output || true
 
     # Loop continues - re-run verification to check if gaps are fixed
   done
@@ -836,7 +836,7 @@ run_step() {
   # Execute Claude Code with fresh context window
   # Let stdout/stderr flow directly to user (transparency)
   local exit_code=0
-  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") || exit_code=$?
+  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") | format_json_output || exit_code=$?
 
   local snapshot_after
   snapshot_after=$(take_progress_snapshot)
