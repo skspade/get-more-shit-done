@@ -9,7 +9,7 @@
 - ✅ **v1.4 Linear Integration** — Phases 20-24 (shipped 2026-03-03)
 - ✅ **v1.5 GSD Brainstorming Command** — Phases 25-29 (shipped 2026-03-04)
 - ✅ **v1.6 Dual-Layer Test Architecture** — Phases 30-35 (shipped 2026-03-05)
-- 🚧 **v2.0 README Rewrite** — Phase 36
+- 🚧 **v2.0 README Rewrite** — Phases 36-37
 
 ## Phases
 
@@ -95,6 +95,7 @@
 **Milestone Goal:** Replace upstream README with a minimal quick start guide reflecting the fork's identity and features.
 
 - [x] **Phase 36: README Rewrite** (1/1 plan) — completed 2026-03-06
+- [ ] **Phase 37: Close Verification Gaps** — Gap Closure
 
 ## Phase Details
 
@@ -112,6 +113,16 @@
 
 Plans:
 - [x] 36-01: Replace README with fork-branded quick start guide — completed 2026-03-06
+
+### Phase 37: Close Verification Gaps
+**Goal**: Create formal verification artifact for Phase 36 and check off all 15 requirements in REQUIREMENTS.md
+**Depends on**: Phase 36
+**Requirements**: ID-01, ID-02, ID-03, CON-01, CON-02, CON-03, QS-01, QS-02, QS-03, QS-04, QS-05, CMD-01, CMD-02, CLN-01, CLN-02
+**Gap Closure:** Closes all orphaned requirements from v2.0 audit (missing VERIFICATION.md)
+**Success Criteria** (what must be TRUE):
+  1. VERIFICATION.md exists for Phase 36 confirming all 15 requirements
+  2. All 15 requirement checkboxes in REQUIREMENTS.md are checked
+**Plans**: 1
 
 ## Progress
 
@@ -156,3 +167,4 @@ Phases execute in numeric order.
 | 34. Documentation | v1.6 | 3/3 | Complete | 2026-03-05 |
 | 35. Close Verification Gaps | v1.6 | 2/2 | Complete | 2026-03-05 |
 | 36. README Rewrite | v2.0 | 1/1 | Complete | 2026-03-06 |
+| 37. Close Verification Gaps | v2.0 | 0/1 | Pending | — |
