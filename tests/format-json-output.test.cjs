@@ -10,6 +10,8 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const { execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const AUTOPILOT_PATH = path.join(__dirname, '..', 'get-shit-done', 'scripts', 'autopilot.sh');
@@ -125,5 +127,81 @@ describe('format_json_output - INT-01: exit code propagation', () => {
     ].join('\n');
     const result = runBashScript(script);
     assert.notStrictEqual(result.exitCode, 0, 'Should propagate non-zero exit code despite format_json_output succeeding');
+  });
+});
+
+describe('FMT-03: format_json_output wired to all Claude invocation sites', () => {
+  const autopilotContent = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
+  const lines = autopilotContent.split('\n');
+
+  test('all 5 Claude invocation lines pipe through format_json_output', () => {
+    // Find lines that are actual Claude CLI invocations (not comments, not dry-run echos)
+    const claudeInvocationLines = lines.filter(line => {
+      const trimmed = line.trim();
+      // Must contain the actual invocation pattern
+      if (!trimmed.includes('claude -p --dangerously-skip-permissions --output-format json')) return false;
+      // Exclude comments
+      if (trimmed.startsWith('#')) return false;
+      // Exclude dry-run echo lines
+      if (trimmed.includes('[DRY RUN]') || trimmed.includes('echo')) return false;
+      return true;
+    });
+
+    assert.strictEqual(claudeInvocationLines.length, 5,
+      `Expected 5 Claude invocation lines, found ${claudeInvocationLines.length}:\n${claudeInvocationLines.join('\n')}`);
+
+    for (const line of claudeInvocationLines) {
+      assert.ok(line.includes('format_json_output'),
+        `Claude invocation line missing format_json_output:\n${line}`);
+    }
+  });
+
+  test('dry-run lines do not pipe through format_json_output', () => {
+    const dryRunLines = lines.filter(line => line.includes('[DRY RUN]'));
+    assert.ok(dryRunLines.length > 0, 'Should find at least one dry-run line');
+
+    for (const line of dryRunLines) {
+      assert.ok(!line.includes('format_json_output'),
+        `Dry-run line should NOT contain format_json_output:\n${line}`);
+    }
+  });
+});
+
+describe('INT-02: output capture works with format_json_output in pipe', () => {
+  test('formatted JSON is captured by tee to output file', () => {
+    const tmpFile = path.join(os.tmpdir(), `gsd-test-tee-${Date.now()}.log`);
+    const script = [
+      FUNC_PREAMBLE,
+      `echo '{"key":"value"}' | format_json_output | tee "${tmpFile}" > /dev/null`,
+      `cat "${tmpFile}"`,
+      `rm -f "${tmpFile}"`,
+    ].join('\n');
+    const result = runBashScript(script);
+    assert.strictEqual(result.exitCode, 0, 'Pipe chain should exit 0');
+    assert.ok(result.stdout.includes('"key": "value"'),
+      `Tee output file should contain formatted JSON, got:\n${result.stdout}`);
+  });
+
+  test('formatted JSON appears on stdout through tee', () => {
+    const tmpFile = path.join(os.tmpdir(), `gsd-test-tee-stdout-${Date.now()}.log`);
+    const script = [
+      FUNC_PREAMBLE,
+      `echo '{"key":"value"}' | format_json_output | tee "${tmpFile}"`,
+      `rm -f "${tmpFile}"`,
+    ].join('\n');
+    const result = runBashScript(script);
+    assert.strictEqual(result.exitCode, 0, 'Pipe chain should exit 0');
+    assert.ok(result.stdout.includes('"key": "value"'),
+      `stdout should contain formatted JSON, got:\n${result.stdout}`);
+  });
+
+  test('failing command exit code propagates through format_json_output and tee', () => {
+    const script = [
+      FUNC_PREAMBLE,
+      '(echo \'{"ok":true}\'; exit 1) | format_json_output | tee /dev/null',
+    ].join('\n');
+    const result = runBashScript(script);
+    assert.notStrictEqual(result.exitCode, 0,
+      'Should propagate non-zero exit code through format_json_output and tee with pipefail');
   });
 });
