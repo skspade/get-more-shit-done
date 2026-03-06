@@ -102,7 +102,7 @@
 ### v2.1 Autopilot Result Parsing (In Progress)
 
 - [x] **Phase 38: JSON Output Formatter** - Build format_json_output() with jq pretty-printing, raw fallback, and pipefail exit code preservation (completed 2026-03-06)
-- [ ] **Phase 39: Apply Formatting to Invocation Sites** - Integrate formatter into all 5 Claude CLI call sites and verify output capture compatibility
+- [x] **Phase 39: Apply Formatting to Invocation Sites** - Integrate formatter into all 5 Claude CLI call sites and verify output capture compatibility (completed 2026-03-06)
 
 ## Phase Details
 
@@ -171,4 +171,4 @@ Phases execute in numeric order.
 | 36. README Rewrite | v2.0 | 1/1 | Complete | 2026-03-06 |
 | 37. Close Verification Gaps | v2.0 | 1/1 | Complete | 2026-03-06 |
 | 38. JSON Output Formatter | 1/1 | Complete    | 2026-03-06 | - |
-| 39. Apply Formatting to Invocation Sites | v2.1 | 0/0 | Not started | - |
+| 39. Apply Formatting to Invocation Sites | 1/1 | Complete    | 2026-03-06 | - |
