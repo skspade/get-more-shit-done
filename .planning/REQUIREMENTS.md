@@ -2,16 +2,16 @@
 
 ## Command Infrastructure (CMD)
 
-- [ ] **CMD-01**: `/gsd:pr-review` command spec with YAML frontmatter and argument hint
-- [ ] **CMD-02**: Workflow parses `--ingest`, `--quick`, `--milestone`, `--full` flags and review aspect args
-- [ ] **CMD-03**: Errors when both `--quick` and `--milestone` flags are present
+- [x] **CMD-01**: `/gsd:pr-review` command spec with YAML frontmatter and argument hint
+- [x] **CMD-02**: Workflow parses `--ingest`, `--quick`, `--milestone`, `--full` flags and review aspect args
+- [x] **CMD-03**: Errors when both `--quick` and `--milestone` flags are present
 
 ## Review Capture (REV)
 
-- [ ] **REV-01**: Fresh mode runs `/pr-review-toolkit:review-pr` with aspect passthrough and captures output
-- [ ] **REV-02**: Ingest mode prompts user for pre-existing review summary via AskUserQuestion
-- [ ] **REV-03**: Parses findings into structured format (severity, agent, description, file, line, fix_suggestion)
-- [ ] **REV-04**: Exits with "No actionable issues found" when no findings parsed
+- [x] **REV-01**: Fresh mode runs `/pr-review-toolkit:review-pr` with aspect passthrough and captures output
+- [x] **REV-02**: Ingest mode prompts user for pre-existing review summary via AskUserQuestion
+- [x] **REV-03**: Parses findings into structured format (severity, agent, description, file, line, fix_suggestion)
+- [x] **REV-04**: Exits with "No actionable issues found" when no findings parsed
 
 ## Deduplication (DDP)
 
@@ -63,13 +63,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 40 | Pending |
-| CMD-02 | Phase 40 | Pending |
-| CMD-03 | Phase 40 | Pending |
-| REV-01 | Phase 40 | Pending |
-| REV-02 | Phase 40 | Pending |
-| REV-03 | Phase 40 | Pending |
-| REV-04 | Phase 40 | Pending |
+| CMD-01 | Phase 40 | Complete |
+| CMD-02 | Phase 40 | Complete |
+| CMD-03 | Phase 40 | Complete |
+| REV-01 | Phase 40 | Complete |
+| REV-02 | Phase 40 | Complete |
+| REV-03 | Phase 40 | Complete |
+| REV-04 | Phase 40 | Complete |
 | DDP-01 | Phase 41 | Pending |
 | DDP-02 | Phase 41 | Pending |
 | DDP-03 | Phase 41 | Pending |
