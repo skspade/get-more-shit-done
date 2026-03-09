@@ -514,22 +514,123 @@ Get commit hash:
 commit_hash=$(git rev-parse --short HEAD)
 ```
 
-Display completion:
+Store `$QUICK_DIR` and `$commit_hash` for Step 11 completion banner.
+
+---
+
+**Step 9: Milestone route**
+
+If `$ROUTE == "milestone"`:
+
+**9a. Build MILESTONE-CONTEXT.md:**
+
+Write to `.planning/MILESTONE-CONTEXT.md`:
+
+```markdown
+# Milestone Context
+
+**Source:** PR Review (.planning/reviews/YYYY-MM-DD-pr-review.md)
+**Findings:** {total_findings_count} findings in {groups_count} groups
+**Score:** {$REVIEW_SCORE}
+
+## Goal
+
+Resolve all critical and important issues identified by PR review across {distinct_files_count} files.
+
+## Features
+
+${For each group in $GROUPS:}
+### Fix: ${group.primary_file} (${group.max_severity})
+
+| # | Severity | Agent | Description | Line | Fix |
+|---|----------|-------|-------------|------|-----|
+${For each finding in group.findings:}
+| ${n} | ${finding.severity} | ${finding.agent} | ${finding.description} | ${finding.line} | ${finding.fix_suggestion or "—"} |
+${end}
+${end}
+```
+
+For groups with null `primary_file` (general observations), use header `### Fix: General observations (${max_severity})`.
+
+**9b. Initialize and delegate to new-milestone workflow:**
+
+```bash
+MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
+```
+
+Parse MINIT JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
+
+Execute new-milestone workflow steps 1-11 inline (follow `new-milestone.md`):
+
+1. Load context (PROJECT.md, MILESTONES.md, STATE.md)
+2. Gather milestone goals — MILESTONE-CONTEXT.md exists, use it
+3. Determine milestone version
+4. Update PROJECT.md
+5. Update STATE.md
+6. Cleanup and commit (delete MILESTONE-CONTEXT.md after consuming)
+7. Resolve models from MINIT
+8. Research decision (ask user)
+9. Define requirements
+10. Create roadmap (spawn gsd-roadmapper)
+11. Done — display completion
+
+Use models from MINIT JSON for spawned agents:
+- Researchers: `researcher_model`
+- Synthesizer: `synthesizer_model`
+- Roadmapper: `roadmapper_model`
+
+Extract `$MILESTONE_VERSION` and `$MILESTONE_NAME` from the new-milestone output (version from step 3, name from PROJECT.md update in step 4).
+
+Display after delegation:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- GSD ► PR REVIEW QUICK TASK COMPLETE ✓
+ GSD ► PR REVIEW MILESTONE INITIALIZED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Source: PR Review ({N} findings -> {N} groups)
-Route: Quick task
-Directory: ${QUICK_DIR}
-Commit: ${commit_hash}
 ```
 
 ---
 
-**Steps 9-11: Milestone Route and Cleanup**
+**Step 10: Cleanup**
 
-(Implemented in Phase 43)
+This step runs after BOTH routes (shared exit path).
+
+```bash
+rm -f .planning/review-context.md
+```
+
+The permanent review report at `.planning/reviews/YYYY-MM-DD-pr-review.md` is explicitly preserved — it serves as the audit trail.
+
+---
+
+**Step 11: Completion banner**
+
+Display unified completion banner:
+
+**If `$ROUTE == "quick"`:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PR REVIEW COMPLETE ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Source: {total_findings_count} findings in {groups_count} groups
+Route: Quick task
+Report: .planning/reviews/YYYY-MM-DD-pr-review.md
+Directory: ${QUICK_DIR}
+Commit: ${commit_hash}
+```
+
+**If `$ROUTE == "milestone"`:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PR REVIEW COMPLETE ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Source: {total_findings_count} findings in {groups_count} groups
+Route: Milestone
+Report: .planning/reviews/YYYY-MM-DD-pr-review.md
+Milestone: ${MILESTONE_VERSION} ${MILESTONE_NAME}
+```
 
 </process>
