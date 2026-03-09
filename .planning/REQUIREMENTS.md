@@ -35,12 +35,12 @@
 
 ## Quick Route (QCK)
 
-- [ ] **QCK-01**: Synthesizes description from grouped findings
-- [ ] **QCK-02**: Creates quick task directory via gsd-tools.cjs init
-- [ ] **QCK-03**: Spawns planner with review findings as context, one task per file-region group
-- [ ] **QCK-04**: Spawns executor for sequential fix execution
-- [ ] **QCK-05**: Updates STATE.md with pr-review source notation
-- [ ] **QCK-06**: Final commit with plan, summary, and state files
+- [x] **QCK-01**: Synthesizes description from grouped findings
+- [x] **QCK-02**: Creates quick task directory via gsd-tools.cjs init
+- [x] **QCK-03**: Spawns planner with review findings as context, one task per file-region group
+- [x] **QCK-04**: Spawns executor for sequential fix execution
+- [x] **QCK-05**: Updates STATE.md with pr-review source notation
+- [x] **QCK-06**: Final commit with plan, summary, and state files
 
 ## Milestone Route (MST)
 
@@ -81,12 +81,12 @@
 | RTE-01 | Phase 42 | Complete |
 | RTE-02 | Phase 42 | Complete |
 | RTE-03 | Phase 42 | Complete |
-| QCK-01 | Phase 45 | Pending |
-| QCK-02 | Phase 45 | Pending |
-| QCK-03 | Phase 45 | Pending |
-| QCK-04 | Phase 45 | Pending |
-| QCK-05 | Phase 45 | Pending |
-| QCK-06 | Phase 45 | Pending |
+| QCK-01 | Phase 45 | Complete |
+| QCK-02 | Phase 45 | Complete |
+| QCK-03 | Phase 45 | Complete |
+| QCK-04 | Phase 45 | Complete |
+| QCK-05 | Phase 45 | Complete |
+| QCK-06 | Phase 45 | Complete |
 | MST-01 | Phase 46 | Pending |
 | MST-02 | Phase 46 | Pending |
 | CLN-01 | Phase 46 | Pending |
