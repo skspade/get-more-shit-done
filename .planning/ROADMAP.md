@@ -221,7 +221,7 @@ Phases execute in numeric order.
 | 38. JSON Output Formatter | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 39. Apply Formatting to Invocation Sites | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 40. Command Spec and Review Capture | 1/1 | Complete    | 2026-03-09 | - |
-| 41. Deduplication and Persistence | 1/1 | Complete   | 2026-03-09 | - |
+| 41. Deduplication and Persistence | 1/1 | Complete    | 2026-03-09 | - |
 | 42. Scoring and Quick Route | v2.2 | 0/0 | Not started | - |
 | 43. Milestone Route and Cleanup | v2.2 | 0/0 | Not started | - |
 | 44. Documentation | v2.2 | 0/0 | Not started | - |
