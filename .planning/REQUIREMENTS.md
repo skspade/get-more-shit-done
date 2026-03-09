@@ -29,9 +29,9 @@
 
 ## Routing (RTE)
 
-- [ ] **RTE-01**: Scores findings: +2 critical, +1 important, +1 per 5 files
-- [ ] **RTE-02**: Routes score >= 5 to milestone, < 5 to quick
-- [ ] **RTE-03**: `--quick` and `--milestone` flags bypass scoring
+- [x] **RTE-01**: Scores findings: +2 critical, +1 important, +1 per 5 files
+- [x] **RTE-02**: Routes score >= 5 to milestone, < 5 to quick
+- [x] **RTE-03**: `--quick` and `--milestone` flags bypass scoring
 
 ## Quick Route (QCK)
 
@@ -78,9 +78,9 @@
 | PER-01 | Phase 41 | Complete |
 | PER-02 | Phase 41 | Complete |
 | PER-03 | Phase 41 | Complete |
-| RTE-01 | Phase 42 | Pending |
-| RTE-02 | Phase 42 | Pending |
-| RTE-03 | Phase 42 | Pending |
+| RTE-01 | Phase 42 | Complete |
+| RTE-02 | Phase 42 | Complete |
+| RTE-03 | Phase 42 | Complete |
 | QCK-01 | Phase 42 | Pending |
 | QCK-02 | Phase 42 | Pending |
 | QCK-03 | Phase 42 | Pending |

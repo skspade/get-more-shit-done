@@ -222,6 +222,6 @@ Phases execute in numeric order.
 | 39. Apply Formatting to Invocation Sites | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 40. Command Spec and Review Capture | 1/1 | Complete    | 2026-03-09 | - |
 | 41. Deduplication and Persistence | 1/1 | Complete    | 2026-03-09 | - |
-| 42. Scoring and Quick Route | v2.2 | 0/0 | Not started | - |
+| 42. Scoring and Quick Route | 1/2 | In Progress|  | - |
 | 43. Milestone Route and Cleanup | v2.2 | 0/0 | Not started | - |
 | 44. Documentation | v2.2 | 0/0 | Not started | - |
