@@ -132,6 +132,13 @@ CONTEXT: [✓ if has_context | - if not]
 <step name="route">
 **Determine next action based on verified counts.**
 
+**Step 0: Handle unstarted milestone**
+
+If `phase_count` from init progress is 0 AND `next_phase` is not null (populated from ROADMAP.md):
+- This means the milestone has phases defined in ROADMAP.md but no planning has started
+- Use `next_phase.number` as the target phase number
+- Go directly to **Route B** with this phase number (skip Steps 1-2)
+
 **Step 1: Count plans, summaries, and issues in current phase**
 
 List files in the current phase directory:

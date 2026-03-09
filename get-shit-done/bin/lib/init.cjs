@@ -524,6 +524,21 @@ function cmdInitMilestoneOp(cwd, raw) {
     }
   } catch {}
 
+  // If no phase dirs exist, check ROADMAP for defined phases
+  let roadmapPhaseCount = phaseCount;
+  if (phaseCount === 0) {
+    try {
+      const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+      if (fs.existsSync(roadmapPath)) {
+        const content = fs.readFileSync(roadmapPath, 'utf-8');
+        const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+        let count = 0;
+        while (phasePattern.exec(content) !== null) count++;
+        if (count > 0) roadmapPhaseCount = count;
+      }
+    } catch {}
+  }
+
   // Check archive
   const archiveDir = path.join(cwd, '.planning', 'archive');
   let archivedMilestones = [];
@@ -544,6 +559,7 @@ function cmdInitMilestoneOp(cwd, raw) {
 
     // Phase counts
     phase_count: phaseCount,
+    roadmap_phase_count: roadmapPhaseCount,
     completed_phases: completedPhases,
     all_phases_complete: phaseCount > 0 && phaseCount === completedPhases,
 
@@ -648,6 +664,27 @@ function cmdInitProgress(cwd, raw) {
     }
   } catch {}
 
+  // If no phase dirs exist, check ROADMAP for defined phases
+  let roadmapPhaseCount = phases.length;
+  if (phases.length === 0) {
+    try {
+      const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+      if (fs.existsSync(roadmapPath)) {
+        const content = fs.readFileSync(roadmapPath, 'utf-8');
+        const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+        let m;
+        while ((m = phasePattern.exec(content)) !== null) {
+          roadmapPhaseCount++;
+          const phaseNum = m[1];
+          const phaseName = m[2].replace(/\(INSERTED\)/i, '').trim();
+          if (!nextPhase) {
+            nextPhase = { number: phaseNum, name: phaseName, directory: null, status: 'not_started', plan_count: 0, summary_count: 0 };
+          }
+        }
+      }
+    } catch {}
+  }
+
   // Check for paused work
   let pausedAt = null;
   try {
@@ -671,6 +708,7 @@ function cmdInitProgress(cwd, raw) {
     // Phase overview
     phases,
     phase_count: phases.length,
+    roadmap_phase_count: roadmapPhaseCount,
     completed_count: phases.filter(p => p.status === 'complete').length,
     in_progress_count: phases.filter(p => p.status === 'in_progress').length,
 
