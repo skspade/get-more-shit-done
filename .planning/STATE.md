@@ -1,32 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Autopilot Result Parsing
-status: complete
-last_updated: "2026-03-06"
+milestone: v2.2
+milestone_name: PR Review Integration
+status: initializing
+last_updated: "2026-03-09"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-06)
+See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** v2.1 complete — planning next milestone
+**Current focus:** v2.2 PR Review Integration — initializing
 
 ## Current Position
 
-Milestone: v2.1 Autopilot Result Parsing — SHIPPED 2026-03-06
-Phase: 39 of 39 (Apply Formatting to Invocation Sites)
-Plan: 1 of 1 in current phase
-Status: Milestone complete
-Last activity: 2026-03-08 - Completed quick task 7: Add file-based logging to GSD Autopilot
+Milestone: v2.2 PR Review Integration — initializing
+Phase: Awaiting roadmap
+Plan: N/A
+Status: Initializing
+Last activity: 2026-03-09 - Initialized v2.2 milestone from brainstorm design
 
 Progress: [██████████] 100%
 

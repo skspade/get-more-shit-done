@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
 
 ## Core Value
 
@@ -67,7 +67,16 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — define in next milestone)
+- `/gsd:pr-review` command spec with argument parsing (--ingest, --quick, --milestone, --full, aspect passthrough) — v2.2
+- Run or ingest PR review: execute toolkit fresh or accept pasted review summary — v2.2
+- Parse findings into structured format (severity, agent, description, file, line, fix suggestion) — v2.2
+- File-region deduplication: group findings by file proximity (20-line threshold), merge overlapping groups — v2.2
+- Permanent review report written to `.planning/reviews/YYYY-MM-DD-pr-review.md` — v2.2
+- Hybrid scoring heuristic: +2 critical, +1 important, +1 per 5 files; score >= 5 → milestone — v2.2
+- Quick route: single task with one plan task per file-region group, sequential execution — v2.2
+- Milestone route: MILESTONE-CONTEXT.md from findings, delegate to new-milestone workflow — v2.2
+- Temporary review-context.md for routing state, deleted after completion — v2.2
+- Documentation in help.md, USER-GUIDE.md, README.md — v2.2
 
 ### Out of Scope
 
