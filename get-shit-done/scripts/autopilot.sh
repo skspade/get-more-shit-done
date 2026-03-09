@@ -75,6 +75,27 @@ if [[ ! -f "$GSD_TOOLS" ]]; then
   exit 1
 fi
 
+# ─── Logging Infrastructure ──────────────────────────────────────────────────
+
+mkdir -p "$PROJECT_DIR/.planning/logs"
+LOG_FILE="$PROJECT_DIR/.planning/logs/autopilot-$(date +%Y%m%d-%H%M%S).log"
+
+# Write session header
+{
+  echo "============================================"
+  echo "GSD Autopilot Session Log"
+  echo "Started: $(date -Iseconds 2>/dev/null || date)"
+  echo "Project: $PROJECT_DIR"
+  echo "From-phase: ${FROM_PHASE:-auto-detect}"
+  echo "Dry-run: $DRY_RUN"
+  echo "============================================"
+  echo ""
+} >> "$LOG_FILE"
+
+log_msg() {
+  echo "[$(date +%H:%M:%S)] $*" >> "$LOG_FILE"
+}
+
 # ─── Helper Functions ─────────────────────────────────────────────────────────
 
 gsd_tools() {
@@ -88,6 +109,7 @@ print_banner() {
   echo " GSD ► AUTOPILOT: $text"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
+  log_msg "BANNER: $text"
 }
 
 get_phase_status() {
@@ -139,12 +161,15 @@ check_progress() {
   local step_desc="$3"
 
   TOTAL_ITERATIONS=$((TOTAL_ITERATIONS + 1))
+  log_msg "PROGRESS CHECK: step=$step_desc before=$before after=$after"
 
   if [[ "$before" == "$after" ]]; then
     NO_PROGRESS_COUNT=$((NO_PROGRESS_COUNT + 1))
     ITERATION_LOG+=("Iteration $TOTAL_ITERATIONS ($step_desc): NO PROGRESS - snapshot unchanged ($before)")
+    log_msg "NO PROGRESS: count=$NO_PROGRESS_COUNT/$CIRCUIT_BREAKER_THRESHOLD"
 
     if [[ $NO_PROGRESS_COUNT -ge $CIRCUIT_BREAKER_THRESHOLD ]]; then
+      log_msg "CIRCUIT BREAKER TRIGGERED at step=$step_desc"
       print_halt_report "Circuit breaker triggered" "$step_desc" "N/A"
       exit 1
     fi
@@ -152,6 +177,7 @@ check_progress() {
   else
     NO_PROGRESS_COUNT=0
     ITERATION_LOG=()
+    log_msg "PROGRESS DETECTED: snapshot changed"
   fi
 }
 
@@ -159,6 +185,14 @@ print_halt_report() {
   local reason="$1"
   local step="$2"
   local exit_code="$3"
+
+  log_msg "HALT REPORT: reason=$reason phase=$CURRENT_PHASE step=$step exit_code=$exit_code"
+  log_msg "HALT: total_iterations=$TOTAL_ITERATIONS no_progress_count=$NO_PROGRESS_COUNT"
+
+  # Dump iteration log entries to log file
+  for entry in "${ITERATION_LOG[@]}"; do
+    log_msg "ITERATION: $entry"
+  done
 
   echo ""
   echo "╔══════════════════════════════════════════════════════════════╗"
@@ -192,12 +226,15 @@ print_halt_report() {
   echo "  - Artifact file count in .planning/phases/"
   echo ""
   echo "To resume: autopilot.sh --from-phase $CURRENT_PHASE --project-dir $PROJECT_DIR"
+  echo "Log file: $LOG_FILE"
   echo ""
 }
 
 print_escalation_report() {
   local iterations="$1"
   local max_iterations="$2"
+
+  log_msg "ESCALATION: gap closure exhausted iterations=$iterations/$max_iterations"
 
   local audit_file
   audit_file=$(ls -t "$PROJECT_DIR/.planning/v"*"-MILESTONE-AUDIT.md" 2>/dev/null | head -1)
@@ -223,6 +260,8 @@ print_escalation_report() {
 }
 
 print_final_report() {
+  log_msg "COMPLETE: all phases done, total_iterations=$TOTAL_ITERATIONS"
+
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo " GSD ► AUTOPILOT COMPLETE ✓"
@@ -237,6 +276,7 @@ print_final_report() {
 
 run_milestone_audit() {
   print_banner "MILESTONE AUDIT"
+  log_msg "AUDIT: starting milestone audit"
 
   # Invoke audit-milestone via claude with retry support
   local audit_prompt="/gsd:audit-milestone"
@@ -244,6 +284,7 @@ run_milestone_audit() {
   run_step_with_retry "$audit_prompt" "milestone-audit" || audit_exit=$?
 
   if [[ $audit_exit -ne 0 ]]; then
+    log_msg "AUDIT: failed with exit=$audit_exit"
     echo "ERROR: Milestone audit failed (exit $audit_exit)" >&2
     return 1
   fi
@@ -266,6 +307,7 @@ run_milestone_audit() {
     return 1
   fi
 
+  log_msg "AUDIT: result=$audit_status"
   echo "Audit result: $audit_status"
 
   # Read tech debt config
@@ -318,6 +360,7 @@ run_gap_closure_loop() {
 
     iteration=$((iteration + 1))
 
+    log_msg "GAP CLOSURE: iteration=$iteration/$max_iterations"
     print_banner "GAP CLOSURE: Iteration $iteration/$max_iterations"
 
     # Reset circuit breaker and iteration log for fresh cycle
@@ -644,12 +687,14 @@ run_step_captured() {
   local step_name="$2"
   local output_file="$3"
 
+  log_msg "STEP START: phase=$CURRENT_PHASE step=$step_name"
   print_banner "Phase $CURRENT_PHASE > $step_name"
 
   local snapshot_before
   snapshot_before=$(take_progress_snapshot)
 
   if [[ "$DRY_RUN" == true ]]; then
+    log_msg "STEP DRY-RUN: $step_name"
     echo "[DRY RUN] Would execute: claude -p ..." | tee -a "$output_file"
     check_progress "$snapshot_before" "$snapshot_before" "$step_name (dry-run)"
     return 0
@@ -658,7 +703,9 @@ run_step_captured() {
   # Execute Claude Code with output capture via tee
   # pipefail (set at top of script) ensures we get claude's exit code, not tee's
   local exit_code=0
-  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") 2>&1 | format_json_output | tee -a "$output_file" || exit_code=$?
+  (cd "$PROJECT_DIR" && claude -p --dangerously-skip-permissions --output-format json "$prompt") 2> >(tee -a "$LOG_FILE" >&2) | format_json_output | tee -a "$output_file" || exit_code=$?
+
+  log_msg "STEP DONE: step=$step_name exit_code=$exit_code"
 
   local snapshot_after
   snapshot_after=$(take_progress_snapshot)
@@ -689,7 +736,9 @@ run_step_with_retry() {
     fi
 
     retry_count=$((retry_count + 1))
+    log_msg "RETRY: step=$step_name attempt=$retry_count/$MAX_DEBUG_RETRIES exit_code=$step_exit"
     if [[ $retry_count -gt $MAX_DEBUG_RETRIES ]]; then
+      log_msg "RETRY EXHAUSTED: step=$step_name"
       echo ""
       echo "Debug retries exhausted ($retry_count/$MAX_DEBUG_RETRIES) for step '$step_name'." >&2
       write_failure_state "$step_name" "$step_exit" "$retry_count" "$MAX_DEBUG_RETRIES" "$output_file"
@@ -698,6 +747,7 @@ run_step_with_retry() {
     fi
 
     echo ""
+    log_msg "DEBUG PROMPT: invoking debugger for step=$step_name retry=$retry_count"
     echo "◆ Debug retry $retry_count/$MAX_DEBUG_RETRIES for step '$step_name'..." >&2
     echo ""
 
@@ -791,6 +841,7 @@ run_verify_with_debug_retry() {
     fi
 
     echo ""
+    log_msg "VERIFY GAPS: retry=$retry_count/$MAX_DEBUG_RETRIES"
     echo "◆ Verification found gaps. Debug retry $retry_count/$MAX_DEBUG_RETRIES..." >&2
     echo ""
 
@@ -1176,13 +1227,18 @@ echo "Starting step: $CURRENT_STEP"
 echo "Circuit breaker: $CIRCUIT_BREAKER_THRESHOLD consecutive iterations"
 echo "Debug retries: $MAX_DEBUG_RETRIES per step"
 echo "Dry run: $DRY_RUN"
+echo "Log file: $LOG_FILE"
 echo ""
+
+log_msg "STARTUP: phase=$CURRENT_PHASE step=$CURRENT_STEP circuit_breaker=$CIRCUIT_BREAKER_THRESHOLD max_retries=$MAX_DEBUG_RETRIES"
 
 # ─── Main Loop ────────────────────────────────────────────────────────────────
 
 while true; do
   STATUS_JSON=$(get_phase_status "$CURRENT_PHASE")
   CURRENT_STEP=$(echo "$STATUS_JSON" | jq -r '.step')
+
+  log_msg "MAIN LOOP: phase=$CURRENT_PHASE step=$CURRENT_STEP"
 
   case "$CURRENT_STEP" in
     discuss)
