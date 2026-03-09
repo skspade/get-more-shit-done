@@ -564,8 +564,11 @@ async function main() {
         case 'linear':
           init.cmdInitLinear(cwd, raw);
           break;
+        case 'pr-review':
+          init.cmdInitPrReview(cwd, raw);
+          break;
         default:
-          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, linear`);
+          error(`Unknown init workflow: ${workflow}\nAvailable: execute-phase, plan-phase, new-project, new-milestone, quick, resume, verify-work, phase-op, todos, milestone-op, map-codebase, progress, linear, pr-review`);
       }
       break;
     }
