@@ -115,6 +115,8 @@
 - [x] **Phase 42: Scoring and Quick Route** - Hybrid scoring heuristic, quick task creation with one task per file-region group (completed 2026-03-09)
 - [x] **Phase 43: Milestone Route and Cleanup** - MILESTONE-CONTEXT.md generation, new-milestone delegation, temp file cleanup, completion banner (completed 2026-03-09)
 - [x] **Phase 44: Documentation** - help.md, USER-GUIDE.md, and README.md updates for /gsd:pr-review (completed 2026-03-09)
+- [ ] **Phase 45: Fix Quick Route Init Command** - Add `init pr-review` subcommand to gsd-tools.cjs to unblock quick route (Gap Closure)
+- [ ] **Phase 46: Close Verification and Metadata Gaps** - Create missing VERIFICATION.md files and fix SUMMARY/REQUIREMENTS metadata (Gap Closure)
 
 ## Phase Details
 
@@ -174,6 +176,29 @@
   3. README.md command table includes `/gsd:pr-review` entry
 **Plans**: TBD
 
+### Phase 45: Fix Quick Route Init Command
+**Goal**: Quick route works end-to-end by adding the missing `init pr-review` subcommand to gsd-tools.cjs
+**Depends on**: Phase 42
+**Requirements**: QCK-01, QCK-02, QCK-03, QCK-04, QCK-05, QCK-06
+**Gap Closure:** Closes gaps from audit — runtime integration bug blocking entire quick route
+**Success Criteria** (what must be TRUE):
+  1. `gsd-tools.cjs init pr-review` creates a quick task directory with correct structure
+  2. Quick route E2E flow completes without crashing (fresh review → score < 5 → quick fix)
+  3. Tests cover the new init subcommand
+**Plans**: TBD
+
+### Phase 46: Close Verification and Metadata Gaps
+**Goal**: All phases have proper verification and metadata, closing remaining audit gaps
+**Depends on**: Phase 45
+**Requirements**: DDP-01, DDP-02, DDP-03, DDP-04, DDP-05, PER-01, PER-02, PER-03, MST-01, MST-02, CLN-01, CLN-02, CLN-03, DOC-01, DOC-02, DOC-03
+**Gap Closure:** Closes verification and metadata gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 41 has VERIFICATION.md confirming DDP-01-05 and PER-01-03
+  2. Phase 44 has VERIFICATION.md confirming DOC-01-03
+  3. Phase 43 SUMMARY.md has `requirements-completed` frontmatter
+  4. REQUIREMENTS.md checkboxes for MST-01, MST-02, CLN-01, CLN-02, CLN-03 are checked
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -225,3 +250,5 @@ Phases execute in numeric order.
 | 42. Scoring and Quick Route | 2/2 | Complete    | 2026-03-09 | - |
 | 43. Milestone Route and Cleanup | 1/1 | Complete    | 2026-03-09 | - |
 | 44. Documentation | v2.2 | 1/1 | Complete | 2026-03-09 |
+| 45. Fix Quick Route Init Command | v2.2 | 0/0 | Planned | - |
+| 46. Close Verification and Metadata Gaps | v2.2 | 0/0 | Planned | - |

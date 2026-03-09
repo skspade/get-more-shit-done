@@ -35,12 +35,12 @@
 
 ## Quick Route (QCK)
 
-- [x] **QCK-01**: Synthesizes description from grouped findings
-- [x] **QCK-02**: Creates quick task directory via gsd-tools.cjs init
-- [x] **QCK-03**: Spawns planner with review findings as context, one task per file-region group
-- [x] **QCK-04**: Spawns executor for sequential fix execution
-- [x] **QCK-05**: Updates STATE.md with pr-review source notation
-- [x] **QCK-06**: Final commit with plan, summary, and state files
+- [ ] **QCK-01**: Synthesizes description from grouped findings
+- [ ] **QCK-02**: Creates quick task directory via gsd-tools.cjs init
+- [ ] **QCK-03**: Spawns planner with review findings as context, one task per file-region group
+- [ ] **QCK-04**: Spawns executor for sequential fix execution
+- [ ] **QCK-05**: Updates STATE.md with pr-review source notation
+- [ ] **QCK-06**: Final commit with plan, summary, and state files
 
 ## Milestone Route (MST)
 
@@ -70,31 +70,31 @@
 | REV-02 | Phase 40 | Complete |
 | REV-03 | Phase 40 | Complete |
 | REV-04 | Phase 40 | Complete |
-| DDP-01 | Phase 41 | Complete |
-| DDP-02 | Phase 41 | Complete |
-| DDP-03 | Phase 41 | Complete |
-| DDP-04 | Phase 41 | Complete |
-| DDP-05 | Phase 41 | Complete |
-| PER-01 | Phase 41 | Complete |
-| PER-02 | Phase 41 | Complete |
-| PER-03 | Phase 41 | Complete |
+| DDP-01 | Phase 46 | Pending |
+| DDP-02 | Phase 46 | Pending |
+| DDP-03 | Phase 46 | Pending |
+| DDP-04 | Phase 46 | Pending |
+| DDP-05 | Phase 46 | Pending |
+| PER-01 | Phase 46 | Pending |
+| PER-02 | Phase 46 | Pending |
+| PER-03 | Phase 46 | Pending |
 | RTE-01 | Phase 42 | Complete |
 | RTE-02 | Phase 42 | Complete |
 | RTE-03 | Phase 42 | Complete |
-| QCK-01 | Phase 42 | Complete |
-| QCK-02 | Phase 42 | Complete |
-| QCK-03 | Phase 42 | Complete |
-| QCK-04 | Phase 42 | Complete |
-| QCK-05 | Phase 42 | Complete |
-| QCK-06 | Phase 42 | Complete |
-| MST-01 | Phase 43 | Pending |
-| MST-02 | Phase 43 | Pending |
-| CLN-01 | Phase 43 | Pending |
-| CLN-02 | Phase 43 | Pending |
-| CLN-03 | Phase 43 | Pending |
-| DOC-01 | Phase 44 | Complete |
-| DOC-02 | Phase 44 | Complete |
-| DOC-03 | Phase 44 | Complete |
+| QCK-01 | Phase 45 | Pending |
+| QCK-02 | Phase 45 | Pending |
+| QCK-03 | Phase 45 | Pending |
+| QCK-04 | Phase 45 | Pending |
+| QCK-05 | Phase 45 | Pending |
+| QCK-06 | Phase 45 | Pending |
+| MST-01 | Phase 46 | Pending |
+| MST-02 | Phase 46 | Pending |
+| CLN-01 | Phase 46 | Pending |
+| CLN-02 | Phase 46 | Pending |
+| CLN-03 | Phase 46 | Pending |
+| DOC-01 | Phase 46 | Pending |
+| DOC-02 | Phase 46 | Pending |
+| DOC-03 | Phase 46 | Pending |
 
 ## Future Requirements
 
