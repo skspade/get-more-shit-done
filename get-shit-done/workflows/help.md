@@ -201,6 +201,28 @@ Usage: `/gsd:brainstorm "add dark mode support"` (seed with a topic)
 
 Result: Design doc in `.planning/designs/` + optional milestone/project creation
 
+### PR Review
+
+**`/gsd:pr-review [--ingest] [--quick|--milestone] [--full] [aspects...]`**
+
+Run a fresh PR review or ingest an existing one, extract structured findings, and route to quick task or milestone.
+
+- Fresh mode (default): invokes the PR review toolkit, captures and parses findings
+- Ingest mode (--ingest): paste a pre-existing review summary
+- Deduplicates findings by file proximity (20-line threshold)
+- Scores findings and routes: score >= 5 to milestone, < 5 to quick task
+- Flag overrides: --quick or --milestone bypass scoring
+- --full adds plan-checking and verification to quick route
+- Aspects passthrough: pass review focus areas (e.g., security, performance)
+
+Usage: `/gsd:pr-review` (run fresh review)
+Usage: `/gsd:pr-review --ingest` (paste existing review)
+Usage: `/gsd:pr-review --quick` (force quick task route)
+Usage: `/gsd:pr-review --milestone` (force milestone route)
+Usage: `/gsd:pr-review security performance` (focus on specific aspects)
+
+Result: Quick task in `.planning/quick/` or new milestone, plus permanent report in `.planning/reviews/`
+
 ### Progress Tracking
 
 **`/gsd:progress`**
@@ -542,6 +564,15 @@ Example config:
 ```
 /gsd:brainstorm                              # Start brainstorming session
 /gsd:brainstorm "add caching layer"          # Start with a specific topic
+```
+
+**PR Review:**
+
+```
+/gsd:pr-review                               # Run fresh review, auto-route findings
+/gsd:pr-review --ingest                      # Paste existing review summary
+/gsd:pr-review --quick                       # Force quick task route
+/gsd:pr-review security performance          # Focus review on specific aspects
 ```
 
 **Debugging an issue:**

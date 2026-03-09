@@ -310,6 +310,7 @@ During `/gsd:plan-phase`, the planner receives current budget status and generat
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 | `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone | Have a Linear issue to implement |
 | `/gsd:brainstorm [topic]` | Collaborative brainstorming that produces a design doc and routes into milestone/project creation | Want to explore an idea before committing to implementation |
+| `/gsd:pr-review [flags] [aspects...]` | Route PR review findings to quick task or milestone | Have PR review feedback to act on |
 
 ---
 
@@ -563,6 +564,68 @@ After completion, GSD posts a summary comment back to each Linear issue with the
 ```
 
 **Flow:** The brainstorm command explores your codebase, asks clarifying questions, proposes approaches, and builds a design document section by section. After approval, it offers to create a milestone or project from the design.
+
+### PR Review
+
+Route PR review findings into GSD workflows. Runs a fresh review or ingests an existing one, deduplicates findings by file proximity, scores for complexity, and routes to a quick task or milestone.
+
+#### Pipeline
+
+```
+  /gsd:pr-review
+         |
+         +-- Capture (fresh toolkit review or --ingest paste)
+         |
+         +-- Parse findings (severity, file, line, fix suggestion)
+         |
+         +-- Deduplicate by file proximity (20-line threshold)
+         |     Group overlapping findings transitively
+         |
+         +-- Score: +2 critical, +1 important, +1 per 5 files
+         |
+         +-- Route
+               |
+               +-- Score < 5 --> Quick task (one task per file-region group)
+               +-- Score >= 5 --> New milestone
+```
+
+#### Flags
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Run fresh review, auto-route based on scoring |
+| `--ingest` | Paste a pre-existing review summary instead of running fresh |
+| `--quick` | Force quick task route (skip scoring) |
+| `--milestone` | Force milestone route (skip scoring) |
+| `--full` | Add plan-checking and verification to quick route |
+
+#### Routing Heuristic
+
+When no flag override is provided, GSD scores findings: +2 per critical, +1 per important, +1 per 5 distinct files touched. Score >= 5 routes to a new milestone; < 5 routes to a quick task with one task per file-region group.
+
+#### Examples
+
+```
+# Run a fresh PR review with auto-routing
+/gsd:pr-review
+
+# Paste an existing review summary
+/gsd:pr-review --ingest
+
+# Force quick task route regardless of score
+/gsd:pr-review --quick
+
+# Force milestone route regardless of score
+/gsd:pr-review --milestone
+
+# Focus review on specific aspects
+/gsd:pr-review security performance
+
+# Quick task with plan-checking and verification
+/gsd:pr-review --full
+```
+
+After completion, GSD displays a banner with route taken, report path, and artifacts created. The permanent review report at `.planning/reviews/YYYY-MM-DD-pr-review.md` serves as an audit trail.
 
 ---
 
