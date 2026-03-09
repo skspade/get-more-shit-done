@@ -44,14 +44,14 @@
 
 ## Milestone Route (MST)
 
-- [ ] **MST-01**: Builds MILESTONE-CONTEXT.md from file-region groups as features
-- [ ] **MST-02**: Delegates to new-milestone workflow steps 1-11
+- [x] **MST-01**: Builds MILESTONE-CONTEXT.md from file-region groups as features
+- [x] **MST-02**: Delegates to new-milestone workflow steps 1-11
 
 ## Cleanup (CLN)
 
-- [ ] **CLN-01**: Deletes temporary review-context.md after completion
-- [ ] **CLN-02**: Permanent review report preserved as audit trail
-- [ ] **CLN-03**: Displays completion banner with route, report path, and artifacts
+- [x] **CLN-01**: Deletes temporary review-context.md after completion
+- [x] **CLN-02**: Permanent review report preserved as audit trail
+- [x] **CLN-03**: Displays completion banner with route, report path, and artifacts
 
 ## Documentation (DOC)
 
@@ -70,14 +70,14 @@
 | REV-02 | Phase 40 | Complete |
 | REV-03 | Phase 40 | Complete |
 | REV-04 | Phase 40 | Complete |
-| DDP-01 | Phase 46 | Pending |
-| DDP-02 | Phase 46 | Pending |
-| DDP-03 | Phase 46 | Pending |
-| DDP-04 | Phase 46 | Pending |
-| DDP-05 | Phase 46 | Pending |
-| PER-01 | Phase 46 | Pending |
-| PER-02 | Phase 46 | Pending |
-| PER-03 | Phase 46 | Pending |
+| DDP-01 | Phase 46 | Complete |
+| DDP-02 | Phase 46 | Complete |
+| DDP-03 | Phase 46 | Complete |
+| DDP-04 | Phase 46 | Complete |
+| DDP-05 | Phase 46 | Complete |
+| PER-01 | Phase 46 | Complete |
+| PER-02 | Phase 46 | Complete |
+| PER-03 | Phase 46 | Complete |
 | RTE-01 | Phase 42 | Complete |
 | RTE-02 | Phase 42 | Complete |
 | RTE-03 | Phase 42 | Complete |
@@ -87,14 +87,14 @@
 | QCK-04 | Phase 45 | Complete |
 | QCK-05 | Phase 45 | Complete |
 | QCK-06 | Phase 45 | Complete |
-| MST-01 | Phase 46 | Pending |
-| MST-02 | Phase 46 | Pending |
-| CLN-01 | Phase 46 | Pending |
-| CLN-02 | Phase 46 | Pending |
-| CLN-03 | Phase 46 | Pending |
-| DOC-01 | Phase 46 | Pending |
-| DOC-02 | Phase 46 | Pending |
-| DOC-03 | Phase 46 | Pending |
+| MST-01 | Phase 46 | Complete |
+| MST-02 | Phase 46 | Complete |
+| CLN-01 | Phase 46 | Complete |
+| CLN-02 | Phase 46 | Complete |
+| CLN-03 | Phase 46 | Complete |
+| DOC-01 | Phase 46 | Complete |
+| DOC-02 | Phase 46 | Complete |
+| DOC-03 | Phase 46 | Complete |
 
 ## Future Requirements
 
