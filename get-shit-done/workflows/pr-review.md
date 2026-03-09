@@ -251,8 +251,285 @@ Write the updated file back.
 
 ---
 
-**Steps 8-11: Quick Route, Milestone Route, and Cleanup**
+**Step 8: Quick route**
 
-(Implemented in Phases 42-43)
+If `$ROUTE == "quick"`:
+
+**8a. Synthesize description:**
+
+Build `$DESCRIPTION` from the grouped findings:
+- Title line: `"Fix PR review issues: {N} groups across {distinct_files_count} files"`
+- Body: For each file-region group, append: `"- {primary_file}:{line_range} ({max_severity}, {findings_count} findings)"`
+- Truncate total `$DESCRIPTION` to 2000 chars
+
+**8b. Initialize:**
+
+```bash
+SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "$DESCRIPTION")
+INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init pr-review)
+```
+
+Parse INIT JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `next_num`, `date`, `timestamp`, `quick_dir`, `state_path`, `roadmap_path`, `planning_exists`, `roadmap_exists`.
+
+**If `roadmap_exists` is false:** Error — "Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first."
+
+**8c. Create task directory:**
+
+```bash
+mkdir -p "${quick_dir}"
+QUICK_DIR=".planning/quick/${next_num}-${SLUG}"
+mkdir -p "$QUICK_DIR"
+```
+
+Display:
+```
+Creating quick task ${next_num}: Fix PR review issues
+Directory: ${QUICK_DIR}
+Source: pr-review
+```
+
+**8d. Spawn planner (quick mode):**
+
+The planner prompt includes review findings as context. Each file-region group maps to one plan task.
+
+```
+Task(
+  prompt="
+<planning_context>
+
+**Mode:** ${FULL_MODE ? 'quick-full' : 'quick'}
+**Directory:** ${QUICK_DIR}
+**Description:** ${DESCRIPTION}
+
+<review_findings>
+${For each file-region group:}
+### Group ${id}: ${primary_file}:${line_range[0]}-${line_range[1]}
+Severity: ${max_severity}
+Findings:
+${For each finding in group:}
+- [${agent}] ${description} (line ${line}) — Fix: ${fix_suggestion}
+${end}
+${end}
+</review_findings>
+
+<files_to_read>
+- .planning/reviews/YYYY-MM-DD-pr-review.md (Full review report)
+- .planning/STATE.md
+- ./CLAUDE.md (if exists)
+</files_to_read>
+</planning_context>
+
+<constraints>
+- Create a SINGLE plan with one task per file-region group
+- Each task targets one file-region group — include ALL findings from that group
+- Tasks should reference the specific fix suggestions from the review
+- Do NOT split a file-region group across multiple tasks
+${FULL_MODE ? '- Target ~40% context usage (structured for verification)' : '- Target ~30% context usage (simple, focused)'}
+${FULL_MODE ? '- MUST generate must_haves in plan frontmatter (truths, artifacts, key_links)' : ''}
+${FULL_MODE ? '- Each task MUST have files, action, verify, done fields' : ''}
+</constraints>
+
+<output>
+Write plan to: ${QUICK_DIR}/${next_num}-PLAN.md
+Return: ## PLANNING COMPLETE with plan path
+</output>
+",
+  subagent_type="gsd-planner",
+  model="{planner_model}",
+  description="Quick plan: Fix PR review issues"
+)
+```
+
+After planner returns:
+1. Verify plan exists at `${QUICK_DIR}/${next_num}-PLAN.md`
+2. Report: "Plan created: ${QUICK_DIR}/${next_num}-PLAN.md"
+
+If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
+
+**8e. Plan-checker loop (only when `$FULL_MODE`):**
+
+Skip if NOT `$FULL_MODE`.
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► CHECKING PLAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Spawning plan checker...
+```
+
+Checker prompt:
+
+```markdown
+<verification_context>
+**Mode:** quick-full
+**Task Description:** ${DESCRIPTION}
+
+<files_to_read>
+- ${QUICK_DIR}/${next_num}-PLAN.md (Plan to verify)
+</files_to_read>
+
+**Scope:** This is a quick task, not a full phase. Skip checks that require a ROADMAP phase goal.
+</verification_context>
+
+<check_dimensions>
+- Requirement coverage: Does the plan address the task description?
+- Task completeness: Do tasks have files, action, verify, done fields?
+- Key links: Are referenced files real?
+- Scope sanity: Is this appropriately sized for a quick task (1 task per file-region group)?
+- must_haves derivation: Are must_haves traceable to the task description?
+
+Skip: context compliance (no CONTEXT.md), cross-plan deps (single plan), ROADMAP alignment
+</check_dimensions>
+
+<expected_output>
+- ## VERIFICATION PASSED — all checks pass
+- ## ISSUES FOUND — structured issue list
+</expected_output>
+```
+
+```
+Task(
+  prompt=checker_prompt,
+  subagent_type="gsd-plan-checker",
+  model="{checker_model}",
+  description="Check quick plan: Fix PR review issues"
+)
+```
+
+Handle checker return:
+- `## VERIFICATION PASSED`: Display confirmation, proceed to 8f.
+- `## ISSUES FOUND`: Display issues, enter revision loop (max 2 iterations).
+
+**8f. Spawn executor:**
+
+```
+Task(
+  prompt="
+Execute quick task ${next_num}.
+
+<files_to_read>
+- ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
+- .planning/STATE.md (Project state)
+- ./CLAUDE.md (Project instructions, if exists)
+</files_to_read>
+
+<constraints>
+- Execute all tasks in the plan
+- Commit each task atomically
+- Create summary at: ${QUICK_DIR}/${next_num}-SUMMARY.md
+- Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
+</constraints>
+",
+  subagent_type="gsd-executor",
+  model="{executor_model}",
+  description="Execute: Fix PR review issues"
+)
+```
+
+After executor returns:
+1. Verify summary exists at `${QUICK_DIR}/${next_num}-SUMMARY.md`
+2. Extract commit hash from executor output
+3. Report completion status
+
+**Known Claude Code bug (classifyHandoffIfNeeded):** If executor reports "failed" with error `classifyHandoffIfNeeded is not defined`, this is a Claude Code runtime bug — not a real failure. Check if summary file exists and git log shows commits. If so, treat as successful.
+
+If summary not found, error: "Executor failed to create ${next_num}-SUMMARY.md"
+
+**8g. Verification (only when `$FULL_MODE`):**
+
+Skip if NOT `$FULL_MODE`.
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► VERIFYING RESULTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Spawning verifier...
+```
+
+```
+Task(
+  prompt="Verify quick task goal achievement.
+Task directory: ${QUICK_DIR}
+Task goal: ${DESCRIPTION}
+
+<files_to_read>
+- ${QUICK_DIR}/${next_num}-PLAN.md (Plan)
+</files_to_read>
+
+Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}/${next_num}-VERIFICATION.md.",
+  subagent_type="gsd-verifier",
+  model="{verifier_model}",
+  description="Verify: Fix PR review issues"
+)
+```
+
+Handle verification status:
+- `passed`: Store `$VERIFICATION_STATUS = "Verified"`, continue
+- `human_needed`: Display items needing manual check, store `$VERIFICATION_STATUS = "Needs Review"`, continue
+- `gaps_found`: Display gap summary, offer: 1) Re-run executor, 2) Accept as-is. Store `$VERIFICATION_STATUS = "Gaps"`
+
+**8h. Update STATE.md:**
+
+Read STATE.md. Check for `### Quick Tasks Completed` section.
+
+If section does not exist, create it after `### Blockers/Concerns` section.
+
+Check if table has a "Source" column. If not, add it to header and separator rows. The table format should be:
+
+```markdown
+| # | Description | Date | Commit | Source | Directory |
+|---|-------------|------|--------|--------|-----------|
+```
+
+If table currently has a "Linear" column instead of "Source", rename the column header from "Linear" to "Source" so the table accommodates both linear and pr-review entries.
+
+Append new row:
+```markdown
+| ${next_num} | Fix PR review issues: ${groups_count} groups | ${date} | ${commit_hash} | pr-review | [${next_num}-${SLUG}](./quick/${next_num}-${SLUG}/) |
+```
+
+Update "Last activity" line:
+```
+Last activity: ${date} - Completed quick task ${next_num}: Fix PR review issues
+```
+
+**8i. Final commit and completion:**
+
+Build file list:
+- `${QUICK_DIR}/${next_num}-PLAN.md`
+- `${QUICK_DIR}/${next_num}-SUMMARY.md`
+- `.planning/STATE.md`
+- `.planning/review-context.md`
+- If `$FULL_MODE` and verification exists: `${QUICK_DIR}/${next_num}-VERIFICATION.md`
+
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(quick-${next_num}): Fix PR review issues" --files ${file_list}
+```
+
+Get commit hash:
+```bash
+commit_hash=$(git rev-parse --short HEAD)
+```
+
+Display completion:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PR REVIEW QUICK TASK COMPLETE ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Source: PR Review ({N} findings -> {N} groups)
+Route: Quick task
+Directory: ${QUICK_DIR}
+Commit: ${commit_hash}
+```
+
+---
+
+**Steps 9-11: Milestone Route and Cleanup**
+
+(Implemented in Phase 43)
 
 </process>
