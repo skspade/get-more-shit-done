@@ -208,7 +208,50 @@ The `route` and `score` fields are empty placeholders — Phase 42 populates the
 
 ---
 
-**Steps 7-11: Scoring, Routing, and Cleanup**
+**Step 7: Score and route**
+
+**7a. Check flag overrides first:**
+
+**If `$FORCE_QUICK`:**
+- Set `$ROUTE = "quick"`
+- Set `$REVIEW_SCORE = "override"`
+- Display: "Route: QUICK (flag override)"
+- Skip scoring, proceed to Step 8.
+
+**If `$FORCE_MILESTONE`:**
+- Set `$ROUTE = "milestone"`
+- Set `$REVIEW_SCORE = "override"`
+- Display: "Route: MILESTONE (flag override)"
+- Skip scoring, proceed to Step 8.
+
+**7b. Compute score from `$GROUPS`:**
+
+Start `$REVIEW_SCORE` at 0. Iterate all findings across all groups:
+- For each finding with severity "critical": +2
+- For each finding with severity "important": +1
+- For each finding with severity "suggestion": +0
+
+Then count distinct files across all groups (deduplicate `primary_file` values, excluding null). Add +1 per 5 distinct files (integer division: `Math.floor(distinct_files / 5)`).
+
+Minimum score is 0 (cannot go negative).
+
+**7c. Route decision:**
+- If `$REVIEW_SCORE >= 5`: set `$ROUTE = "milestone"`
+- If `$REVIEW_SCORE < 5`: set `$ROUTE = "quick"`
+
+Display: `Routing: {$ROUTE} (score: {$REVIEW_SCORE})`
+
+**7d. Update review-context.md:**
+
+Read `.planning/review-context.md`. Update the YAML frontmatter:
+- Set `route:` to `$ROUTE` (replacing the empty placeholder)
+- Set `score:` to `$REVIEW_SCORE` (replacing the empty placeholder)
+
+Write the updated file back.
+
+---
+
+**Steps 8-11: Quick Route, Milestone Route, and Cleanup**
 
 (Implemented in Phases 42-43)
 
