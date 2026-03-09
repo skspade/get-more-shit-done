@@ -1,5 +1,23 @@
 # Milestones
 
+## v2.2 PR Review Integration (Shipped: 2026-03-09)
+
+**Phases completed:** 7 phases, 8 plans, 0 tasks
+
+**Timeline:** 1 day (2026-03-09)
+**Files modified:** 47 (4,961 insertions, 24 deletions)
+
+**Key accomplishments:**
+- Created `/gsd:pr-review` command with fresh review execution and `--ingest` mode for pre-existing reviews
+- Built file-proximity deduplication with transitive merging — groups findings within 20 lines of each other
+- Implemented hybrid scoring heuristic (+2 critical, +1 important, +1 per 5 files) routing to quick or milestone paths
+- Quick route creates one task per file-region group with sequential execution and STATE.md tracking
+- Milestone route generates MILESTONE-CONTEXT.md from findings and delegates to new-milestone workflow
+- Added `init pr-review` subcommand to gsd-tools.cjs for quick route initialization
+- Full documentation in help.md, USER-GUIDE.md, and README.md; milestone audit passed 30/30 requirements
+
+---
+
 ## v2.1 Autopilot Result Parsing (Shipped: 2026-03-06)
 
 **Phases completed:** 2 phases, 2 plans, 4 tasks

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
 
 ## Core Value
 
@@ -64,19 +64,20 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Pretty-print JSON output from Claude CLI invocations in autopilot.sh — v2.1
 - ✓ Add `format_json_output()` helper function with jq + cat fallback — v2.1
 - ✓ Apply formatting to all 5 direct Claude invocation sites — v2.1
+- ✓ `/gsd:pr-review` command spec with argument parsing (--ingest, --quick, --milestone, --full, aspect passthrough) — v2.2
+- ✓ Run or ingest PR review: execute toolkit fresh or accept pasted review summary — v2.2
+- ✓ Parse findings into structured format (severity, agent, description, file, line, fix suggestion) — v2.2
+- ✓ File-region deduplication: group findings by file proximity (20-line threshold), merge overlapping groups — v2.2
+- ✓ Permanent review report written to `.planning/reviews/YYYY-MM-DD-pr-review.md` — v2.2
+- ✓ Hybrid scoring heuristic: +2 critical, +1 important, +1 per 5 files; score >= 5 → milestone — v2.2
+- ✓ Quick route: single task with one plan task per file-region group, sequential execution — v2.2
+- ✓ Milestone route: MILESTONE-CONTEXT.md from findings, delegate to new-milestone workflow — v2.2
+- ✓ Temporary review-context.md for routing state, deleted after completion — v2.2
+- ✓ Documentation in help.md, USER-GUIDE.md, README.md — v2.2
 
 ### Active
 
-- `/gsd:pr-review` command spec with argument parsing (--ingest, --quick, --milestone, --full, aspect passthrough) — v2.2
-- Run or ingest PR review: execute toolkit fresh or accept pasted review summary — v2.2
-- Parse findings into structured format (severity, agent, description, file, line, fix suggestion) — v2.2
-- File-region deduplication: group findings by file proximity (20-line threshold), merge overlapping groups — v2.2
-- Permanent review report written to `.planning/reviews/YYYY-MM-DD-pr-review.md` — v2.2
-- Hybrid scoring heuristic: +2 critical, +1 important, +1 per 5 files; score >= 5 → milestone — v2.2
-- Quick route: single task with one plan task per file-region group, sequential execution — v2.2
-- Milestone route: MILESTONE-CONTEXT.md from findings, delegate to new-milestone workflow — v2.2
-- Temporary review-context.md for routing state, deleted after completion — v2.2
-- Documentation in help.md, USER-GUIDE.md, README.md — v2.2
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -102,6 +103,10 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Visual test reports (HTML/dashboard) — CLI output is sufficient
 - Test mutation analysis (Stryker) — AI-driven redundancy detection is simpler and sufficient
 - Flaky test quarantine — retry-before-debug handles transient failures
+- Modifying the PR review toolkit itself — this workflow consumes its output, doesn't change it
+- Automatic re-review after fixes — user can re-run manually
+- PR comment posting (like Linear comment-back) — no GitHub PR integration for v2.2
+- Cross-PR review aggregation — each invocation handles one review session
 
 ## Constraints
 
@@ -115,57 +120,40 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Native GSD extension over external wrapper | Leverages existing agent/workflow patterns, avoids maintaining separate orchestration layer | Good — seamless integration with existing commands |
-| Fork over upstream contribution | Need freedom to modify core workflows without PR review cycles | Good — enabled rapid iteration on autopilot.sh |
-| Always auto-decide discuss phase | The whole point is autonomous execution; human input at discuss defeats the purpose | Good — auto-context produces usable CONTEXT.md |
-| Human checkpoint at verification only | Verification is where you see what was actually built — the one place human judgment adds the most value | Good — right balance of autonomy and oversight |
-| Debug-first failure handling | gsd-debugger already exists and is purpose-built for diagnosing execution failures | Good — reuses existing infrastructure |
-| Progress circuit breaker over budget cap | Stuck detection is more meaningful than token counting for preventing runaway | Good — catches semantic stalls, not arbitrary limits |
-| Layered decision approach for context generation | Front-loading from PROJECT.md eliminates obvious ambiguities; Claude handles the rest with documented reasoning | Good — domain adaptation works across phase types |
-| Artifact-based state inference | Phase lifecycle step determined by file presence (CONTEXT, PLAN, SUMMARY, VERIFICATION) | Good — stateless, survives context resets |
-| ROADMAP checkbox completion detection | Use ROADMAP checkbox line for completion status instead of section parsing | Good — simpler and more reliable |
-| Remove git tagging entirely over making it optional | Fork doesn't need release tags; simpler to remove than add config toggles | Good — clean removal, no dead code |
-| Preserve README Bash(git tag:*) permissions example | Generic Claude Code permissions snippet, not a GSD feature claim | Good — correct scope boundary |
-| Exit code 10 for gaps_found | Avoid conflict with existing codes 0/1/2/130 | Good — clean routing signal |
-| DRY milestone completion function | Single function called from all 4 audit-passed paths | Good — eliminates duplication |
-| Gap closure reuses existing phase lifecycle | Fix phases use identical discuss/plan/execute/verify cycle as normal phases | Good — no special-case code |
-| Version extracted from STATE.md frontmatter | Single source of truth for milestone version | Good — consistent across invocations |
-| CLI builds on gsd-tools.cjs parsing layer | Reuses existing state parsing rather than duplicating logic | Good — consistent data, no divergence |
-| Inline data gathering over calling existing commands | Avoids output() side-effects from existing functions | Good — clean separation of concerns |
-| gatherXData/handleX pattern for all commands | Consistent handler architecture across progress, todos, health, settings, help | Good — predictable, testable |
-| Read-only CLI except settings set | Minimizes risk; deterministic reads are the primary use case | Good — simple and safe |
-| Single workflow file for both quick and milestone routes | Inline delegation avoids subagent spawning limitations | Good — simpler control flow |
-| Additive complexity scoring heuristic | 6 factors (issue count, sub-issues, description length, labels, relations) combined into single score | Good — transparent routing decisions |
-| Error on conflicting flags (--quick + --milestone) | Explicit error vs first-wins prevents ambiguous intent | Good — clear UX |
-| MCP failures warn-and-continue for comment-back | Primary work already committed; non-critical MCP failures shouldn't fail the workflow | Good — resilient completion |
-| No Linear-specific data in init output | MCP tool names and issue ID formats belong in workflow, not init | Good — clean separation of concerns |
-| 10-step brainstorm workflow in single file | All brainstorm logic in one workflow file, extended in-place across phases 25-27 | Good — single source of truth, easy to follow |
-| AskUserQuestion for all brainstorm interactions | Consistent with GSD interactive patterns (topic prompt, questions, approach selection, section approval) | Good — familiar UX pattern |
-| Per-section design approval with unlimited revisions | User controls quality; no artificial limits on revision rounds | Good — flexibility without complexity |
-| MILESTONE-CONTEXT.md for design-to-milestone bridge | Maps approved design sections as milestone features, replaces questioning phase | Good — seamless handoff |
-| New-project route delegates to user command | Cannot execute new-project inline due to command context requirements | Good — honest about constraints |
-| PROJECT.md existence as routing signal | Simple file test determines milestone vs project route | Good — stateless, deterministic |
-| Framework-specific output parsing with exit-code fallback | Different test runners produce different output formats | Good — supports node:test, Jest, Vitest, Mocha |
-| Baseline comparison via Set difference on failed test names | Only blocks on NEW failures, not pre-existing | Good — enables progressive adoption |
-| TDD RED detection via commit message regex | Gate recognizes intentional test failures and skips check | Good — preserves TDD workflows |
-| Gate advisory on errors (timeout/crash) | Non-test errors should not block execution | Good — resilient to infrastructure issues |
-| AT ownership invariant enforced in execute-plan | AI cannot modify human-defined acceptance tests | Good — preserves human control |
-| Test steward is read-only | Agent analyzes but never modifies test files | Good — safe analysis without side effects |
-| Budget is informational (warnings, not blockers) | Budgets guide planning, not prevent execution | Good — advisory over enforcement |
-| `<test_budget>` XML tag for planner injection | Planner receives budget context without modifying prompt structure | Good — clean integration |
-| Complete README rewrite over incremental edit | Ensures zero upstream residue — no partial branding cleanup needed | Good — clean slate, 97 lines vs 746 |
-| Brainstorm design doc as content blueprint | Design doc provided exact section content, reducing execution to mechanical copy | Good — seamless brainstorm-to-execution |
-| sed extraction for bash function testing | Avoids sourcing entire autopilot.sh (which requires env vars); tests function in isolation | Good — reliable, no dependency leakage |
-| Structural grep tests for wiring verification | Verifies all 5 call sites without requiring live Claude CLI invocations | Good — fast, deterministic |
+| Native GSD extension over external wrapper | Leverages existing agent/workflow patterns, avoids maintaining separate orchestration layer | ✓ Good |
+| Fork over upstream contribution | Need freedom to modify core workflows without PR review cycles | ✓ Good |
+| Always auto-decide discuss phase | The whole point is autonomous execution; human input at discuss defeats the purpose | ✓ Good |
+| Human checkpoint at verification only | Verification is where you see what was actually built — the one place human judgment adds the most value | ✓ Good |
+| Debug-first failure handling | gsd-debugger already exists and is purpose-built for diagnosing execution failures | ✓ Good |
+| Progress circuit breaker over budget cap | Stuck detection is more meaningful than token counting for preventing runaway | ✓ Good |
+| Layered decision approach for context generation | Front-loading from PROJECT.md eliminates obvious ambiguities; Claude handles the rest with documented reasoning | ✓ Good |
+| Artifact-based state inference | Phase lifecycle step determined by file presence (CONTEXT, PLAN, SUMMARY, VERIFICATION) | ✓ Good |
+| Remove git tagging entirely over making it optional | Fork doesn't need release tags; simpler to remove than add config toggles | ✓ Good |
+| Exit code 10 for gaps_found | Avoid conflict with existing codes 0/1/2/130 | ✓ Good |
+| DRY milestone completion function | Single function called from all 4 audit-passed paths | ✓ Good |
+| CLI builds on gsd-tools.cjs parsing layer | Reuses existing state parsing rather than duplicating logic | ✓ Good |
+| Single workflow file for both quick and milestone routes | Inline delegation avoids subagent spawning limitations | ✓ Good |
+| Additive complexity scoring heuristic | 6 factors combined into single score for transparent routing decisions | ✓ Good |
+| 10-step brainstorm workflow in single file | All brainstorm logic in one workflow file, extended in-place across phases | ✓ Good |
+| MILESTONE-CONTEXT.md for design-to-milestone bridge | Maps approved design sections as milestone features, replaces questioning phase | ✓ Good |
+| Framework-specific output parsing with exit-code fallback | Different test runners produce different output formats | ✓ Good |
+| Baseline comparison via Set difference on failed test names | Only blocks on NEW failures, not pre-existing | ✓ Good |
+| Test steward is read-only | Agent analyzes but never modifies test files | ✓ Good |
+| Complete README rewrite over incremental edit | Ensures zero upstream residue | ✓ Good |
+| sed extraction for bash function testing | Avoids sourcing entire autopilot.sh; tests function in isolation | ✓ Good |
+| File-proximity deduplication with transitive merging | Groups findings within 20 lines, merges overlapping groups — reduces noise in PR review routing | ✓ Good |
+| Hybrid scoring for quick vs milestone routing | +2 critical, +1 important, +1 per 5 files — transparent threshold with flag override | ✓ Good |
+| STATE.md generic Source column for quick tasks | Accommodates both pr-review and Linear entries in same table | ✓ Good |
+| Review findings as XML block for planner context | Mirrors Linear issue context pattern; one group per section gives structured review data | ✓ Good |
 
 ## Context
 
-Shipped v2.1 with autopilot result parsing. 9 milestones shipped (v1.0-v2.1) across 39 phases, 57 plans. 692 tests pass, 0 failures.
+Shipped v2.2 with PR review integration. 10 milestones shipped (v1.0-v2.2) across 46 phases, 65 plans. 699 tests pass, 0 failures.
 
-**Architecture:** Core autopilot loop with `format_json_output()` pipe on all 5 Claude CLI invocation sites. `gsd` CLI binary with 6 deterministic commands (added `test-count`). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
+**Architecture:** Core autopilot loop with `format_json_output()` pipe on all 5 Claude CLI invocation sites. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~24,202 LOC JavaScript/CJS/Bash
-**Known tech debt:** Handler function signature mismatch (mode param silently discarded — cosmetic); `run_gap_closure_loop` return value unchecked (safe due to exit semantics); brainstorm step 10 inline reference to new-milestone steps could become stale; phase 35 missing VERIFICATION.md (procedural, deliverables confirmed by SUMMARYs); `docs/CLI.md` line 14 contains upstream package name (pre-existing); test budget at 86.5% (692/800) — consider consolidating health check overlap if future milestones add significant tests
+**Codebase:** ~58,624 LOC JavaScript/CJS/Bash/Markdown
+**Known tech debt:** Test budget at 87.4% (699/800) — 5 redundancy findings with 3 consolidation proposals (estimated reduction to 84.4%); Phase 45 missing VERIFICATION.md (QCK-01..06 already verified by Phase 42, metadata only); `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-06 after v2.1 milestone*
+*Last updated: 2026-03-09 after v2.2 milestone*

@@ -369,6 +369,50 @@
 
 ---
 
+## Milestone: v2.2 — PR Review Integration
+
+**Shipped:** 2026-03-09
+**Phases:** 7 | **Plans:** 8 | **Commits:** 48
+
+### What Was Built
+- `/gsd:pr-review` command — fresh review execution or ingest mode for pre-existing reviews
+- File-proximity deduplication with transitive merging — groups findings within 20 lines of each other
+- Hybrid scoring heuristic (+2 critical, +1 important, +1 per 5 files) routing to quick or milestone paths
+- Quick route: one task per file-region group with sequential execution and STATE.md tracking
+- Milestone route: MILESTONE-CONTEXT.md generation from findings, delegation to new-milestone workflow
+- `init pr-review` subcommand added to gsd-tools.cjs for quick route initialization
+- Full documentation in help.md, USER-GUIDE.md, and README.md
+
+### What Worked
+- Pattern reuse from `/gsd:linear`: single workflow file, inline delegation, complexity scoring heuristic, dual-path routing — adapted quickly
+- File-proximity deduplication is genuinely useful — reduces noise from multiple findings in the same code region
+- Gap closure phases (45, 46) caught a real runtime integration bug: `init pr-review` subcommand was missing from gsd-tools dispatch
+- Milestone audit validated all 30 requirements with 3-source cross-reference (VERIFICATION, SUMMARY, REQUIREMENTS)
+- All 7 phases completed in a single day
+
+### What Was Inefficient
+- Phase 45 was needed because `init pr-review` wasn't wired during Phase 42 — the quick route was untestable end-to-end until gap closure
+- Phase 46 gap closure was entirely metadata: missing VERIFICATION.md files, missing SUMMARY frontmatter, unchecked REQUIREMENTS boxes
+- ROADMAP progress table had inconsistent formatting for phases 40-43 and 45-46 (missing milestone column)
+
+### Patterns Established
+- PR review workflow mirrors Linear workflow: capture → dedup → score → route (quick or milestone)
+- Generic Source column in STATE.md quick tasks table accommodates multiple input sources (Linear, pr-review)
+- Review findings as XML blocks for planner context: structured data per file-region group
+
+### Key Lessons
+1. Runtime integration gaps (missing dispatch cases) need E2E testing during initial phase, not gap closure
+2. Metadata completeness (VERIFICATION.md, SUMMARY frontmatter) continues to be the systemic gap — 8th milestone with this pattern
+3. Pattern reuse from previous milestones (v1.4 Linear) dramatically accelerates development of similar features
+4. File-proximity deduplication is a reusable pattern for any tool that processes multi-file findings
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for plan checker/verifier)
+- Sessions: 8 plan executions across 7 phases
+- Notable: pattern reuse from v1.4 made workflow development very fast; gap closure was mechanical
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -384,15 +428,17 @@
 | v1.6 | 16 | 6 | Largest milestone (15 plans) — dual-layer test architecture with config-gated progressive adoption |
 | v2.0 | 14 | 2 | First docs-only milestone — brainstorm-to-README pipeline, smallest scope yet |
 | v2.1 | 16 | 2 | First zero-gap-closure milestone — clean audit pass, TDD + sed-based bash testing |
+| v2.2 | 48 | 7 | PR review integration — pattern reuse from v1.4, file-proximity dedup, dual-path routing |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 8 of 9 milestones (v2.1 is first clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 7 of 9 milestones; v2.1 shows well-scoped milestones can avoid this
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 7 of 9 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 9 of 10 milestones (v2.1 is only clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 8 of 10 milestones; only v2.1 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 8 of 10 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
-6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5 and v1.6
+6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
 7. Config-gated features with zero-config degradation enable progressive adoption without breaking existing projects (v1.6)
 8. Brainstorm design docs serve as effective content blueprints — execution becomes mechanical when design is pre-approved (v2.0, v2.1)
 9. TDD + structural grep tests provide strong verification for bash function wiring without requiring live CLI invocations (v2.1)
+10. Pattern reuse across milestones (v1.4 → v2.2) dramatically accelerates development — similar features share scoring, routing, and delegation patterns
