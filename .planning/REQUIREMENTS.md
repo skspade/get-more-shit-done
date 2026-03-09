@@ -61,9 +61,40 @@
 
 ## Traceability
 
-| Requirement | Phase |
-|-------------|-------|
-| (To be filled by roadmapper) | |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CMD-01 | Phase 40 | Pending |
+| CMD-02 | Phase 40 | Pending |
+| CMD-03 | Phase 40 | Pending |
+| REV-01 | Phase 40 | Pending |
+| REV-02 | Phase 40 | Pending |
+| REV-03 | Phase 40 | Pending |
+| REV-04 | Phase 40 | Pending |
+| DDP-01 | Phase 41 | Pending |
+| DDP-02 | Phase 41 | Pending |
+| DDP-03 | Phase 41 | Pending |
+| DDP-04 | Phase 41 | Pending |
+| DDP-05 | Phase 41 | Pending |
+| PER-01 | Phase 41 | Pending |
+| PER-02 | Phase 41 | Pending |
+| PER-03 | Phase 41 | Pending |
+| RTE-01 | Phase 42 | Pending |
+| RTE-02 | Phase 42 | Pending |
+| RTE-03 | Phase 42 | Pending |
+| QCK-01 | Phase 42 | Pending |
+| QCK-02 | Phase 42 | Pending |
+| QCK-03 | Phase 42 | Pending |
+| QCK-04 | Phase 42 | Pending |
+| QCK-05 | Phase 42 | Pending |
+| QCK-06 | Phase 42 | Pending |
+| MST-01 | Phase 43 | Pending |
+| MST-02 | Phase 43 | Pending |
+| CLN-01 | Phase 43 | Pending |
+| CLN-02 | Phase 43 | Pending |
+| CLN-03 | Phase 43 | Pending |
+| DOC-01 | Phase 44 | Pending |
+| DOC-02 | Phase 44 | Pending |
+| DOC-03 | Phase 44 | Pending |
 
 ## Future Requirements
 

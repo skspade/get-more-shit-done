@@ -11,6 +11,7 @@
 - ✅ **v1.6 Dual-Layer Test Architecture** — Phases 30-35 (shipped 2026-03-05)
 - ✅ **v2.0 README Rewrite** — Phases 36-37 (shipped 2026-03-06)
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
+- **v2.2 PR Review Integration** — Phases 40-44
 
 ## Phases
 
@@ -107,6 +108,72 @@
 
 </details>
 
+### v2.2 PR Review Integration (Phases 40-44)
+
+- [ ] **Phase 40: Command Spec and Review Capture** - Command definition, argument parsing, fresh/ingest review modes, findings extraction
+- [ ] **Phase 41: Deduplication and Persistence** - File-region grouping, transitive merging, review report and routing context output
+- [ ] **Phase 42: Scoring and Quick Route** - Hybrid scoring heuristic, quick task creation with one task per file-region group
+- [ ] **Phase 43: Milestone Route and Cleanup** - MILESTONE-CONTEXT.md generation, new-milestone delegation, temp file cleanup, completion banner
+- [ ] **Phase 44: Documentation** - help.md, USER-GUIDE.md, and README.md updates for /gsd:pr-review
+
+## Phase Details
+
+### Phase 40: Command Spec and Review Capture
+**Goal**: User can invoke `/gsd:pr-review` to run a fresh review or ingest an existing one, and the workflow extracts structured findings
+**Depends on**: Nothing (first phase of v2.2)
+**Requirements**: CMD-01, CMD-02, CMD-03, REV-01, REV-02, REV-03, REV-04
+**Success Criteria** (what must be TRUE):
+  1. User can run `/gsd:pr-review` with no args and get a fresh PR review executed via the toolkit
+  2. User can run `/gsd:pr-review --ingest` and paste a pre-existing review summary
+  3. User receives an error when passing both `--quick` and `--milestone` flags
+  4. Workflow parses review output into structured findings with severity, agent, file, line, and fix suggestion
+  5. Workflow exits cleanly with "No actionable issues found" when the review contains no findings
+**Plans**: TBD
+
+### Phase 41: Deduplication and Persistence
+**Goal**: Findings are grouped by file proximity and written as a permanent review report for audit trail
+**Depends on**: Phase 40
+**Requirements**: DDP-01, DDP-02, DDP-03, DDP-04, DDP-05, PER-01, PER-02, PER-03
+**Success Criteria** (what must be TRUE):
+  1. Findings from the same file within 20 lines are merged into a single file-region group
+  2. Overlapping groups are merged transitively (A overlaps B, B overlaps C -> one group)
+  3. User sees a dedup summary showing raw count vs grouped count with per-group details
+  4. A permanent review report exists at `.planning/reviews/YYYY-MM-DD-pr-review.md` after completion
+  5. A temporary `review-context.md` is written with routing metadata for downstream consumption
+**Plans**: TBD
+
+### Phase 42: Scoring and Quick Route
+**Goal**: Findings are scored for complexity and low-scoring reviews are resolved as quick tasks with one task per file-region group
+**Depends on**: Phase 41
+**Requirements**: RTE-01, RTE-02, RTE-03, QCK-01, QCK-02, QCK-03, QCK-04, QCK-05, QCK-06
+**Success Criteria** (what must be TRUE):
+  1. Scoring applies +2 per critical, +1 per important, +1 per 5 files -- and score < 5 routes to quick
+  2. `--quick` and `--milestone` flags override the scoring decision
+  3. Quick route creates a task directory with a plan containing one task per file-region group
+  4. Quick route executes fixes sequentially and commits results with STATE.md updated
+**Plans**: TBD
+
+### Phase 43: Milestone Route and Cleanup
+**Goal**: High-scoring reviews are routed to a new milestone, and temporary files are cleaned up after either route completes
+**Depends on**: Phase 42
+**Requirements**: MST-01, MST-02, CLN-01, CLN-02, CLN-03
+**Success Criteria** (what must be TRUE):
+  1. Milestone route generates MILESTONE-CONTEXT.md with file-region groups as features and delegates to new-milestone workflow
+  2. Temporary review-context.md is deleted after completion regardless of route taken
+  3. Permanent review report is preserved as audit trail after completion
+  4. User sees a completion banner showing route, report path, and artifacts created
+**Plans**: TBD
+
+### Phase 44: Documentation
+**Goal**: Users can discover and learn the /gsd:pr-review workflow from project documentation
+**Depends on**: Phase 43
+**Requirements**: DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. help.md includes `/gsd:pr-review` with argument reference and usage examples
+  2. USER-GUIDE.md documents the PR review workflow end-to-end (capture, dedup, scoring, routing)
+  3. README.md command table includes `/gsd:pr-review` entry
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -153,3 +220,8 @@ Phases execute in numeric order.
 | 37. Close Verification Gaps | v2.0 | 1/1 | Complete | 2026-03-06 |
 | 38. JSON Output Formatter | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 39. Apply Formatting to Invocation Sites | v2.1 | 1/1 | Complete | 2026-03-06 |
+| 40. Command Spec and Review Capture | v2.2 | 0/0 | Not started | - |
+| 41. Deduplication and Persistence | v2.2 | 0/0 | Not started | - |
+| 42. Scoring and Quick Route | v2.2 | 0/0 | Not started | - |
+| 43. Milestone Route and Cleanup | v2.2 | 0/0 | Not started | - |
+| 44. Documentation | v2.2 | 0/0 | Not started | - |
