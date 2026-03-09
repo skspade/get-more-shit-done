@@ -223,5 +223,5 @@ Phases execute in numeric order.
 | 40. Command Spec and Review Capture | 1/1 | Complete    | 2026-03-09 | - |
 | 41. Deduplication and Persistence | 1/1 | Complete    | 2026-03-09 | - |
 | 42. Scoring and Quick Route | 2/2 | Complete    | 2026-03-09 | - |
-| 43. Milestone Route and Cleanup | 1/1 | Complete   | 2026-03-09 | - |
+| 43. Milestone Route and Cleanup | 1/1 | Complete    | 2026-03-09 | - |
 | 44. Documentation | v2.2 | 0/0 | Not started | - |
