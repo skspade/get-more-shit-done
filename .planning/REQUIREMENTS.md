@@ -15,17 +15,17 @@
 
 ## Deduplication (DDP)
 
-- [ ] **DDP-01**: Sorts findings by file path then line number
-- [ ] **DDP-02**: Groups findings within same file and 20-line proximity into file-region groups
-- [ ] **DDP-03**: Merges overlapping groups transitively
-- [ ] **DDP-04**: Assigns max_severity, agents_involved, and line_range to each group
-- [ ] **DDP-05**: Displays dedup summary with raw vs grouped counts
+- [x] **DDP-01**: Sorts findings by file path then line number
+- [x] **DDP-02**: Groups findings within same file and 20-line proximity into file-region groups
+- [x] **DDP-03**: Merges overlapping groups transitively
+- [x] **DDP-04**: Assigns max_severity, agents_involved, and line_range to each group
+- [x] **DDP-05**: Displays dedup summary with raw vs grouped counts
 
 ## Persistence (PER)
 
-- [ ] **PER-01**: Writes permanent review report to `.planning/reviews/YYYY-MM-DD-pr-review.md`
-- [ ] **PER-02**: Writes temporary `review-context.md` with routing metadata
-- [ ] **PER-03**: Creates `.planning/reviews/` directory if needed
+- [x] **PER-01**: Writes permanent review report to `.planning/reviews/YYYY-MM-DD-pr-review.md`
+- [x] **PER-02**: Writes temporary `review-context.md` with routing metadata
+- [x] **PER-03**: Creates `.planning/reviews/` directory if needed
 
 ## Routing (RTE)
 
@@ -70,14 +70,14 @@
 | REV-02 | Phase 40 | Complete |
 | REV-03 | Phase 40 | Complete |
 | REV-04 | Phase 40 | Complete |
-| DDP-01 | Phase 41 | Pending |
-| DDP-02 | Phase 41 | Pending |
-| DDP-03 | Phase 41 | Pending |
-| DDP-04 | Phase 41 | Pending |
-| DDP-05 | Phase 41 | Pending |
-| PER-01 | Phase 41 | Pending |
-| PER-02 | Phase 41 | Pending |
-| PER-03 | Phase 41 | Pending |
+| DDP-01 | Phase 41 | Complete |
+| DDP-02 | Phase 41 | Complete |
+| DDP-03 | Phase 41 | Complete |
+| DDP-04 | Phase 41 | Complete |
+| DDP-05 | Phase 41 | Complete |
+| PER-01 | Phase 41 | Complete |
+| PER-02 | Phase 41 | Complete |
+| PER-03 | Phase 41 | Complete |
 | RTE-01 | Phase 42 | Pending |
 | RTE-02 | Phase 42 | Pending |
 | RTE-03 | Phase 42 | Pending |

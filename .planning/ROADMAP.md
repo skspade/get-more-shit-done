@@ -111,7 +111,7 @@
 ### v2.2 PR Review Integration (Phases 40-44)
 
 - [x] **Phase 40: Command Spec and Review Capture** - Command definition, argument parsing, fresh/ingest review modes, findings extraction (completed 2026-03-09)
-- [ ] **Phase 41: Deduplication and Persistence** - File-region grouping, transitive merging, review report and routing context output
+- [x] **Phase 41: Deduplication and Persistence** - File-region grouping, transitive merging, review report and routing context output (completed 2026-03-09)
 - [ ] **Phase 42: Scoring and Quick Route** - Hybrid scoring heuristic, quick task creation with one task per file-region group
 - [ ] **Phase 43: Milestone Route and Cleanup** - MILESTONE-CONTEXT.md generation, new-milestone delegation, temp file cleanup, completion banner
 - [ ] **Phase 44: Documentation** - help.md, USER-GUIDE.md, and README.md updates for /gsd:pr-review
@@ -221,7 +221,7 @@ Phases execute in numeric order.
 | 38. JSON Output Formatter | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 39. Apply Formatting to Invocation Sites | v2.1 | 1/1 | Complete | 2026-03-06 |
 | 40. Command Spec and Review Capture | 1/1 | Complete    | 2026-03-09 | - |
-| 41. Deduplication and Persistence | v2.2 | 0/0 | Not started | - |
+| 41. Deduplication and Persistence | 1/1 | Complete   | 2026-03-09 | - |
 | 42. Scoring and Quick Route | v2.2 | 0/0 | Not started | - |
 | 43. Milestone Route and Cleanup | v2.2 | 0/0 | Not started | - |
 | 44. Documentation | v2.2 | 0/0 | Not started | - |
