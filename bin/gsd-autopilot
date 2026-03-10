@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
 # gsd-autopilot — CLI entry point for GSD Autopilot
-# Delegates to the installed autopilot.sh script.
+# Routes to autopilot.mjs by default, or autopilot-legacy.sh with --legacy.
 
 set -euo pipefail
 
-AUTOPILOT="$HOME/.claude/get-shit-done/scripts/autopilot.sh"
+SCRIPTS_DIR="$HOME/.claude/get-shit-done/scripts"
 
-if [ ! -f "$AUTOPILOT" ]; then
-  echo "Error: GSD is not installed ($AUTOPILOT not found)." >&2
-  echo "Run 'bash bin/replace-vanilla.sh' from the fork repo to install." >&2
-  exit 1
+if [ "${1:-}" = "--legacy" ]; then
+  shift
+  TARGET="$SCRIPTS_DIR/autopilot-legacy.sh"
+  if [ ! -f "$TARGET" ]; then
+    echo "Error: Legacy autopilot not found ($TARGET)." >&2
+    echo "Run 'bash bin/replace-vanilla.sh' from the fork repo to install." >&2
+    exit 1
+  fi
+  exec bash "$TARGET" "$@"
+else
+  TARGET="$SCRIPTS_DIR/autopilot.mjs"
+  if [ ! -f "$TARGET" ]; then
+    echo "Error: Autopilot not found ($TARGET)." >&2
+    echo "Run 'bash bin/replace-vanilla.sh' from the fork repo to install." >&2
+    exit 1
+  fi
+  exec node "$TARGET" "$@"
 fi
-
-exec bash "$AUTOPILOT" "$@"

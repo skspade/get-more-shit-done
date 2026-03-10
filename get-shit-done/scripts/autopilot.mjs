@@ -132,7 +132,7 @@ process.on('SIGINT', () => {
   console.log('Autopilot interrupted (SIGINT).');
   console.log(`Phase ${CURRENT_PHASE} was in progress.`);
   console.log('');
-  console.log(`To resume: autopilot.sh --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
+  console.log(`To resume: gsd-autopilot --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
   console.log('');
   process.exit(130);
 });
@@ -144,7 +144,7 @@ process.on('SIGTERM', () => {
   console.log('Autopilot interrupted (SIGTERM).');
   console.log(`Phase ${CURRENT_PHASE} was in progress.`);
   console.log('');
-  console.log(`To resume: autopilot.sh --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
+  console.log(`To resume: gsd-autopilot --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
   console.log('');
   process.exit(0);
 });
@@ -252,7 +252,7 @@ function printHaltReport(reason, step, exitCode) {
   console.log('  - Git commit count');
   console.log('  - Artifact file count in .planning/phases/');
   console.log('');
-  console.log(`To resume: autopilot.sh --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
+  console.log(`To resume: gsd-autopilot --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}`);
   console.log(`Log file: ${LOG_FILE}`);
   console.log('');
 }
@@ -436,7 +436,7 @@ ${debugSessionsList}
 
 After manually fixing the issue, resume with:
 \`\`\`
-autopilot.sh --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}
+gsd-autopilot --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}
 \`\`\`
 
 ---
@@ -690,7 +690,7 @@ function handleAbort(phase) {
   console.log(`Autopilot aborted by user at Phase ${phase} verification.`);
   console.log('');
   console.log('State preserved. To resume:');
-  console.log(`  autopilot.sh --from-phase ${phase} --project-dir ${PROJECT_DIR}`);
+  console.log(`  gsd-autopilot --from-phase ${phase} --project-dir ${PROJECT_DIR}`);
   console.log('');
   process.exit(2);
 }
@@ -780,7 +780,7 @@ function printEscalationReport(iterations, maxIterations) {
   console.log('Human review is required to diagnose remaining gaps.');
   console.log('');
   console.log('To resume after manual fixes:');
-  console.log(`  autopilot.sh --project-dir ${PROJECT_DIR}`);
+  console.log(`  gsd-autopilot --project-dir ${PROJECT_DIR}`);
   console.log('');
 }
 
