@@ -1,0 +1,47 @@
+# Requirements: v2.3 Autopilot CJS Consolidation
+
+## Source
+
+Design: `.planning/designs/2026-03-10-autopilot-cjs-consolidation-design.md`
+
+## Requirements
+
+### CJS Module Extensions
+
+- REQ-01: `phase.cjs` exports `findFirstIncompletePhase(cwd)` that returns the first incomplete phase number (or null) by iterating roadmap phases and checking completion status
+- REQ-02: `phase.cjs` exports `nextIncompletePhase(cwd, currentPhase)` that returns the next incomplete phase after the given phase (or null)
+- REQ-03: `phase.cjs` extracts shared `computePhaseStatus(cwd, phaseInfo)` internal from `cmdPhaseStatus` so both the command and the new functions reuse the same logic
+- REQ-04: `verify.cjs` exports `getVerificationStatus(cwd, phaseDir)` that finds VERIFICATION.md or UAT.md and returns `{ status, score }` by parsing frontmatter
+- REQ-05: `verify.cjs` exports `getGapsSummary(cwd, phaseDir)` that extracts gap description lines from verification files
+- REQ-06: `cli.cjs` defines `CONFIG_DEFAULTS` map for autopilot config keys (`circuit_breaker_threshold: 3`, `max_debug_retries: 3`, `max_audit_fix_iterations: 3`, `auto_accept_tech_debt: true`) and `config-get` returns the default when the key is unset
+- REQ-07: `gsd-tools.cjs` dispatches `phase find-next [--from N]` to the new phase functions
+- REQ-08: `gsd-tools.cjs` dispatches `verify status <phase>` and `verify gaps <phase>` to the new verify functions
+
+### zx Autopilot Script
+
+- REQ-09: `autopilot.mjs` replaces `autopilot.sh` as the primary autopilot entry point, using zx for shell operations
+- REQ-10: `autopilot.mjs` directly imports CJS modules (`phase.cjs`, `verify.cjs`, `cli.cjs`, `frontmatter.cjs`, `roadmap.cjs`) via `require()` — no JSON serialization boundary
+- REQ-11: `autopilot.mjs` implements the same state machine (discuss → plan → execute → verify → complete) with identical phase progression behavior
+- REQ-12: `autopilot.mjs` spawns `claude -p` processes via zx `$` template literals with `.nothrow()` for exit code handling
+- REQ-13: `autopilot.mjs` implements circuit breaker using config defaults from CJS (no hardcoded thresholds)
+- REQ-14: `autopilot.mjs` implements debug retry loop with the same behavior as `run_step_with_retry` and `run_verify_with_debug_retry`
+- REQ-15: `autopilot.mjs` implements verification gate with TTY input (approve/fix/abort) using readline
+- REQ-16: `autopilot.mjs` implements milestone audit, gap closure loop, and milestone completion with same routing logic
+- REQ-17: `autopilot.mjs` implements file-based logging with the same format as autopilot.sh
+- REQ-18: `autopilot.mjs` handles SIGINT/SIGTERM with cleanup and resume instructions via `process.on()`
+- REQ-19: `autopilot.mjs` supports `--from-phase`, `--project-dir`, and `--dry-run` arguments via zx's `argv`
+
+### Migration & Fallback
+
+- REQ-20: `zx` added to `package.json` as a runtime dependency
+- REQ-21: `autopilot.sh` renamed to `autopilot-legacy.sh` and preserved as fallback
+- REQ-22: `bin/gsd-autopilot` entrypoint routes to `autopilot.mjs` by default and to `autopilot-legacy.sh` with `--legacy` flag
+- REQ-23: Existing `format-json-output.test.cjs` updated or retired to reflect elimination of `format_json_output()`
+
+### Tests
+
+- REQ-24: Unit tests for `findFirstIncompletePhase` and `nextIncompletePhase` covering: all complete, one incomplete, multiple incomplete, decimal phases
+- REQ-25: Unit tests for `getVerificationStatus` and `getGapsSummary` covering: VERIFICATION.md present, UAT.md fallback, neither present, gaps_found status
+- REQ-26: Unit tests for `CONFIG_DEFAULTS` fallback: unset key returns default, set key returns configured value
+- REQ-27: Unit tests for `phase find-next` and `verify status/gaps` dispatch in gsd-tools
+- REQ-28: Integration test: `autopilot.mjs --dry-run` completes without error on a valid `.planning/` structure
