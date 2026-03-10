@@ -54,14 +54,11 @@ describe('autopilot.mjs --dry-run', () => {
   test('completes without fatal error on valid structure', { skip: !hasClaude ? 'claude CLI not found as binary on PATH' : false }, () => {
     let stdout = '';
     let stderr = '';
-    let exitedCleanly = false;
-
     try {
       stdout = execSync(
         `npx zx "${AUTOPILOT_PATH}" --dry-run --project-dir "${tmpDir}"`,
         { encoding: 'utf-8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
       );
-      exitedCleanly = true;
     } catch (err) {
       stdout = err.stdout?.toString() || '';
       stderr = err.stderr?.toString() || '';
