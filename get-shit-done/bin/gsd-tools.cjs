@@ -136,7 +136,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { error } = require('./lib/core.cjs');
+const core = require('./lib/core.cjs');
+const { output, error } = core;
 const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
@@ -346,8 +347,22 @@ async function main() {
         verify.cmdVerifyArtifacts(cwd, args[2], raw);
       } else if (subcommand === 'key-links') {
         verify.cmdVerifyKeyLinks(cwd, args[2], raw);
+      } else if (subcommand === 'status') {
+        const phaseArg = args[2];
+        if (!phaseArg) error('Usage: verify status <phase>');
+        const phaseInfo = core.findPhaseInternal(cwd, phaseArg);
+        if (!phaseInfo) error('Phase ' + phaseArg + ' not found');
+        const result = verify.getVerificationStatus(cwd, phaseInfo.directory);
+        output(result, raw);
+      } else if (subcommand === 'gaps') {
+        const phaseArg = args[2];
+        if (!phaseArg) error('Usage: verify gaps <phase>');
+        const phaseInfo = core.findPhaseInternal(cwd, phaseArg);
+        if (!phaseInfo) error('Phase ' + phaseArg + ' not found');
+        const result = verify.getGapsSummary(cwd, phaseInfo.directory);
+        output(result, raw);
       } else {
-        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links');
+        error('Unknown verify subcommand. Available: plan-structure, phase-completeness, references, commits, artifacts, key-links, status, gaps');
       }
       break;
     }
@@ -448,8 +463,17 @@ async function main() {
         phase.cmdPhaseComplete(cwd, args[2], raw);
       } else if (subcommand === 'status') {
         phase.cmdPhaseStatus(cwd, args[2], raw);
+      } else if (subcommand === 'find-next') {
+        const fromIndex = args.indexOf('--from');
+        if (fromIndex !== -1 && args[fromIndex + 1]) {
+          const result = phase.nextIncompletePhase(cwd, args[fromIndex + 1]);
+          output(result, raw, result ? String(result) : '');
+        } else {
+          const result = phase.findFirstIncompletePhase(cwd);
+          output(result, raw, result ? String(result) : '');
+        }
       } else {
-        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, status');
+        error('Unknown phase subcommand. Available: next-decimal, add, insert, remove, complete, status, find-next');
       }
       break;
     }
