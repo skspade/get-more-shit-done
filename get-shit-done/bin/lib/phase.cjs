@@ -870,42 +870,18 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   output(result, raw);
 }
 
-function cmdPhaseStatus(cwd, phaseArg, raw) {
-  if (!phaseArg) {
-    error('phase required for phase-status');
-  }
-
-  let phaseInfo = findPhaseInternal(cwd, phaseArg);
-  if (!phaseInfo) {
-    // Phase directory doesn't exist on disk — check if it's defined in the ROADMAP
-    // (e.g., a new milestone phase that hasn't been started yet)
-    const roadmapPhase = getRoadmapPhaseInternal(cwd, phaseArg);
-    if (!roadmapPhase) {
-      error(`Phase ${phaseArg} not found`);
-    }
-
-    // Auto-create the phase directory so the lifecycle can begin
-    const normalized = normalizePhaseName(phaseArg);
-    const slug = generateSlugInternal(roadmapPhase.phase_name);
-    const dirName = slug ? `${normalized}-${slug}` : normalized;
-    const phasesDir = path.join(cwd, '.planning', 'phases');
-    const dirPath = path.join(phasesDir, dirName);
-    fs.mkdirSync(dirPath, { recursive: true });
-    fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
-
-    // Re-find the phase now that the directory exists
-    phaseInfo = findPhaseInternal(cwd, phaseArg);
-    if (!phaseInfo) {
-      error(`Phase ${phaseArg} not found after creating directory`);
-    }
-  }
-
+/**
+ * computePhaseStatus — Internal helper that computes phase status from a phaseInfo object.
+ * Returns the status result object or null if the phase directory cannot be read.
+ * Used by cmdPhaseStatus, findFirstIncompletePhase, and nextIncompletePhase.
+ */
+function computePhaseStatus(cwd, phaseInfo) {
   const phaseDir = path.join(cwd, phaseInfo.directory);
   let files = [];
   try {
     files = fs.readdirSync(phaseDir);
   } catch {
-    error(`Cannot read phase directory: ${phaseInfo.directory}`);
+    return null;
   }
 
   const hasContext = files.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
@@ -969,7 +945,7 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
     step = 'verify';
   }
 
-  const result = {
+  return {
     phase: phaseInfo.phase_number,
     phase_dir: phaseInfo.directory,
     step,
@@ -983,8 +959,111 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
     has_verification: hasVerification,
     phase_complete: phaseComplete,
   };
+}
+
+function cmdPhaseStatus(cwd, phaseArg, raw) {
+  if (!phaseArg) {
+    error('phase required for phase-status');
+  }
+
+  let phaseInfo = findPhaseInternal(cwd, phaseArg);
+  if (!phaseInfo) {
+    // Phase directory doesn't exist on disk — check if it's defined in the ROADMAP
+    // (e.g., a new milestone phase that hasn't been started yet)
+    const roadmapPhase = getRoadmapPhaseInternal(cwd, phaseArg);
+    if (!roadmapPhase) {
+      error(`Phase ${phaseArg} not found`);
+    }
+
+    // Auto-create the phase directory so the lifecycle can begin
+    const normalized = normalizePhaseName(phaseArg);
+    const slug = generateSlugInternal(roadmapPhase.phase_name);
+    const dirName = slug ? `${normalized}-${slug}` : normalized;
+    const phasesDir = path.join(cwd, '.planning', 'phases');
+    const dirPath = path.join(phasesDir, dirName);
+    fs.mkdirSync(dirPath, { recursive: true });
+    fs.writeFileSync(path.join(dirPath, '.gitkeep'), '');
+
+    // Re-find the phase now that the directory exists
+    phaseInfo = findPhaseInternal(cwd, phaseArg);
+    if (!phaseInfo) {
+      error(`Phase ${phaseArg} not found after creating directory`);
+    }
+  }
+
+  const result = computePhaseStatus(cwd, phaseInfo);
+  if (!result) {
+    error(`Cannot read phase directory: ${phaseInfo.directory}`);
+  }
 
   output(result, raw);
+}
+
+/**
+ * findFirstIncompletePhase — Returns the first incomplete phase number (string) from the roadmap, or null.
+ */
+function findFirstIncompletePhase(cwd) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  if (!fs.existsSync(roadmapPath)) return null;
+
+  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const phases = [];
+  let match;
+
+  while ((match = phasePattern.exec(content)) !== null) {
+    phases.push(match[1]);
+  }
+
+  phases.sort((a, b) => comparePhaseNum(a, b));
+
+  for (const phaseNum of phases) {
+    const phaseInfo = findPhaseInternal(cwd, phaseNum);
+    if (!phaseInfo) {
+      // No directory means not started — incomplete
+      return phaseNum;
+    }
+    const status = computePhaseStatus(cwd, phaseInfo);
+    if (!status || !status.phase_complete) {
+      return phaseNum;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * nextIncompletePhase — Returns the next incomplete phase number (string) after currentPhase, or null.
+ */
+function nextIncompletePhase(cwd, currentPhase) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  if (!fs.existsSync(roadmapPath)) return null;
+
+  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
+  const phases = [];
+  let match;
+
+  while ((match = phasePattern.exec(content)) !== null) {
+    phases.push(match[1]);
+  }
+
+  phases.sort((a, b) => comparePhaseNum(a, b));
+
+  for (const phaseNum of phases) {
+    if (comparePhaseNum(phaseNum, String(currentPhase)) <= 0) continue;
+
+    const phaseInfo = findPhaseInternal(cwd, phaseNum);
+    if (!phaseInfo) {
+      return phaseNum;
+    }
+    const status = computePhaseStatus(cwd, phaseInfo);
+    if (!status || !status.phase_complete) {
+      return phaseNum;
+    }
+  }
+
+  return null;
 }
 
 module.exports = {
@@ -997,4 +1076,6 @@ module.exports = {
   cmdPhaseRemove,
   cmdPhaseComplete,
   cmdPhaseStatus,
+  findFirstIncompletePhase,
+  nextIncompletePhase,
 };
