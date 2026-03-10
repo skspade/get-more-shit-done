@@ -275,3 +275,105 @@ requirements-completed: [TEST-01]
     assert.deepStrictEqual(parsed.requirements_completed, ['TEST-01'], 'requirements_completed should contain TEST-01');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// phase find-next dispatch
+// Requirements: REQ-27
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase find-next dispatch', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns first incomplete phase', () => {
+    const result = runGsdTools('phase find-next', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed, '2');
+  });
+
+  test('returns null when all phases complete', () => {
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p2, '.completed'), '');
+
+    const result = runGsdTools('phase find-next', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed, null);
+  });
+
+  test('--from returns next incomplete after given phase', () => {
+    const result = runGsdTools('phase find-next --from 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed, '2');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify status/gaps dispatch
+// Requirements: REQ-27
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify status/gaps dispatch', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n'
+    );
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: passed\nscore: 90\n---\n## Results\nAll good.\n## Gaps Found\n- Missing coverage\n## Summary\nDone.\n'
+    );
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('verify status returns status and score', () => {
+    const result = runGsdTools('verify status 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.status, 'passed');
+    assert.strictEqual(parsed.score, '90');
+  });
+
+  test('verify gaps returns gap lines', () => {
+    const result = runGsdTools('verify gaps 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const parsed = JSON.parse(result.output);
+    assert.ok(Array.isArray(parsed), 'Output should be an array');
+    assert.ok(parsed.includes('- Missing coverage'), `Expected "- Missing coverage" in: ${JSON.stringify(parsed)}`);
+  });
+
+  test('verify status errors without phase arg', () => {
+    const result = runGsdTools('verify status', tmpDir);
+    assert.strictEqual(result.success, false);
+  });
+
+  test('verify gaps errors without phase arg', () => {
+    const result = runGsdTools('verify gaps', tmpDir);
+    assert.strictEqual(result.success, false);
+  });
+});

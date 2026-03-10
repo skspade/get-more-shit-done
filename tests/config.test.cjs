@@ -359,3 +359,59 @@ describe('config-get command', () => {
     assert.strictEqual(result.success, false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG_DEFAULTS fallback
+// Requirements: REQ-26
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('CONFIG_DEFAULTS fallback', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns default for unset autopilot.circuit_breaker_threshold', () => {
+    const result = runGsdTools('config-get autopilot.circuit_breaker_threshold', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 3);
+  });
+
+  test('returns default for unset autopilot.max_debug_retries', () => {
+    const result = runGsdTools('config-get autopilot.max_debug_retries', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 3);
+  });
+
+  test('returns default for unset autopilot.max_audit_fix_iterations', () => {
+    const result = runGsdTools('config-get autopilot.max_audit_fix_iterations', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 3);
+  });
+
+  test('returns default for unset autopilot.auto_accept_tech_debt', () => {
+    const result = runGsdTools('config-get autopilot.auto_accept_tech_debt', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), true);
+  });
+
+  test('returns configured value when key is explicitly set', () => {
+    runGsdTools('config-ensure-section', tmpDir);
+    runGsdTools('config-set autopilot.circuit_breaker_threshold 5', tmpDir);
+    const result = runGsdTools('config-get autopilot.circuit_breaker_threshold', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 5);
+  });
+
+  test('returns default when config.json exists but key path is absent', () => {
+    runGsdTools('config-ensure-section', tmpDir);
+    const result = runGsdTools('config-get autopilot.circuit_breaker_threshold', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 3);
+  });
+});
