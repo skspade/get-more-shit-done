@@ -208,14 +208,12 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
 
   // Find phase directory
   let phaseDir = null;
-  let phaseDirName = null;
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
     const match = dirs.find(d => d.startsWith(normalized));
     if (match) {
       phaseDir = path.join(phasesDir, match);
-      phaseDirName = match;
     }
   } catch {
     // phases dir doesn't exist
@@ -706,7 +704,6 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   const phasesDir = path.join(cwd, '.planning', 'phases');
-  const normalized = normalizePhaseName(phaseNum);
   const today = new Date().toISOString().split('T')[0];
 
   // Verify phase info
