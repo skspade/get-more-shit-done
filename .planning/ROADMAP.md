@@ -185,7 +185,9 @@
   3. Unit tests verify `CONFIG_DEFAULTS` fallback (unset key returns default, set key returns configured value)
   4. Unit tests verify `phase find-next` and `verify status/gaps` dispatch correctly through `gsd-tools`
   5. `autopilot.mjs --dry-run` completes without error on a valid `.planning/` structure
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 51-01-PLAN.md — Phase navigation and verification status unit tests
+- [ ] 51-02-PLAN.md — Config defaults, dispatch, and autopilot dry-run tests
 
 ## Progress
 
