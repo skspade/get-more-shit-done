@@ -77,3 +77,7 @@ Dry-run: false
 [14:36:27] BANNER: MILESTONE COMPLETION
 [14:36:27] STEP START: phase=46 step=milestone-completion
 [14:36:27] BANNER: Phase 46 > milestone-completion
+[14:42:36] STEP DONE: step=milestone-completion exit_code=0
+[14:42:36] PROGRESS CHECK: step=milestone-completion before=1369|29 after=1371|0
+[14:42:36] PROGRESS DETECTED: snapshot changed
+[14:42:36] BANNER: MILESTONE COMPLETE ✓

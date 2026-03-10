@@ -1,5 +1,23 @@
 # Milestones
 
+## v2.3 Autopilot CJS Consolidation (Shipped: 2026-03-10)
+
+**Phases completed:** 7 phases, 16 plans
+**Timeline:** 1 day (2026-03-10)
+**Git range:** 0120bbe → 48a8145 (49 commits)
+**Files modified:** 66 (6,910 insertions, 274 deletions)
+
+**Key accomplishments:**
+- Added phase navigation (`findFirstIncompletePhase`, `nextIncompletePhase`), verification status/gaps, and `CONFIG_DEFAULTS` to CJS modules with dispatch wiring through gsd-tools.cjs
+- Rewrote autopilot as `autopilot.mjs` zx script with direct CJS imports via `createRequire`, eliminating JSON serialization boundary between bash and Node.js
+- Implemented debug retry loops, TTY verification gate (approve/fix/abort), and milestone audit/gap closure in the zx script — identical behavior to bash version
+- Migrated entrypoint routing: `bin/gsd-autopilot` runs `autopilot.mjs` by default, `--legacy` falls back to renamed `autopilot-legacy.sh`
+- Added 35 unit/integration tests covering phase navigation, verification, config defaults, dispatch, and `--dry-run`
+- Fixed integration bugs (npx zx invocation, `phaseInfo.directory` property) and closed all verification metadata gaps
+- Milestone audit passed: 28/28 requirements satisfied, 5/5 E2E flows verified, 7/7 phases passed
+
+---
+
 ## v2.2 PR Review Integration (Shipped: 2026-03-09)
 
 **Phases completed:** 7 phases, 8 plans, 0 tasks

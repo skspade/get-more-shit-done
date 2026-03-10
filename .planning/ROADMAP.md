@@ -12,7 +12,7 @@
 - ✅ **v2.0 README Rewrite** — Phases 36-37 (shipped 2026-03-06)
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
-- **v2.3 Autopilot CJS Consolidation** — Phases 47-53
+- ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
 
 ## Phases
 
@@ -122,96 +122,18 @@
 
 </details>
 
-### v2.3 Autopilot CJS Consolidation (Phases 47-53)
+<details>
+<summary>✅ v2.3 Autopilot CJS Consolidation (Phases 47-53) — SHIPPED 2026-03-10</summary>
 
-- [x] **Phase 47: CJS Module Extensions** — Add phase navigation, verification status, config defaults, and tool dispatch to existing CJS modules (completed 2026-03-10)
-- [x] **Phase 48: zx Autopilot Core** — Rewrite the main autopilot loop as a zx script importing CJS modules directly (completed 2026-03-10)
-- [x] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script (completed 2026-03-10)
-- [x] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies (completed 2026-03-10)
-- [x] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script (completed 2026-03-10)
-- [x] **Phase 52: Fix Critical Integration Bugs** — Fix entrypoint invocation and property name mismatch (Gap Closure) (completed 2026-03-10)
-- [x] **Phase 53: Close Verification and Metadata Gaps** — Verify Phase 49, fix SUMMARY frontmatter, update traceability (Gap Closure) (completed 2026-03-10)
+- [x] Phase 47: CJS Module Extensions (3/3 plans) — completed 2026-03-10
+- [x] Phase 48: zx Autopilot Core (3/3 plans) — completed 2026-03-10
+- [x] Phase 49: Advanced Autopilot Features (3/3 plans) — completed 2026-03-10
+- [x] Phase 50: Migration and Fallback (2/2 plans) — completed 2026-03-10
+- [x] Phase 51: Tests (2/2 plans) — completed 2026-03-10
+- [x] Phase 52: Fix Critical Integration Bugs (1/1 plan) — completed 2026-03-10 (Gap Closure)
+- [x] Phase 53: Close Verification Gaps (2/2 plans) — completed 2026-03-10 (Gap Closure)
 
-### Phase 47: CJS Module Extensions
-**Goal**: Autopilot logic currently duplicated in bash exists as tested CJS functions callable from any JS context
-**Depends on**: Nothing (first phase of v2.3)
-**Requirements**: REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08
-**Success Criteria** (what must be TRUE):
-  1. `findFirstIncompletePhase(cwd)` returns the correct phase number when called against a roadmap with mixed complete/incomplete phases
-  2. `nextIncompletePhase(cwd, N)` skips completed phases and returns the next incomplete one after N
-  3. `getVerificationStatus(cwd, phaseDir)` parses VERIFICATION.md or UAT.md frontmatter and returns status/score
-  4. `getGapsSummary(cwd, phaseDir)` returns gap description lines from verification files
-  5. `config-get` returns `CONFIG_DEFAULTS` values when keys are unset, and `gsd-tools` dispatches `phase find-next` and `verify status/gaps` to the new functions
-**Plans**: TBD
-
-### Phase 48: zx Autopilot Core
-**Goal**: The autopilot state machine (discuss, plan, execute, verify, complete) runs as a zx script with direct CJS imports instead of shell-outs
-**Depends on**: Phase 47
-**Requirements**: REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19
-**Success Criteria** (what must be TRUE):
-  1. `autopilot.mjs` drives a phase through the full discuss-plan-execute-verify-complete cycle, spawning `claude -p` via zx
-  2. Phase navigation calls `findFirstIncompletePhase` and `nextIncompletePhase` directly (no shell-out to `gsd_tools`)
-  3. Circuit breaker halts execution after the configured threshold of no-progress iterations, reading the threshold from CJS config defaults
-  4. File-based logging writes entries in the same format as `autopilot.sh` so existing log parsers still work
-  5. SIGINT/SIGTERM print resume instructions and exit cleanly, and `--from-phase`, `--project-dir`, `--dry-run` arguments are accepted
-**Plans**: TBD
-
-### Phase 49: Advanced Autopilot Features
-**Goal**: The zx autopilot handles failures, gates verification on human approval, and completes full milestones autonomously
-**Depends on**: Phase 48
-**Requirements**: REQ-14, REQ-15, REQ-16
-**Success Criteria** (what must be TRUE):
-  1. A failing step is retried with debug context (same behavior as bash `run_step_with_retry` and `run_verify_with_debug_retry`)
-  2. After verification, the user is prompted via TTY (approve/fix/abort) and the script routes accordingly
-  3. After all phases complete, milestone audit runs, detects gaps, loops through gap closure, and marks the milestone done
-**Plans**: TBD
-
-### Phase 50: Migration and Fallback
-**Goal**: Users run the zx autopilot by default, with a working fallback to the legacy bash script
-**Depends on**: Phase 49
-**Requirements**: REQ-20, REQ-21, REQ-22, REQ-23
-**Success Criteria** (what must be TRUE):
-  1. `zx` is listed as a runtime dependency in `package.json`
-  2. `autopilot.sh` is renamed to `autopilot-legacy.sh` and the original path no longer exists
-  3. `bin/gsd-autopilot` runs `autopilot.mjs` by default and falls back to `autopilot-legacy.sh` with `--legacy`
-  4. `format-json-output.test.cjs` is updated or retired since `format_json_output()` is no longer needed
-**Plans**: TBD
-
-### Phase 51: Tests
-**Goal**: All new CJS functions and the zx script have automated test coverage
-**Depends on**: Phase 50
-**Requirements**: REQ-24, REQ-25, REQ-26, REQ-27, REQ-28
-**Success Criteria** (what must be TRUE):
-  1. Unit tests for `findFirstIncompletePhase` and `nextIncompletePhase` cover: all complete, one incomplete, multiple incomplete, and decimal phase numbers
-  2. Unit tests for `getVerificationStatus` and `getGapsSummary` cover: VERIFICATION.md present, UAT.md fallback, neither present, and gaps_found status
-  3. Unit tests verify `CONFIG_DEFAULTS` fallback (unset key returns default, set key returns configured value)
-  4. Unit tests verify `phase find-next` and `verify status/gaps` dispatch correctly through `gsd-tools`
-  5. `autopilot.mjs --dry-run` completes without error on a valid `.planning/` structure
-**Plans**: 2 plans
-- [ ] 51-01-PLAN.md — Phase navigation and verification status unit tests
-- [ ] 51-02-PLAN.md — Config defaults, dispatch, and autopilot dry-run tests
-
-### Phase 52: Fix Critical Integration Bugs
-**Goal**: The zx autopilot runs without runtime crashes — entrypoint invokes zx correctly and phase directory resolution uses the correct property name
-**Depends on**: Phase 51
-**Requirements**: REQ-10, REQ-11, REQ-22
-**Gap Closure**: Closes integration bugs from v2.3 audit
-**Success Criteria** (what must be TRUE):
-  1. `bin/gsd-autopilot` invokes `autopilot.mjs` via `npx zx` (not plain `node`), so zx globals are available
-  2. `autopilot.mjs` uses `phaseInfo.directory` (not `.dir`) at all 5 locations, so phase directory resolution works correctly
-  3. `autopilot.mjs --dry-run` completes without `ReferenceError` or `undefined` path errors
-**Plans**: TBD
-
-### Phase 53: Close Verification and Metadata Gaps
-**Goal**: All v2.3 requirements have verification evidence, correct SUMMARY frontmatter, and up-to-date traceability
-**Depends on**: Phase 52
-**Requirements**: REQ-14, REQ-15, REQ-16
-**Gap Closure**: Closes verification and metadata gaps from v2.3 audit
-**Success Criteria** (what must be TRUE):
-  1. Phase 49 has a VERIFICATION.md confirming REQ-14 (debug retry), REQ-15 (verification gate), REQ-16 (milestone audit) are implemented
-  2. SUMMARY frontmatter for Phases 47, 48, 49 includes `requirements-completed` entries for all assigned requirements
-  3. REQUIREMENTS.md traceability table reflects actual status (Complete/Pending) for all 28 requirements
-**Plans**: TBD
+</details>
 
 ## Progress
 
@@ -227,8 +149,4 @@
 | 36-37 | v2.0 | 2/2 | Complete | 2026-03-06 |
 | 38-39 | v2.1 | 2/2 | Complete | 2026-03-06 |
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
-| 47 | 3/3 | Complete    | 2026-03-10 | - |
-| 48 | 3/3 | Complete   | 2026-03-10 | - |
-| 49 | 3/3 | Complete    | 2026-03-10 | - |
-| 50 | 2/2 | Complete    | 2026-03-10 | - |
-| 51 | v2.3 | Complete    | 2026-03-10 | - |
+| 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |

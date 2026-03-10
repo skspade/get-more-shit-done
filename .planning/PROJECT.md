@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A bash outer loop reinvokes Claude Code with fresh context per phase, an auto-context agent replaces interactive discuss, verification gates pause for human review, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Autopilot output now human-readable — all Claude CLI JSON responses are pretty-printed via `format_json_output()` with jq, falling back to raw output for non-JSON.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A zx-based Node.js script (`autopilot.mjs`) reinvokes Claude Code with fresh context per phase, importing CJS modules directly for phase navigation, verification status, and config defaults — eliminating the JSON serialization boundary of the original bash implementation. An auto-context agent replaces interactive discuss, verification gates pause for human review via TTY, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Legacy bash autopilot preserved as `autopilot-legacy.sh` with `--legacy` flag fallback.
 
 ## Core Value
 
@@ -74,16 +74,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Milestone route: MILESTONE-CONTEXT.md from findings, delegate to new-milestone workflow — v2.2
 - ✓ Temporary review-context.md for routing state, deleted after completion — v2.2
 - ✓ Documentation in help.md, USER-GUIDE.md, README.md — v2.2
+- ✓ Rewrite autopilot.sh as zx-based Node.js script (autopilot.mjs) — v2.3
+- ✓ Add findFirstIncompletePhase/nextIncompletePhase to phase.cjs — v2.3
+- ✓ Add getVerificationStatus/getGapsSummary to verify.cjs — v2.3
+- ✓ Add CONFIG_DEFAULTS with fallback to cli.cjs config-get — v2.3
+- ✓ Add gsd-tools dispatch entries: phase find-next, verify status, verify gaps — v2.3
+- ✓ Rename autopilot.sh to autopilot-legacy.sh with --legacy flag fallback — v2.3
+- ✓ Add zx runtime dependency — v2.3
 
 ### Active
 
-- Rewrite autopilot.sh as zx-based Node.js script (autopilot.mjs) — v2.3
-- Add findFirstIncompletePhase/nextIncompletePhase to phase.cjs — v2.3
-- Add getVerificationStatus/getGapsSummary to verify.cjs — v2.3
-- Add CONFIG_DEFAULTS with fallback to cli.cjs config-get — v2.3
-- Add gsd-tools dispatch entries: phase find-next, verify status, verify gaps — v2.3
-- Rename autopilot.sh to autopilot-legacy.sh with --legacy flag fallback — v2.3
-- Add zx runtime dependency — v2.3
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -151,15 +152,19 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Hybrid scoring for quick vs milestone routing | +2 critical, +1 important, +1 per 5 files — transparent threshold with flag override | ✓ Good |
 | STATE.md generic Source column for quick tasks | Accommodates both pr-review and Linear entries in same table | ✓ Good |
 | Review findings as XML block for planner context | Mirrors Linear issue context pattern; one group per section gives structured review data | ✓ Good |
+| zx over pure Node.js for autopilot rewrite | zx provides `$` template literals for shell commands, built-in argv parsing, and shebang support — simpler than raw child_process | ✓ Good |
+| createRequire for CJS imports in ESM | Standard Node.js pattern for importing CJS from ESM; avoids dual-package hazard | ✓ Good |
+| npx zx over global zx install | Avoids requiring users to globally install zx; npx resolves from local node_modules | ✓ Good |
+| Legacy fallback via --legacy flag | Preserves bash autopilot as escape hatch; zero-risk migration path | ✓ Good |
 
 ## Context
 
-Shipped v2.2 with PR review integration. 10 milestones shipped (v1.0-v2.2) across 46 phases, 65 plans. 699 tests pass, 0 failures.
+Shipped v2.3 with autopilot CJS consolidation. 11 milestones shipped (v1.0-v2.3) across 53 phases, 81 plans. 720 tests (budget at 90%).
 
-**Architecture:** Core autopilot loop with `format_json_output()` pipe on all 5 Claude CLI invocation sites. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
-**Tech stack:** Bash, Node.js (cjs), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~58,624 LOC JavaScript/CJS/Bash/Markdown
-**Known tech debt:** Test budget at 87.4% (699/800) — 5 redundancy findings with 3 consolidation proposals (estimated reduction to 84.4%); Phase 45 missing VERIFICATION.md (QCK-01..06 already verified by Phase 42, metadata only); `docs/CLI.md` line 14 contains upstream package name (pre-existing)
+**Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
+**Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP
+**Codebase:** ~65,500 LOC JavaScript/CJS/Bash/Markdown
+**Known tech debt:** Test budget at 90% (720/800) — 3 redundancy findings with 2 consolidation proposals; 2 pre-existing test failures (roadmap.test.cjs, verify-health.test.cjs) unrelated to v2.3; `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-09 after v2.2 milestone*
+*Last updated: 2026-03-10 after v2.3 milestone*

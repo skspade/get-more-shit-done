@@ -413,6 +413,51 @@
 
 ---
 
+## Milestone: v2.3 — Autopilot CJS Consolidation
+
+**Shipped:** 2026-03-10
+**Phases:** 7 | **Plans:** 16 | **Commits:** 49
+
+### What Was Built
+- CJS module extensions: `findFirstIncompletePhase`, `nextIncompletePhase`, `getVerificationStatus`, `getGapsSummary`, `CONFIG_DEFAULTS` with dispatch wiring
+- `autopilot.mjs` zx script — full state machine (discuss→plan→execute→verify→complete) with direct CJS imports via `createRequire`
+- Debug retry loops, TTY verification gate (approve/fix/abort), milestone audit/gap closure loop in zx
+- Entrypoint routing: `bin/gsd-autopilot` → `autopilot.mjs` by default, `--legacy` → `autopilot-legacy.sh`
+- 35 new tests covering phase navigation, verification status, config defaults, dispatch, and `--dry-run`
+- Integration bug fixes: npx zx invocation, `phaseInfo.directory` property resolution
+
+### What Worked
+- Direct CJS imports via `createRequire` eliminated the JSON serialization boundary — no more `gsd_tools ... | parse` chains
+- Single-file autopilot implementation: all 1100+ lines in one `autopilot.mjs` — easy to trace, debug, and modify
+- Phases 47-49 progressed linearly (CJS foundations → core loop → advanced features) with clean separation of concerns
+- Gap closure phases (52, 53) caught real integration bugs: `node` vs `npx zx` invocation and `.dir` vs `.directory` property mismatch
+- All 28 requirements satisfied with 7/7 phases passing verification
+- Entire milestone completed in 1 day (autopilot-driven) including 2 gap closure phases
+
+### What Was Inefficient
+- Phase 50 and 51 SUMMARY files initially lacked `requirements-completed` frontmatter — same recurring metadata gap
+- 2 integration bugs (entrypoint invocation, property name) not caught until audit — could have been caught with a simple `--dry-run` test earlier
+- Phase 52 SUMMARY also missing `requirements-completed` frontmatter — 3 phases with same metadata gap
+
+### Patterns Established
+- `createRequire` pattern for CJS-in-ESM imports — standard Node.js approach, avoids dual-package hazard
+- zx `$` with `.nothrow()` for subprocess management — captures exit codes without throwing
+- Entrypoint routing with `--legacy` flag — zero-risk migration with escape hatch
+- `CONFIG_DEFAULTS` pattern: module-level defaults with config.json override via `getConfig(key, default)`
+
+### Key Lessons
+1. SUMMARY frontmatter gap persists into v2.3 (9th milestone) — truly systemic; Phase 53 gap closure fixed it retroactively
+2. Integration testing (`--dry-run`) should happen in the same phase as implementation, not deferred to a later test phase
+3. zx is a strong fit for orchestration scripts — provides shell ergonomics (`$`, `cd`, `argv`) with Node.js power (imports, async/await)
+4. Legacy fallback preservation (`--legacy` flag) reduces migration risk to near-zero
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents)
+- Sessions: 16 plan executions across 7 phases (autopilot-driven)
+- Notable: largest plan count tied with v1.6 (16 plans), completed in single day via autopilot
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -429,12 +474,13 @@
 | v2.0 | 14 | 2 | First docs-only milestone — brainstorm-to-README pipeline, smallest scope yet |
 | v2.1 | 16 | 2 | First zero-gap-closure milestone — clean audit pass, TDD + sed-based bash testing |
 | v2.2 | 48 | 7 | PR review integration — pattern reuse from v1.4, file-proximity dedup, dual-path routing |
+| v2.3 | 49 | 7 | Autopilot CJS consolidation — zx rewrite with direct CJS imports, legacy bash preserved |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 9 of 10 milestones (v2.1 is only clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 8 of 10 milestones; only v2.1 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 8 of 10 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 10 of 11 milestones (v2.1 is only clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 9 of 11 milestones; only v2.1 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 9 of 11 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -442,3 +488,4 @@
 8. Brainstorm design docs serve as effective content blueprints — execution becomes mechanical when design is pre-approved (v2.0, v2.1)
 9. TDD + structural grep tests provide strong verification for bash function wiring without requiring live CLI invocations (v2.1)
 10. Pattern reuse across milestones (v1.4 → v2.2) dramatically accelerates development — similar features share scoring, routing, and delegation patterns
+11. Integration testing (`--dry-run`) should happen immediately after implementation, not deferred to a later phase (v2.3 — real bugs caught only at audit time)
