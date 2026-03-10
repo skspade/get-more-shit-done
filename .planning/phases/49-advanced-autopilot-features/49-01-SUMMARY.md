@@ -4,6 +4,7 @@ title: Debug Retry and Output Capture
 status: complete
 started: 2026-03-10
 completed: 2026-03-10
+requirements-completed: [REQ-14]
 ---
 
 # Plan 49-01: Debug Retry and Output Capture — Summary

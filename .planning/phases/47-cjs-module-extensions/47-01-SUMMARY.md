@@ -3,6 +3,7 @@ phase: 47-cjs-module-extensions
 plan: 01
 status: complete
 duration: ~3min
+requirements-completed: [REQ-01, REQ-02, REQ-03]
 ---
 
 # Plan 47-01 Summary

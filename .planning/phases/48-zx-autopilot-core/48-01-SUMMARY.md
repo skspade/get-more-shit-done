@@ -5,6 +5,7 @@ title: "Script Scaffold: Arguments, Prerequisites, Logging, Signals"
 status: complete
 started: "2026-03-10"
 completed: "2026-03-10"
+requirements-completed: [REQ-09, REQ-17]
 ---
 
 # Plan 48-01: Script Scaffold
