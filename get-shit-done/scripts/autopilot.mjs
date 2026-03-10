@@ -381,7 +381,7 @@ async function clearFailureState() {
 
 function writeFailureReport(stepName, exitCode, retryCount, maxRetries, outputFile) {
   const phaseInfo = findPhaseInternal(PROJECT_DIR, CURRENT_PHASE);
-  const phaseDir = phaseInfo ? phaseInfo.dir : '.planning/phases/unknown';
+  const phaseDir = phaseInfo ? phaseInfo.directory : '.planning/phases/unknown';
   const paddedPhase = String(CURRENT_PHASE).padStart(2, '0');
   const failureFile = path.join(PROJECT_DIR, phaseDir, `${paddedPhase}-FAILURE.md`);
 
@@ -524,7 +524,7 @@ async function runStepWithRetry(prompt, stepName) {
     } catch {}
 
     const phaseInfo = findPhaseInternal(PROJECT_DIR, CURRENT_PHASE);
-    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+    const phaseDir = phaseInfo ? phaseInfo.directory : '';
 
     const debugPrompt = constructDebugPrompt(stepName, stepExit, errorContext, CURRENT_PHASE, phaseDir, retryCount);
 
@@ -570,7 +570,7 @@ async function runVerifyWithDebugRetry(phase) {
       } catch {}
 
       const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
-      const phaseDir = phaseInfo ? phaseInfo.dir : '';
+      const phaseDir = phaseInfo ? phaseInfo.directory : '';
       const debugPrompt = constructDebugPrompt('verify', verifyExit, errorContext, phase, phaseDir, retryCount);
 
       console.log('\u2501'.repeat(53));
@@ -585,7 +585,7 @@ async function runVerifyWithDebugRetry(phase) {
 
     // Verify succeeded — check for gaps
     const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
-    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+    const phaseDir = phaseInfo ? phaseInfo.directory : '';
     const verifyStatus = getVerificationStatus(PROJECT_DIR, phaseDir);
 
     if (verifyStatus.status !== 'gaps_found') {
@@ -715,7 +715,7 @@ async function runFixCycle(phase) {
 async function runVerificationGate(phase) {
   while (true) {
     const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
-    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+    const phaseDir = phaseInfo ? phaseInfo.directory : '';
     const verifyStatus = getVerificationStatus(PROJECT_DIR, phaseDir);
     const decisions = extractAutonomousDecisions(phaseDir);
 
