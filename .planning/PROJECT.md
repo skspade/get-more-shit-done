@@ -77,7 +77,13 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- Rewrite autopilot.sh as zx-based Node.js script (autopilot.mjs) — v2.3
+- Add findFirstIncompletePhase/nextIncompletePhase to phase.cjs — v2.3
+- Add getVerificationStatus/getGapsSummary to verify.cjs — v2.3
+- Add CONFIG_DEFAULTS with fallback to cli.cjs config-get — v2.3
+- Add gsd-tools dispatch entries: phase find-next, verify status, verify gaps — v2.3
+- Rename autopilot.sh to autopilot-legacy.sh with --legacy flag fallback — v2.3
+- Add zx runtime dependency — v2.3
 
 ### Out of Scope
 
