@@ -12,6 +12,7 @@
 - ✅ **v2.0 README Rewrite** — Phases 36-37 (shipped 2026-03-06)
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
+- **v2.3 Autopilot CJS Consolidation** — Phases 47-51
 
 ## Phases
 
@@ -121,6 +122,71 @@
 
 </details>
 
+### v2.3 Autopilot CJS Consolidation (Phases 47-51)
+
+- [ ] **Phase 47: CJS Module Extensions** — Add phase navigation, verification status, config defaults, and tool dispatch to existing CJS modules
+- [ ] **Phase 48: zx Autopilot Core** — Rewrite the main autopilot loop as a zx script importing CJS modules directly
+- [ ] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script
+- [ ] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies
+- [ ] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script
+
+### Phase 47: CJS Module Extensions
+**Goal**: Autopilot logic currently duplicated in bash exists as tested CJS functions callable from any JS context
+**Depends on**: Nothing (first phase of v2.3)
+**Requirements**: REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08
+**Success Criteria** (what must be TRUE):
+  1. `findFirstIncompletePhase(cwd)` returns the correct phase number when called against a roadmap with mixed complete/incomplete phases
+  2. `nextIncompletePhase(cwd, N)` skips completed phases and returns the next incomplete one after N
+  3. `getVerificationStatus(cwd, phaseDir)` parses VERIFICATION.md or UAT.md frontmatter and returns status/score
+  4. `getGapsSummary(cwd, phaseDir)` returns gap description lines from verification files
+  5. `config-get` returns `CONFIG_DEFAULTS` values when keys are unset, and `gsd-tools` dispatches `phase find-next` and `verify status/gaps` to the new functions
+**Plans**: TBD
+
+### Phase 48: zx Autopilot Core
+**Goal**: The autopilot state machine (discuss, plan, execute, verify, complete) runs as a zx script with direct CJS imports instead of shell-outs
+**Depends on**: Phase 47
+**Requirements**: REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19
+**Success Criteria** (what must be TRUE):
+  1. `autopilot.mjs` drives a phase through the full discuss-plan-execute-verify-complete cycle, spawning `claude -p` via zx
+  2. Phase navigation calls `findFirstIncompletePhase` and `nextIncompletePhase` directly (no shell-out to `gsd_tools`)
+  3. Circuit breaker halts execution after the configured threshold of no-progress iterations, reading the threshold from CJS config defaults
+  4. File-based logging writes entries in the same format as `autopilot.sh` so existing log parsers still work
+  5. SIGINT/SIGTERM print resume instructions and exit cleanly, and `--from-phase`, `--project-dir`, `--dry-run` arguments are accepted
+**Plans**: TBD
+
+### Phase 49: Advanced Autopilot Features
+**Goal**: The zx autopilot handles failures, gates verification on human approval, and completes full milestones autonomously
+**Depends on**: Phase 48
+**Requirements**: REQ-14, REQ-15, REQ-16
+**Success Criteria** (what must be TRUE):
+  1. A failing step is retried with debug context (same behavior as bash `run_step_with_retry` and `run_verify_with_debug_retry`)
+  2. After verification, the user is prompted via TTY (approve/fix/abort) and the script routes accordingly
+  3. After all phases complete, milestone audit runs, detects gaps, loops through gap closure, and marks the milestone done
+**Plans**: TBD
+
+### Phase 50: Migration and Fallback
+**Goal**: Users run the zx autopilot by default, with a working fallback to the legacy bash script
+**Depends on**: Phase 49
+**Requirements**: REQ-20, REQ-21, REQ-22, REQ-23
+**Success Criteria** (what must be TRUE):
+  1. `zx` is listed as a runtime dependency in `package.json`
+  2. `autopilot.sh` is renamed to `autopilot-legacy.sh` and the original path no longer exists
+  3. `bin/gsd-autopilot` runs `autopilot.mjs` by default and falls back to `autopilot-legacy.sh` with `--legacy`
+  4. `format-json-output.test.cjs` is updated or retired since `format_json_output()` is no longer needed
+**Plans**: TBD
+
+### Phase 51: Tests
+**Goal**: All new CJS functions and the zx script have automated test coverage
+**Depends on**: Phase 50
+**Requirements**: REQ-24, REQ-25, REQ-26, REQ-27, REQ-28
+**Success Criteria** (what must be TRUE):
+  1. Unit tests for `findFirstIncompletePhase` and `nextIncompletePhase` cover: all complete, one incomplete, multiple incomplete, and decimal phase numbers
+  2. Unit tests for `getVerificationStatus` and `getGapsSummary` cover: VERIFICATION.md present, UAT.md fallback, neither present, and gaps_found status
+  3. Unit tests verify `CONFIG_DEFAULTS` fallback (unset key returns default, set key returns configured value)
+  4. Unit tests verify `phase find-next` and `verify status/gaps` dispatch correctly through `gsd-tools`
+  5. `autopilot.mjs --dry-run` completes without error on a valid `.planning/` structure
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -135,3 +201,8 @@
 | 36-37 | v2.0 | 2/2 | Complete | 2026-03-06 |
 | 38-39 | v2.1 | 2/2 | Complete | 2026-03-06 |
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
+| 47 | v2.3 | 0/0 | Not started | - |
+| 48 | v2.3 | 0/0 | Not started | - |
+| 49 | v2.3 | 0/0 | Not started | - |
+| 50 | v2.3 | 0/0 | Not started | - |
+| 51 | v2.3 | 0/0 | Not started | - |

@@ -45,3 +45,36 @@ Design: `.planning/designs/2026-03-10-autopilot-cjs-consolidation-design.md`
 - REQ-26: Unit tests for `CONFIG_DEFAULTS` fallback: unset key returns default, set key returns configured value
 - REQ-27: Unit tests for `phase find-next` and `verify status/gaps` dispatch in gsd-tools
 - REQ-28: Integration test: `autopilot.mjs --dry-run` completes without error on a valid `.planning/` structure
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| REQ-01 | Phase 47 | Pending |
+| REQ-02 | Phase 47 | Pending |
+| REQ-03 | Phase 47 | Pending |
+| REQ-04 | Phase 47 | Pending |
+| REQ-05 | Phase 47 | Pending |
+| REQ-06 | Phase 47 | Pending |
+| REQ-07 | Phase 47 | Pending |
+| REQ-08 | Phase 47 | Pending |
+| REQ-09 | Phase 48 | Pending |
+| REQ-10 | Phase 48 | Pending |
+| REQ-11 | Phase 48 | Pending |
+| REQ-12 | Phase 48 | Pending |
+| REQ-13 | Phase 48 | Pending |
+| REQ-14 | Phase 49 | Pending |
+| REQ-15 | Phase 49 | Pending |
+| REQ-16 | Phase 49 | Pending |
+| REQ-17 | Phase 48 | Pending |
+| REQ-18 | Phase 48 | Pending |
+| REQ-19 | Phase 48 | Pending |
+| REQ-20 | Phase 50 | Pending |
+| REQ-21 | Phase 50 | Pending |
+| REQ-22 | Phase 50 | Pending |
+| REQ-23 | Phase 50 | Pending |
+| REQ-24 | Phase 51 | Pending |
+| REQ-25 | Phase 51 | Pending |
+| REQ-26 | Phase 51 | Pending |
+| REQ-27 | Phase 51 | Pending |
+| REQ-28 | Phase 51 | Pending |
