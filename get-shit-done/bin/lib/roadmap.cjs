@@ -191,15 +191,75 @@ function cmdRoadmapAnalyze(cwd, raw) {
   const totalSummaries = phases.reduce((sum, p) => sum + p.summary_count, 0);
   const completedPhases = phases.filter(p => p.disk_status === 'complete').length;
 
-  // Detect phases in summary list without detail sections (malformed ROADMAP)
-  const checklistPattern = /-\s*\[[ x]\]\s*\*\*Phase\s+(\d+[A-Z]?(?:\.\d+)*)/gi;
-  const checklistPhases = new Set();
-  let checklistMatch;
-  while ((checklistMatch = checklistPattern.exec(content)) !== null) {
-    checklistPhases.add(checklistMatch[1]);
-  }
+  // Parse bullet-style phases not already found by heading-style extraction:
+  // - [ ] **Phase 70: Name** - description
+  // - [x] Phase 70: Name — completed
   const detailPhases = new Set(phases.map(p => p.number));
-  const missingDetails = [...checklistPhases].filter(p => !detailPhases.has(p));
+  const bulletPattern = /^-\s*\[([ x])\]\s*(?:\*\*)?Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gim;
+  let bulletMatch;
+  while ((bulletMatch = bulletPattern.exec(content)) !== null) {
+    const checked = bulletMatch[1] === 'x';
+    const phaseNum = bulletMatch[2];
+    const rawName = bulletMatch[3].replace(/\*\*.*/, '').replace(/\s+[-–—]\s+.*$/, '').trim();
+
+    if (detailPhases.has(phaseNum)) continue;
+    detailPhases.add(phaseNum);
+
+    // Check disk status (same logic as heading-style)
+    const normalized = normalizePhaseName(phaseNum);
+    let diskStatus = 'no_directory';
+    let planCount = 0;
+    let summaryCount = 0;
+    let hasContext = false;
+    let hasResearch = false;
+
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+      const dirMatch = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
+
+      if (dirMatch) {
+        const phaseFiles = fs.readdirSync(path.join(phasesDir, dirMatch));
+        planCount = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+        summaryCount = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+        hasContext = phaseFiles.some(f => f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md');
+        hasResearch = phaseFiles.some(f => f.endsWith('-RESEARCH.md') || f === 'RESEARCH.md');
+
+        if (summaryCount >= planCount && planCount > 0) diskStatus = 'complete';
+        else if (summaryCount > 0) diskStatus = 'partial';
+        else if (planCount > 0) diskStatus = 'planned';
+        else if (hasResearch) diskStatus = 'researched';
+        else if (hasContext) diskStatus = 'discussed';
+        else diskStatus = 'empty';
+      }
+    } catch {}
+
+    phases.push({
+      number: phaseNum,
+      name: rawName,
+      goal: null,
+      depends_on: null,
+      plan_count: planCount,
+      summary_count: summaryCount,
+      has_context: hasContext,
+      has_research: hasResearch,
+      disk_status: diskStatus,
+      roadmap_complete: checked,
+    });
+  }
+
+  // Sort phases by number
+  phases.sort((a, b) => {
+    const aParts = a.number.split('.').map(Number);
+    const bParts = b.number.split('.').map(Number);
+    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+      const diff = (aParts[i] || 0) - (bParts[i] || 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  });
+
+  const missingDetails = [];
 
   const result = {
     milestones,
