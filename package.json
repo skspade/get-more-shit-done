@@ -1,6 +1,6 @@
 {
   "name": "get-more-shit-done-cc",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
   "bin": {
     "get-more-shit-done-cc": "bin/install.js",
@@ -19,6 +19,9 @@
   },
   "engines": {
     "node": ">=16.7.0"
+  },
+  "dependencies": {
+    "zx": "^8.0.0"
   },
   "devDependencies": {
     "c8": "^11.0.0",
