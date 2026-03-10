@@ -9,7 +9,9 @@
 // separate `claude -p` process, ensuring fresh 200k-token context windows.
 
 import { createRequire } from 'module';
+import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
+import os from 'os';
 import path from 'path';
 import fs from 'fs';
 
@@ -25,6 +27,7 @@ const require = createRequire(import.meta.url);
 const { findFirstIncompletePhase, nextIncompletePhase, computePhaseStatus } = require('../bin/lib/phase.cjs');
 const { CONFIG_DEFAULTS } = require('../bin/lib/config.cjs');
 const { findPhaseInternal } = require('../bin/lib/core.cjs');
+const { getVerificationStatus, getGapsSummary } = require('../bin/lib/verify.cjs');
 
 // ─── Argument Parsing ─────────────────────────────────────────────────────────
 
@@ -185,6 +188,7 @@ function getConfig(key, defaultVal) {
 }
 
 const CIRCUIT_BREAKER_THRESHOLD = getConfig('autopilot.circuit_breaker_threshold', 3);
+const MAX_DEBUG_RETRIES = getConfig('autopilot.max_debug_retries', 3);
 
 // ─── Progress Tracking (Circuit Breaker) ──────────────────────────────────────
 
@@ -294,6 +298,684 @@ async function runStep(prompt, stepName) {
   return exitCode;
 }
 
+// ─── Debug Retry Infrastructure ────────────────────────────────────────────
+
+function constructDebugPrompt(stepName, exitCode, errorContext, phase, phaseDir, retryNum) {
+  const slug = `autopilot-${stepName}-retry-${retryNum}`;
+
+  let phaseFiles = '';
+  if (phaseDir) {
+    const fullDir = path.join(PROJECT_DIR, phaseDir);
+    try {
+      const files = fs.readdirSync(fullDir);
+      const ctx = files.filter(f => f.endsWith('-CONTEXT.md')).map(f => `- ${path.join(fullDir, f)}`);
+      const plans = files.filter(f => f.endsWith('-PLAN.md')).map(f => `- ${path.join(fullDir, f)}`);
+      const sums = files.filter(f => f.endsWith('-SUMMARY.md')).map(f => `- ${path.join(fullDir, f)}`);
+      phaseFiles = [...ctx, ...plans, ...sums].join('\n');
+    } catch {}
+  }
+
+  const indentedErrors = errorContext.split('\n').map(l => `  ${l}`).join('\n');
+
+  return `<objective>
+Investigate and fix: Autopilot step "${stepName}" failed during Phase ${phase}
+
+**Summary:** Step "${stepName}" exited with code ${exitCode} during autonomous execution. This is debug retry ${retryNum}.
+</objective>
+
+<symptoms>
+expected: Step "${stepName}" completes successfully with exit code 0
+actual: Step failed with exit code ${exitCode}
+errors: |
+${indentedErrors}
+reproduction: Run autopilot for Phase ${phase}, step ${stepName}
+timeline: During autopilot execution
+</symptoms>
+
+<mode>
+symptoms_prefilled: true
+goal: find_and_fix
+</mode>
+
+<debug_file>
+Create: .planning/debug/${slug}.md
+</debug_file>
+
+<files_to_read>
+${phaseFiles}
+- .planning/STATE.md
+</files_to_read>`;
+}
+
+async function writeFailureState(stepName, exitCode, retryCount, maxRetries) {
+  const failureType = (stepName === 'verify' || stepName === 'verify-gaps') ? 'gaps_found' : 'exit_code';
+
+  let debugSessions = 'None created';
+  try {
+    const debugDir = path.join(PROJECT_DIR, '.planning', 'debug');
+    const files = fs.readdirSync(debugDir).filter(f => f.startsWith('autopilot-') && f.endsWith('.md'));
+    if (files.length > 0) debugSessions = files.map(f => path.join(debugDir, f)).join(', ');
+  } catch {}
+
+  const blockerText = `[Phase ${CURRENT_PHASE} FAILURE]: type=${failureType} | step=${stepName} | retries=${retryCount}/${maxRetries} | exit_code=${exitCode} | debug_sessions=${debugSessions}`;
+  try {
+    await gsdTools('state', 'add-blocker', '--text', blockerText);
+  } catch {
+    console.error('WARNING: Could not write failure state to STATE.md');
+  }
+}
+
+async function clearFailureState() {
+  try {
+    const existing = await gsdTools('state', 'get', 'blockers');
+    if (existing.includes(`Phase ${CURRENT_PHASE} FAILURE`)) {
+      const lines = existing.split('\n');
+      const match = lines.find(l => l.includes(`Phase ${CURRENT_PHASE} FAILURE`));
+      if (match) {
+        const blockerText = match.replace(/^\s*-\s*/, '');
+        await gsdTools('state', 'resolve-blocker', '--text', blockerText);
+      }
+    }
+  } catch {}
+}
+
+function writeFailureReport(stepName, exitCode, retryCount, maxRetries, outputFile) {
+  const phaseInfo = findPhaseInternal(PROJECT_DIR, CURRENT_PHASE);
+  const phaseDir = phaseInfo ? phaseInfo.dir : '.planning/phases/unknown';
+  const paddedPhase = String(CURRENT_PHASE).padStart(2, '0');
+  const failureFile = path.join(PROJECT_DIR, phaseDir, `${paddedPhase}-FAILURE.md`);
+
+  const failureType = (stepName === 'verify' || stepName === 'verify-gaps') ? 'gaps_found' : 'exit_code';
+
+  let debugSessionsList = '- None created';
+  try {
+    const debugDir = path.join(PROJECT_DIR, '.planning', 'debug');
+    const files = fs.readdirSync(debugDir).filter(f => f.startsWith('autopilot-') && f.endsWith('.md'));
+    if (files.length > 0) debugSessionsList = files.map(f => `- ${path.join(debugDir, f)}`).join('\n');
+  } catch {}
+
+  let lastError = 'Output not available';
+  try {
+    const content = fs.readFileSync(outputFile, 'utf-8');
+    const lines = content.split('\n');
+    lastError = lines.slice(-50).join('\n');
+  } catch {}
+
+  const typeDesc = failureType === 'exit_code'
+    ? 'The step process returned a non-zero exit code, indicating a crash or error.'
+    : 'Verification found gaps that could not be automatically fixed by the debugger.';
+
+  const report = `# Phase ${CURRENT_PHASE}: Failure Report
+
+**Generated:** ${new Date().toISOString()}
+**Failure Type:** ${failureType}
+**Step:** ${stepName}
+**Exit Code:** ${exitCode}
+**Retries:** ${retryCount}/${maxRetries}
+
+## What Failed
+
+Step "${stepName}" in Phase ${CURRENT_PHASE} failed with exit code ${exitCode}.
+After ${retryCount} debug retry attempts (max: ${maxRetries}), the issue could not be automatically resolved.
+
+## Failure Type
+
+- **${failureType}**: ${typeDesc}
+
+## Last Error Output
+
+\`\`\`
+${lastError}
+\`\`\`
+
+## Debug Sessions
+
+${debugSessionsList}
+
+## Resume
+
+After manually fixing the issue, resume with:
+\`\`\`
+autopilot.sh --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}
+\`\`\`
+
+---
+*Generated by autopilot.mjs debug-retry exhaustion handler*
+`;
+
+  fs.writeFileSync(failureFile, report);
+  console.error(`Failure report written to: ${failureFile}`);
+}
+
+// ─── Output-Capturing Step Execution ───────────────────────────────────────
+
+async function runStepCaptured(prompt, stepName, outputFile) {
+  printBanner(`Phase ${CURRENT_PHASE} > ${stepName}`);
+
+  const snapshotBefore = await takeProgressSnapshot();
+
+  if (DRY_RUN) {
+    logMsg(`STEP DRY-RUN: ${stepName}`);
+    const msg = `[DRY RUN] Would execute: claude -p --dangerously-skip-permissions --output-format json "${prompt}"`;
+    console.log(msg);
+    console.log('');
+    fs.appendFileSync(outputFile, msg + '\n');
+    checkProgress(snapshotBefore, snapshotBefore, `${stepName} (dry-run)`);
+    return 0;
+  }
+
+  logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
+
+  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt}`.nothrow();
+
+  const exitCode = result.exitCode;
+  logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
+
+  if (result.stdout) {
+    process.stdout.write(result.stdout);
+    fs.appendFileSync(outputFile, result.stdout);
+  }
+
+  const snapshotAfter = await takeProgressSnapshot();
+  checkProgress(snapshotBefore, snapshotAfter, stepName);
+
+  return exitCode;
+}
+
+// ─── Retry Loop ─────────────────────────────────────────────────────────────
+
+async function runStepWithRetry(prompt, stepName) {
+  let retryCount = 0;
+
+  while (true) {
+    const outputFile = path.join(os.tmpdir(), `gsd-autopilot-${Date.now()}`);
+    fs.writeFileSync(outputFile, '');
+    tempFiles.push(outputFile);
+
+    const stepExit = await runStepCaptured(prompt, stepName, outputFile);
+
+    if (stepExit === 0) {
+      await clearFailureState();
+      return 0;
+    }
+
+    retryCount++;
+    logMsg(`RETRY: step=${stepName} attempt=${retryCount}/${MAX_DEBUG_RETRIES} exit_code=${stepExit}`);
+
+    if (retryCount > MAX_DEBUG_RETRIES) {
+      logMsg(`RETRY EXHAUSTED: step=${stepName}`);
+      console.error('');
+      console.error(`Debug retries exhausted (${retryCount}/${MAX_DEBUG_RETRIES}) for step '${stepName}'.`);
+      await writeFailureState(stepName, stepExit, retryCount, MAX_DEBUG_RETRIES);
+      writeFailureReport(stepName, stepExit, retryCount, MAX_DEBUG_RETRIES, outputFile);
+      return stepExit;
+    }
+
+    console.log('');
+    logMsg(`DEBUG PROMPT: invoking debugger for step=${stepName} retry=${retryCount}`);
+    console.error(`\u25c6 Debug retry ${retryCount}/${MAX_DEBUG_RETRIES} for step '${stepName}'...`);
+    console.log('');
+
+    let errorContext = 'No output captured';
+    try {
+      const content = fs.readFileSync(outputFile, 'utf-8');
+      const lines = content.split('\n');
+      errorContext = lines.slice(-100).join('\n');
+    } catch {}
+
+    const phaseInfo = findPhaseInternal(PROJECT_DIR, CURRENT_PHASE);
+    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+
+    const debugPrompt = constructDebugPrompt(stepName, stepExit, errorContext, CURRENT_PHASE, phaseDir, retryCount);
+
+    console.log('\u2501'.repeat(53));
+    console.log(` GSD \u25b6 AUTOPILOT: Debug Retry ${retryCount}/${MAX_DEBUG_RETRIES}`);
+    console.log('\u2501'.repeat(53));
+    console.log('');
+
+    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+    if (debugResult.stdout) process.stdout.write(debugResult.stdout);
+    if (debugResult.exitCode !== 0) {
+      console.error('WARNING: Debugger itself returned non-zero. Continuing to next retry.');
+    }
+  }
+}
+
+async function runVerifyWithDebugRetry(phase) {
+  let retryCount = 0;
+
+  while (true) {
+    const outputFile = path.join(os.tmpdir(), `gsd-autopilot-${Date.now()}`);
+    fs.writeFileSync(outputFile, '');
+    tempFiles.push(outputFile);
+
+    const verifyExit = await runStepCaptured(`/gsd:verify-work ${phase}`, 'verify', outputFile);
+
+    if (verifyExit !== 0) {
+      retryCount++;
+      if (retryCount > MAX_DEBUG_RETRIES) {
+        console.error('Debug retries exhausted for verify step.');
+        await writeFailureState('verify', verifyExit, retryCount, MAX_DEBUG_RETRIES);
+        writeFailureReport('verify', verifyExit, retryCount, MAX_DEBUG_RETRIES, outputFile);
+        return verifyExit;
+      }
+
+      console.log('');
+      console.error(`\u25c6 Debug retry ${retryCount}/${MAX_DEBUG_RETRIES} for verify crash...`);
+
+      let errorContext = 'No output captured';
+      try {
+        const content = fs.readFileSync(outputFile, 'utf-8');
+        errorContext = content.split('\n').slice(-100).join('\n');
+      } catch {}
+
+      const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
+      const phaseDir = phaseInfo ? phaseInfo.dir : '';
+      const debugPrompt = constructDebugPrompt('verify', verifyExit, errorContext, phase, phaseDir, retryCount);
+
+      console.log('\u2501'.repeat(53));
+      console.log(` GSD \u25b6 AUTOPILOT: Debug Retry ${retryCount}/${MAX_DEBUG_RETRIES}`);
+      console.log('\u2501'.repeat(53));
+      console.log('');
+
+      const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+      if (debugResult.stdout) process.stdout.write(debugResult.stdout);
+      continue;
+    }
+
+    // Verify succeeded — check for gaps
+    const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
+    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+    const verifyStatus = getVerificationStatus(PROJECT_DIR, phaseDir);
+
+    if (verifyStatus.status !== 'gaps_found') {
+      await clearFailureState();
+      return 0;
+    }
+
+    // Gaps found — attempt debug retry
+    retryCount++;
+    if (retryCount > MAX_DEBUG_RETRIES) {
+      console.log('');
+      console.error(`Debug retries exhausted (${retryCount}/${MAX_DEBUG_RETRIES}) for verification gaps.`);
+      await writeFailureState('verify-gaps', 0, retryCount, MAX_DEBUG_RETRIES);
+      writeFailureReport('verify-gaps', 0, retryCount, MAX_DEBUG_RETRIES, outputFile);
+      return 0; // Return 0 so verification gate still presents
+    }
+
+    console.log('');
+    logMsg(`VERIFY GAPS: retry=${retryCount}/${MAX_DEBUG_RETRIES}`);
+    console.error(`\u25c6 Verification found gaps. Debug retry ${retryCount}/${MAX_DEBUG_RETRIES}...`);
+    console.log('');
+
+    const gapsSummary = getGapsSummary(PROJECT_DIR, phaseDir).join('\n');
+    const errorContext = `Verification status: gaps_found\nGaps:\n${gapsSummary}`;
+    const debugPrompt = constructDebugPrompt('verify-gaps', 0, errorContext, phase, phaseDir, retryCount);
+
+    console.log('\u2501'.repeat(53));
+    console.log(` GSD \u25b6 AUTOPILOT: Gap Fix ${retryCount}/${MAX_DEBUG_RETRIES}`);
+    console.log('\u2501'.repeat(53));
+    console.log('');
+
+    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+    if (debugResult.stdout) process.stdout.write(debugResult.stdout);
+  }
+}
+
+// ─── TTY Input ──────────────────────────────────────────────────────────────
+
+function askTTY(prompt) {
+  return new Promise((resolve) => {
+    const rl = createInterface({
+      input: fs.createReadStream('/dev/tty'),
+      output: process.stdout,
+    });
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+// ─── Verification Gate ──────────────────────────────────────────────────────
+
+function extractAutonomousDecisions(phaseDir) {
+  try {
+    const fullDir = path.join(PROJECT_DIR, phaseDir);
+    const files = fs.readdirSync(fullDir).filter(f => f.endsWith('-CONTEXT.md'));
+    if (files.length === 0) return '';
+
+    const content = fs.readFileSync(path.join(fullDir, files[0]), 'utf-8');
+    if (!content.includes('auto-context') && !content.includes('Auto-generated')) return '';
+
+    return content.split('\n')
+      .filter(l => l.includes("(Claude's Decision:"))
+      .map(l => `  - ${l.replace(/^\s*-\s*/, '')}`)
+      .join('\n');
+  } catch {
+    return '';
+  }
+}
+
+function printVerificationGate(phase, status, score, decisions, gaps) {
+  console.log('');
+  console.log('\u2554' + '\u2550'.repeat(62) + '\u2557');
+  console.log('\u2551  CHECKPOINT: Verification Required                          \u2551');
+  console.log('\u255a' + '\u2550'.repeat(62) + '\u255d');
+  console.log('');
+  console.log(`Phase ${phase} verification: ${status} (score: ${score})`);
+  console.log('');
+
+  if (status === 'gaps_found' && gaps) {
+    console.log('Gaps found:');
+    console.log(gaps);
+    console.log('');
+  }
+
+  if (decisions) {
+    console.log('Decisions Made Autonomously:');
+    console.log(decisions);
+    console.log('');
+  }
+
+  console.log('\u2500'.repeat(62));
+  console.log('\u2192 approve  \u2014 continue to next phase');
+  console.log('\u2192 fix      \u2014 describe issues and trigger gap-closure cycle');
+  console.log('\u2192 abort    \u2014 stop autopilot cleanly (state preserved)');
+  console.log('\u2500'.repeat(62));
+}
+
+function handleAbort(phase) {
+  console.log('');
+  console.log(`Autopilot aborted by user at Phase ${phase} verification.`);
+  console.log('');
+  console.log('State preserved. To resume:');
+  console.log(`  autopilot.sh --from-phase ${phase} --project-dir ${PROJECT_DIR}`);
+  console.log('');
+  process.exit(2);
+}
+
+async function runFixCycle(phase) {
+  const fixDesc = await askTTY('Describe what to fix: ');
+
+  console.log('');
+  console.log(`Running gap-closure cycle for Phase ${phase}...`);
+  console.log(`Fix request: ${fixDesc}`);
+  console.log('');
+
+  noProgressCount = 0;
+
+  await runStep(`/gsd:plan-phase ${phase} --gaps -- Human fix request: ${fixDesc}`, 'fix-plan');
+  await runStep(`/gsd:execute-phase ${phase} --gaps-only -- Human fix request: ${fixDesc}`, 'fix-execute');
+  await runStep(`/gsd:verify-work ${phase}`, 'fix-verify');
+
+  noProgressCount = 0;
+}
+
+async function runVerificationGate(phase) {
+  while (true) {
+    const phaseInfo = findPhaseInternal(PROJECT_DIR, phase);
+    const phaseDir = phaseInfo ? phaseInfo.dir : '';
+    const verifyStatus = getVerificationStatus(PROJECT_DIR, phaseDir);
+    const decisions = extractAutonomousDecisions(phaseDir);
+
+    let gaps = '';
+    if (verifyStatus.status === 'gaps_found') {
+      gaps = getGapsSummary(PROJECT_DIR, phaseDir).join('\n');
+    }
+
+    printVerificationGate(phase, verifyStatus.status, verifyStatus.score, decisions, gaps);
+
+    const response = (await askTTY('\u2192 ')).toLowerCase();
+
+    switch (response) {
+      case 'a': case 'approve': case 'yes': case 'y':
+        console.log('');
+        console.log(`\u2713 Phase ${phase} approved. Continuing...`);
+        return;
+      case 'f': case 'fix':
+        await runFixCycle(phase);
+        break; // Loop continues — re-presents gate
+      case 'x': case 'abort': case 'quit': case 'q':
+        handleAbort(phase);
+        break;
+      default:
+        console.log('');
+        console.log(`Unknown response: '${response}'`);
+        console.log('Enter: approve / fix / abort');
+        console.log('');
+        break;
+    }
+  }
+}
+
+// ─── Milestone Audit and Completion ─────────────────────────────────────────
+
+function printEscalationReport(iterations, maxIterations) {
+  logMsg(`ESCALATION: gap closure exhausted iterations=${iterations}/${maxIterations}`);
+
+  let auditFile = '';
+  try {
+    const planningDir = path.join(PROJECT_DIR, '.planning');
+    const files = fs.readdirSync(planningDir)
+      .filter(f => /^v.*-MILESTONE-AUDIT\.md$/.test(f))
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(planningDir, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+    if (files.length > 0) auditFile = path.join(planningDir, files[0].name);
+  } catch {}
+
+  console.log('');
+  console.log('\u2554' + '\u2550'.repeat(62) + '\u2557');
+  console.log('\u2551  AUTOPILOT ESCALATION                                       \u2551');
+  console.log('\u255a' + '\u2550'.repeat(62) + '\u255d');
+  console.log('');
+  console.log(`Gap closure exhausted: ${iterations}/${maxIterations} iterations completed`);
+  console.log(`Audit gaps persist after ${iterations} fix cycles.`);
+  console.log('');
+  if (auditFile) {
+    console.log(`Latest audit: ${auditFile}`);
+    console.log('');
+  }
+  console.log('The autopilot could not converge to a passing audit.');
+  console.log('Human review is required to diagnose remaining gaps.');
+  console.log('');
+  console.log('To resume after manual fixes:');
+  console.log(`  autopilot.sh --project-dir ${PROJECT_DIR}`);
+  console.log('');
+}
+
+async function runMilestoneAudit() {
+  printBanner('MILESTONE AUDIT');
+  logMsg('AUDIT: starting milestone audit');
+
+  const auditExit = await runStepWithRetry('/gsd:audit-milestone', 'milestone-audit');
+  if (auditExit !== 0) {
+    logMsg(`AUDIT: failed with exit=${auditExit}`);
+    console.error(`ERROR: Milestone audit failed (exit ${auditExit})`);
+    return 1;
+  }
+
+  // Locate most recent audit file
+  let auditFile = '';
+  try {
+    const planningDir = path.join(PROJECT_DIR, '.planning');
+    const files = fs.readdirSync(planningDir)
+      .filter(f => /^v.*-MILESTONE-AUDIT\.md$/.test(f))
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(planningDir, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+    if (files.length > 0) auditFile = path.join(planningDir, files[0].name);
+  } catch {}
+
+  if (!auditFile) {
+    console.error('ERROR: No MILESTONE-AUDIT.md file found after audit');
+    return 1;
+  }
+
+  const auditStatus = (await gsdTools('frontmatter', 'get', auditFile, '--field', 'status', '--raw')).trim();
+  if (!auditStatus) {
+    console.error(`ERROR: Could not parse status from ${auditFile}`);
+    return 1;
+  }
+
+  logMsg(`AUDIT: result=${auditStatus}`);
+  console.log(`Audit result: ${auditStatus}`);
+
+  const autoAcceptTechDebt = getConfig('autopilot.auto_accept_tech_debt', true);
+
+  switch (auditStatus) {
+    case 'passed':
+      printBanner('MILESTONE AUDIT PASSED \u2713');
+      console.log('All requirements satisfied. Ready for milestone completion.');
+      return 0;
+    case 'gaps_found':
+      printBanner('MILESTONE AUDIT: GAPS FOUND');
+      console.log('Audit found gaps that need fixing.');
+      return 10;
+    case 'tech_debt':
+      if (autoAcceptTechDebt) {
+        printBanner('MILESTONE AUDIT PASSED \u2713 (tech debt accepted)');
+        console.log('Audit found tech debt only. auto_accept_tech_debt=true \u2014 treating as passed.');
+        return 0;
+      }
+      printBanner('MILESTONE AUDIT: GAPS FOUND (tech debt rejected)');
+      console.log('Audit found tech debt. auto_accept_tech_debt=false \u2014 treating as gaps.');
+      return 10;
+    default:
+      console.error(`ERROR: Unknown audit status '${auditStatus}'`);
+      return 1;
+  }
+}
+
+async function runGapClosureLoop() {
+  const maxIterations = getConfig('autopilot.max_audit_fix_iterations', 3);
+  let iteration = 0;
+
+  while (true) {
+    if (iteration >= maxIterations) {
+      printEscalationReport(iteration, maxIterations);
+      process.exit(1);
+    }
+
+    iteration++;
+    logMsg(`GAP CLOSURE: iteration=${iteration}/${maxIterations}`);
+    printBanner(`GAP CLOSURE: Iteration ${iteration}/${maxIterations}`);
+
+    noProgressCount = 0;
+    iterationLog = [];
+
+    const gapPlanExit = await runStepWithRetry('/gsd:plan-milestone-gaps --auto', 'gap-planning');
+    if (gapPlanExit !== 0) {
+      console.error(`ERROR: Gap planning failed (exit ${gapPlanExit})`);
+      printEscalationReport(iteration, maxIterations);
+      process.exit(1);
+    }
+
+    // Execute fix phases through full lifecycle
+    while (true) {
+      const fixPhase = findFirstIncompletePhase(PROJECT_DIR);
+      if (!fixPhase) break;
+
+      CURRENT_PHASE = fixPhase;
+      noProgressCount = 0;
+      iterationLog = [];
+
+      while (true) {
+        const step = getPhaseStep(CURRENT_PHASE);
+
+        switch (step) {
+          case 'discuss':
+            await runStep(`/gsd:discuss-phase ${CURRENT_PHASE} --auto`, 'discuss');
+            break;
+          case 'plan':
+            await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan');
+            break;
+          case 'execute': {
+            const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
+            if (execExit !== 0) {
+              printHaltReport('Fix phase execution failed after debug retries', 'execute', execExit);
+              process.exit(1);
+            }
+            break;
+          }
+          case 'verify': {
+            const verifyExit = await runVerifyWithDebugRetry(CURRENT_PHASE);
+            if (verifyExit !== 0) {
+              printHaltReport('Fix phase verification failed after debug retries', 'verify', verifyExit);
+              process.exit(1);
+            }
+            if (DRY_RUN) {
+              console.log('[DRY RUN] Auto-approving verification gate');
+            } else {
+              await runVerificationGate(CURRENT_PHASE);
+            }
+            await gsdTools('phase', 'complete', CURRENT_PHASE);
+            break;
+          }
+          case 'complete':
+            printBanner(`Fix Phase ${CURRENT_PHASE} COMPLETE \u2713`);
+            break;
+          default:
+            console.error(`ERROR: Unknown step '${step}' for fix phase ${CURRENT_PHASE}`);
+            process.exit(1);
+        }
+
+        if (step === 'complete') break;
+      }
+    }
+
+    // Re-audit after fix phases
+    printBanner(`RE-AUDIT: After iteration ${iteration}`);
+
+    const auditResult = await runMilestoneAudit();
+    if (auditResult === 0) {
+      printBanner('GAP CLOSURE COMPLETE \u2713');
+      console.log(`Audit passed after ${iteration} iteration(s).`);
+      return;
+    } else if (auditResult === 10) {
+      console.log(`Gaps remain after iteration ${iteration}. Continuing...`);
+      continue;
+    } else {
+      console.error('ERROR: Milestone audit encountered an error during re-audit');
+      process.exit(1);
+    }
+  }
+}
+
+async function runMilestoneCompletion() {
+  printBanner('MILESTONE COMPLETION');
+
+  const versionRaw = (await gsdTools('frontmatter', 'get', '.planning/STATE.md', '--field', 'milestone', '--raw')).trim();
+  if (!versionRaw) {
+    console.error('ERROR: Could not extract milestone version from STATE.md');
+    console.error("Expected frontmatter field 'milestone' (e.g., 'milestone: v1.2')");
+    printHaltReport('Milestone version extraction failed', 'milestone-completion', '1');
+    process.exit(1);
+  }
+
+  const version = versionRaw.replace(/^v/, '');
+  console.log(`Completing milestone: ${versionRaw} (${version})`);
+
+  const completionPrompt = `/gsd:complete-milestone ${version}
+
+IMPORTANT: This is running in autopilot mode. Auto-approve ALL interactive confirmations including:
+- Milestone readiness verification
+- Phase directory archival
+- Any other confirmation prompts
+Do not wait for human input at any step.`;
+
+  const completionExit = await runStepWithRetry(completionPrompt, 'milestone-completion');
+  if (completionExit !== 0) {
+    console.error(`ERROR: Milestone completion failed (exit ${completionExit})`);
+    printHaltReport('Milestone completion failed after retries', 'milestone-completion', completionExit);
+    process.exit(1);
+  }
+
+  printBanner('MILESTONE COMPLETE \u2713');
+  console.log(`Milestone ${versionRaw} completed successfully.`);
+  console.log('Archival, PROJECT.md evolution, and commit performed.');
+  console.log('');
+}
+
 function printFinalReport() {
   logMsg(`COMPLETE: all phases done, total_iterations=${totalIterations}`);
 
@@ -327,10 +1009,19 @@ if (FROM_PHASE) {
     printBanner('ALL PHASES COMPLETE');
     console.log('All phases in the milestone are already complete.');
     console.log('');
-    // Stub: milestone audit is Phase 49 scope
-    logMsg('ALL PHASES COMPLETE: milestone audit stub (Phase 49)');
-    console.log('Milestone audit not yet implemented (Phase 49 scope).');
-    process.exit(0);
+
+    const auditResult = await runMilestoneAudit();
+    if (auditResult === 0) {
+      await runMilestoneCompletion();
+      process.exit(0);
+    } else if (auditResult === 10) {
+      await runGapClosureLoop();
+      await runMilestoneCompletion();
+      process.exit(0);
+    } else {
+      console.error('ERROR: Milestone audit encountered an error');
+      process.exit(1);
+    }
   }
 }
 
@@ -364,22 +1055,29 @@ while (true) {
       await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan');
       break;
 
-    case 'execute':
-      // Phase 48: simple runStep (Phase 49 adds runStepWithRetry)
-      await runStep(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
+    case 'execute': {
+      const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
+      if (execExit !== 0) {
+        printHaltReport('Execution failed after debug retries', 'execute', execExit);
+        process.exit(1);
+      }
       break;
+    }
 
-    case 'verify':
-      // Phase 48: simple runStep (Phase 49 adds runVerifyWithDebugRetry + verification gate)
-      await runStep(`/gsd:verify-work ${CURRENT_PHASE}`, 'verify');
-
-      // Mark phase complete after verify
-      // Uses gsdTools shell-out per CONTEXT.md decision
+    case 'verify': {
+      const verifyExit = await runVerifyWithDebugRetry(CURRENT_PHASE);
+      if (verifyExit !== 0) {
+        printHaltReport('Verification failed after debug retries', 'verify', verifyExit);
+        process.exit(1);
+      }
       if (DRY_RUN) {
         console.log('[DRY RUN] Auto-approving verification gate');
+      } else {
+        await runVerificationGate(CURRENT_PHASE);
       }
       await gsdTools('phase', 'complete', CURRENT_PHASE);
       break;
+    }
 
     case 'complete': {
       printBanner(`Phase ${CURRENT_PHASE} COMPLETE`);
@@ -388,10 +1086,19 @@ while (true) {
       const nextPhase = nextIncompletePhase(PROJECT_DIR, CURRENT_PHASE);
       if (!nextPhase) {
         printFinalReport();
-        // Stub: milestone audit is Phase 49 scope
-        logMsg('ALL PHASES COMPLETE: milestone audit stub (Phase 49)');
-        console.log('Milestone audit not yet implemented (Phase 49 scope).');
-        process.exit(0);
+
+        const auditResult = await runMilestoneAudit();
+        if (auditResult === 0) {
+          await runMilestoneCompletion();
+          process.exit(0);
+        } else if (auditResult === 10) {
+          await runGapClosureLoop();
+          await runMilestoneCompletion();
+          process.exit(0);
+        } else {
+          console.error('ERROR: Milestone audit encountered an error');
+          process.exit(1);
+        }
       }
 
       CURRENT_PHASE = nextPhase;
