@@ -129,7 +129,7 @@
 - [x] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script (completed 2026-03-10)
 - [x] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies (completed 2026-03-10)
 - [x] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script (completed 2026-03-10)
-- [ ] **Phase 52: Fix Critical Integration Bugs** — Fix entrypoint invocation and property name mismatch (Gap Closure)
+- [x] **Phase 52: Fix Critical Integration Bugs** — Fix entrypoint invocation and property name mismatch (Gap Closure) (completed 2026-03-10)
 - [ ] **Phase 53: Close Verification and Metadata Gaps** — Verify Phase 49, fix SUMMARY frontmatter, update traceability (Gap Closure)
 
 ### Phase 47: CJS Module Extensions
