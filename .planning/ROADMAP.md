@@ -124,7 +124,7 @@
 
 ### v2.3 Autopilot CJS Consolidation (Phases 47-51)
 
-- [ ] **Phase 47: CJS Module Extensions** — Add phase navigation, verification status, config defaults, and tool dispatch to existing CJS modules
+- [x] **Phase 47: CJS Module Extensions** — Add phase navigation, verification status, config defaults, and tool dispatch to existing CJS modules (completed 2026-03-10)
 - [ ] **Phase 48: zx Autopilot Core** — Rewrite the main autopilot loop as a zx script importing CJS modules directly
 - [ ] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script
 - [ ] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies
@@ -201,7 +201,7 @@
 | 36-37 | v2.0 | 2/2 | Complete | 2026-03-06 |
 | 38-39 | v2.1 | 2/2 | Complete | 2026-03-06 |
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
-| 47 | v2.3 | 0/0 | Not started | - |
+| 47 | 3/3 | Complete   | 2026-03-10 | - |
 | 48 | v2.3 | 0/0 | Not started | - |
 | 49 | v2.3 | 0/0 | Not started | - |
 | 50 | v2.3 | 0/0 | Not started | - |
