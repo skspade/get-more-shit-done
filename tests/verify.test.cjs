@@ -1011,3 +1011,144 @@ describe('verify key-links command', () => {
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getVerificationStatus (direct import)
+// Requirements: REQ-25
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { getVerificationStatus, getGapsSummary } = require('../get-shit-done/bin/lib/verify.cjs');
+
+describe('getVerificationStatus', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns null when phase directory does not exist', () => {
+    const result = getVerificationStatus(tmpDir, '.planning/phases/99-nonexistent');
+    assert.strictEqual(result, null);
+  });
+
+  test('returns status and score from VERIFICATION.md', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: passed\nscore: 95\n---\n# Verification\n'
+    );
+
+    const result = getVerificationStatus(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, { status: 'passed', score: '95' });
+  });
+
+  test('falls back to UAT.md when no VERIFICATION.md', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-UAT.md'),
+      '---\nstatus: diagnosed\nscore: 60\n---\n# UAT\n'
+    );
+
+    const result = getVerificationStatus(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, { status: 'diagnosed', score: '60' });
+  });
+
+  test('returns null status/score when frontmatter has no status', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\n---\n# Verification\n'
+    );
+
+    const result = getVerificationStatus(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, { status: null, score: null });
+  });
+
+  test('parses gaps_found status', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: gaps_found\nscore: 70\n---\n# Verification\n'
+    );
+
+    const result = getVerificationStatus(tmpDir, '.planning/phases/01-test');
+    assert.strictEqual(result.status, 'gaps_found');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getGapsSummary (direct import)
+// Requirements: REQ-25
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('getGapsSummary', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns empty array when phase directory does not exist', () => {
+    const result = getGapsSummary(tmpDir, '.planning/phases/99-nonexistent');
+    assert.deepStrictEqual(result, []);
+  });
+
+  test('returns empty array when no verification file exists', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = getGapsSummary(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, []);
+  });
+
+  test('extracts gap lines from gap section', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: gaps_found\n---\n## Results\nAll good here.\n## Gaps Found\n- Missing unit tests for auth module\n- Error handling not implemented\n## Summary\nNeeds work.\n'
+    );
+
+    const result = getGapsSummary(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, [
+      '- Missing unit tests for auth module',
+      '- Error handling not implemented',
+    ]);
+  });
+
+  test('returns empty array when no gap section exists', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: passed\n---\n## Results\nAll good.\n## Summary\nDone.\n'
+    );
+
+    const result = getGapsSummary(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, []);
+  });
+
+  test('handles multiple gap sections', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(phaseDir, '01-VERIFICATION.md'),
+      '---\nstatus: gaps_found\n---\n## Gaps Found\n- First gap\n## Other Content\nNot a gap.\n## Additional Gaps\n- Second gap\n## End\n'
+    );
+
+    const result = getGapsSummary(tmpDir, '.planning/phases/01-test');
+    assert.deepStrictEqual(result, ['- First gap', '- Second gap']);
+  });
+});

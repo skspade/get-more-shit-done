@@ -1461,3 +1461,161 @@ describe('letter-suffix phase sorting', () => {
 // milestone complete command
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// findFirstIncompletePhase (direct import)
+// Requirements: REQ-24
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { findFirstIncompletePhase, nextIncompletePhase } = require('../get-shit-done/bin/lib/phase.cjs');
+
+describe('findFirstIncompletePhase', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns null when no ROADMAP.md exists', () => {
+    const result = findFirstIncompletePhase(tmpDir);
+    assert.strictEqual(result, null);
+  });
+
+  test('returns null when all phases complete', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+    fs.writeFileSync(path.join(p2, '.completed'), '');
+
+    const result = findFirstIncompletePhase(tmpDir);
+    assert.strictEqual(result, null);
+  });
+
+  test('returns first incomplete phase when one exists', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n### Phase 3: UI\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+
+    const result = findFirstIncompletePhase(tmpDir);
+    assert.strictEqual(result, '2');
+  });
+
+  test('returns first phase when none complete', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n'
+    );
+
+    const result = findFirstIncompletePhase(tmpDir);
+    assert.strictEqual(result, '1');
+  });
+
+  test('handles decimal phase numbers', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 1.1: Hotfix\n### Phase 2: API\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+
+    const result = findFirstIncompletePhase(tmpDir);
+    assert.strictEqual(result, '1.1');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// nextIncompletePhase (direct import)
+// Requirements: REQ-24
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('nextIncompletePhase', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns null when no ROADMAP.md exists', () => {
+    const result = nextIncompletePhase(tmpDir, '1');
+    assert.strictEqual(result, null);
+  });
+
+  test('returns next incomplete phase after given phase', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n### Phase 3: UI\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+    fs.writeFileSync(path.join(p2, '.completed'), '');
+
+    const result = nextIncompletePhase(tmpDir, '1');
+    assert.strictEqual(result, '3');
+  });
+
+  test('returns null when no more incomplete phases exist', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+    fs.writeFileSync(path.join(p2, '.completed'), '');
+
+    const result = nextIncompletePhase(tmpDir, '1');
+    assert.strictEqual(result, null);
+  });
+
+  test('skips completed phases between current and next incomplete', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 2: API\n### Phase 3: UI\n### Phase 4: Deploy\n'
+    );
+    const p1 = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    const p2 = path.join(tmpDir, '.planning', 'phases', '02-api');
+    const p3 = path.join(tmpDir, '.planning', 'phases', '03-ui');
+    fs.mkdirSync(p1, { recursive: true });
+    fs.mkdirSync(p2, { recursive: true });
+    fs.mkdirSync(p3, { recursive: true });
+    fs.writeFileSync(path.join(p1, '.completed'), '');
+    fs.writeFileSync(path.join(p2, '.completed'), '');
+    fs.writeFileSync(path.join(p3, '.completed'), '');
+
+    const result = nextIncompletePhase(tmpDir, '1');
+    assert.strictEqual(result, '4');
+  });
+
+  test('handles decimal phase numbers', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n## Phases\n### Phase 1: Foundation\n### Phase 1.1: Hotfix\n### Phase 2: API\n'
+    );
+
+    const result = nextIncompletePhase(tmpDir, '1');
+    assert.strictEqual(result, '1.1');
+  });
+});
