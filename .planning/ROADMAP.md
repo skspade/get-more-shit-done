@@ -128,7 +128,7 @@
 - [x] **Phase 48: zx Autopilot Core** — Rewrite the main autopilot loop as a zx script importing CJS modules directly (completed 2026-03-10)
 - [x] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script (completed 2026-03-10)
 - [x] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies (completed 2026-03-10)
-- [ ] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script
+- [x] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script (completed 2026-03-10)
 
 ### Phase 47: CJS Module Extensions
 **Goal**: Autopilot logic currently duplicated in bash exists as tested CJS functions callable from any JS context
@@ -207,4 +207,4 @@
 | 48 | 3/3 | Complete   | 2026-03-10 | - |
 | 49 | 3/3 | Complete    | 2026-03-10 | - |
 | 50 | 2/2 | Complete    | 2026-03-10 | - |
-| 51 | v2.3 | 0/0 | Not started | - |
+| 51 | v2.3 | Complete    | 2026-03-10 | - |
