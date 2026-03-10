@@ -1073,6 +1073,7 @@ module.exports = {
   cmdPhaseRemove,
   cmdPhaseComplete,
   cmdPhaseStatus,
+  computePhaseStatus,
   findFirstIncompletePhase,
   nextIncompletePhase,
 };
