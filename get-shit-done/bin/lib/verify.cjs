@@ -394,6 +394,24 @@ function cmdVerifyKeyLinks(cwd, planFilePath, raw) {
   }, raw, verified === results.length ? 'valid' : 'invalid');
 }
 
+// Extract phase numbers from roadmap content using multiple patterns:
+// heading-style (## Phase 1:), bullet-style (- [x] Phase 1:), range-style (Phases 1-7)
+function extractPhasesFromContent(content) {
+  const phases = new Set();
+  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+  const bulletPhasePattern = /^-\s*(?:\[[ x]\]\s*)?(?:\*\*)?Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gim;
+  const rangePhasePattern = /Phases?\s+(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)/gi;
+  let m;
+  while ((m = phasePattern.exec(content)) !== null) phases.add(m[1]);
+  while ((m = bulletPhasePattern.exec(content)) !== null) phases.add(m[1]);
+  while ((m = rangePhasePattern.exec(content)) !== null) {
+    const start = parseInt(m[1], 10);
+    const end = parseInt(m[2], 10);
+    for (let i = start; i <= end; i++) phases.add(String(i));
+  }
+  return phases;
+}
+
 function cmdValidateConsistency(cwd, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -409,13 +427,12 @@ function cmdValidateConsistency(cwd, raw) {
 
   const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
-  // Extract phases from ROADMAP
-  const roadmapPhases = new Set();
-  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
-  let m;
-  while ((m = phasePattern.exec(roadmapContent)) !== null) {
-    roadmapPhases.add(m[1]);
-  }
+  // All phases (including shipped/archived in <details>) — used for W007
+  const roadmapPhases = extractPhasesFromContent(roadmapContent);
+  // Active phases only (from ## Phases section) — used for W006
+  const sections = roadmapContent.split(/^(?=## )/m);
+  const activeContent = sections.find(s => /^## Phases\b/.test(s)) || '';
+  const activeRoadmapPhases = extractPhasesFromContent(activeContent);
 
   // Get phases on disk
   const diskPhases = new Set();
@@ -428,14 +445,14 @@ function cmdValidateConsistency(cwd, raw) {
     }
   } catch {}
 
-  // Check: phases in ROADMAP but not on disk
-  for (const p of roadmapPhases) {
+  // Check: active phases in ROADMAP but not on disk (W006 equivalent)
+  for (const p of activeRoadmapPhases) {
     if (!diskPhases.has(p) && !diskPhases.has(normalizePhaseName(p))) {
       warnings.push(`Phase ${p} in ROADMAP.md but no directory on disk`);
     }
   }
 
-  // Check: phases on disk but not in ROADMAP
+  // Check: phases on disk but not in ROADMAP (W007 equivalent)
   for (const p of diskPhases) {
     const unpadded = String(parseInt(p, 10));
     if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
@@ -650,12 +667,13 @@ function cmdValidateHealth(cwd, options, raw) {
   // Inline subset of cmdValidateConsistency
   if (fs.existsSync(roadmapPath)) {
     const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-    const roadmapPhases = new Set();
-    const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
-    let m;
-    while ((m = phasePattern.exec(roadmapContent)) !== null) {
-      roadmapPhases.add(m[1]);
-    }
+
+    // All phases (including shipped/archived in <details>) — used for W007
+    const roadmapPhases = extractPhasesFromContent(roadmapContent);
+    // Active phases only (from ## Phases section) — used for W006
+    const sections = roadmapContent.split(/^(?=## )/m);
+    const activeContent = sections.find(s => /^## Phases\b/.test(s)) || '';
+    const activeRoadmapPhases = extractPhasesFromContent(activeContent);
 
     const diskPhases = new Set();
     try {
@@ -668,15 +686,15 @@ function cmdValidateHealth(cwd, options, raw) {
       }
     } catch {}
 
-    // Phases in ROADMAP but not on disk
-    for (const p of roadmapPhases) {
+    // Active phases in ROADMAP but not on disk
+    for (const p of activeRoadmapPhases) {
       const padded = String(parseInt(p, 10)).padStart(2, '0');
       if (!diskPhases.has(p) && !diskPhases.has(padded)) {
         addIssue('warning', 'W006', `Phase ${p} in ROADMAP.md but no directory on disk`, 'Create phase directory or remove from roadmap');
       }
     }
 
-    // Phases on disk but not in ROADMAP
+    // Phases on disk but not in ROADMAP (checks all phases including archived)
     for (const p of diskPhases) {
       const unpadded = String(parseInt(p, 10));
       if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
