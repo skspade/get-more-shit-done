@@ -6,6 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const { output, error } = require('./core.cjs');
 
+const CONFIG_DEFAULTS = {
+  'autopilot.circuit_breaker_threshold': 3,
+  'autopilot.max_debug_retries': 3,
+  'autopilot.max_audit_fix_iterations': 3,
+  'autopilot.auto_accept_tech_debt': true,
+};
+
 function cmdConfigEnsureSection(cwd, raw) {
   const configPath = path.join(cwd, '.planning', 'config.json');
   const planningDir = path.join(cwd, '.planning');
@@ -147,25 +154,30 @@ function cmdConfigGet(cwd, keyPath, raw) {
   try {
     if (fs.existsSync(configPath)) {
       config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    } else {
-      error('No config.json found at ' + configPath);
     }
   } catch (err) {
-    if (err.message.startsWith('No config.json')) throw err;
-    error('Failed to read config.json: ' + err.message);
+    // Config exists but is malformed — fall through to defaults check
   }
 
   // Traverse dot-notation path (e.g., "workflow.auto_advance")
   const keys = keyPath.split('.');
   let current = config;
+  let found = true;
   for (const key of keys) {
     if (current === undefined || current === null || typeof current !== 'object') {
-      error(`Key not found: ${keyPath}`);
+      found = false;
+      break;
     }
     current = current[key];
   }
 
-  if (current === undefined) {
+  if (!found || current === undefined) {
+    // Fall back to CONFIG_DEFAULTS
+    if (CONFIG_DEFAULTS[keyPath] !== undefined) {
+      const defaultVal = CONFIG_DEFAULTS[keyPath];
+      output(defaultVal, raw, String(defaultVal));
+      return;
+    }
     error(`Key not found: ${keyPath}`);
   }
 
@@ -176,4 +188,5 @@ module.exports = {
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
+  CONFIG_DEFAULTS,
 };

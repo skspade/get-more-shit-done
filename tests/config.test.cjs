@@ -340,14 +340,14 @@ describe('config-get command', () => {
     );
   });
 
-  test('errors when config.json does not exist', () => {
+  test('errors when config.json does not exist and key not in defaults', () => {
     const emptyTmpDir = createTempProject();
     try {
       const result = runGsdTools('config-get model_profile', emptyTmpDir);
       assert.strictEqual(result.success, false);
       assert.ok(
-        result.error.includes('No config.json'),
-        `Expected "No config.json" in error: ${result.error}`
+        result.error.includes('Key not found'),
+        `Expected "Key not found" in error: ${result.error}`
       );
     } finally {
       cleanup(emptyTmpDir);

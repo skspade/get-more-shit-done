@@ -778,6 +778,76 @@ function cmdValidateHealth(cwd, options, raw) {
   }, raw);
 }
 
+/**
+ * getVerificationStatus — Returns { status, score } from VERIFICATION.md or UAT.md frontmatter, or null.
+ * @param {string} cwd - project root
+ * @param {string} phaseDir - relative phase directory (e.g., ".planning/phases/47-cjs-module-extensions")
+ */
+function getVerificationStatus(cwd, phaseDir) {
+  const absDir = path.join(cwd, phaseDir);
+  let files;
+  try {
+    files = fs.readdirSync(absDir);
+  } catch {
+    return null;
+  }
+
+  // Search order: VERIFICATION.md first, UAT.md fallback
+  const verFile = files.find(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+  const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
+  const targetFile = verFile || uatFile;
+  if (!targetFile) return null;
+
+  const content = fs.readFileSync(path.join(absDir, targetFile), 'utf-8');
+  const fm = extractFrontmatter(content);
+  return {
+    status: fm.status || null,
+    score: fm.score || null,
+  };
+}
+
+/**
+ * getGapsSummary — Returns array of gap description strings from VERIFICATION.md or UAT.md.
+ * @param {string} cwd - project root
+ * @param {string} phaseDir - relative phase directory
+ */
+function getGapsSummary(cwd, phaseDir) {
+  const absDir = path.join(cwd, phaseDir);
+  let files;
+  try {
+    files = fs.readdirSync(absDir);
+  } catch {
+    return [];
+  }
+
+  const verFile = files.find(f => f.endsWith('-VERIFICATION.md') || f === 'VERIFICATION.md');
+  const uatFile = files.find(f => f.endsWith('-UAT.md') || f === 'UAT.md');
+  const targetFile = verFile || uatFile;
+  if (!targetFile) return [];
+
+  const content = fs.readFileSync(path.join(absDir, targetFile), 'utf-8');
+  const lines = content.split('\n');
+  const gaps = [];
+  let inGapSection = false;
+
+  for (const line of lines) {
+    if (/^## .*[Gg]ap/.test(line)) {
+      inGapSection = true;
+      continue;
+    }
+    if (inGapSection && /^## /.test(line)) {
+      inGapSection = false;
+      continue;
+    }
+    if (inGapSection) {
+      const trimmed = line.trim();
+      if (trimmed) gaps.push(trimmed);
+    }
+  }
+
+  return gaps;
+}
+
 module.exports = {
   cmdVerifySummary,
   cmdVerifyPlanStructure,
@@ -788,4 +858,6 @@ module.exports = {
   cmdVerifyKeyLinks,
   cmdValidateConsistency,
   cmdValidateHealth,
+  getVerificationStatus,
+  getGapsSummary,
 };
