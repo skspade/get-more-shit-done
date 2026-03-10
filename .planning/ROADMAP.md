@@ -12,7 +12,7 @@
 - ✅ **v2.0 README Rewrite** — Phases 36-37 (shipped 2026-03-06)
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
-- **v2.3 Autopilot CJS Consolidation** — Phases 47-51
+- **v2.3 Autopilot CJS Consolidation** — Phases 47-53
 
 ## Phases
 
@@ -122,13 +122,15 @@
 
 </details>
 
-### v2.3 Autopilot CJS Consolidation (Phases 47-51)
+### v2.3 Autopilot CJS Consolidation (Phases 47-53)
 
 - [x] **Phase 47: CJS Module Extensions** — Add phase navigation, verification status, config defaults, and tool dispatch to existing CJS modules (completed 2026-03-10)
 - [x] **Phase 48: zx Autopilot Core** — Rewrite the main autopilot loop as a zx script importing CJS modules directly (completed 2026-03-10)
 - [x] **Phase 49: Advanced Autopilot Features** — Debug retry, verification gate, and milestone audit in the zx script (completed 2026-03-10)
 - [x] **Phase 50: Migration and Fallback** — Wire up entrypoint, preserve legacy script, update dependencies (completed 2026-03-10)
 - [x] **Phase 51: Tests** — Unit and integration tests for all new CJS functions and the zx script (completed 2026-03-10)
+- [ ] **Phase 52: Fix Critical Integration Bugs** — Fix entrypoint invocation and property name mismatch (Gap Closure)
+- [ ] **Phase 53: Close Verification and Metadata Gaps** — Verify Phase 49, fix SUMMARY frontmatter, update traceability (Gap Closure)
 
 ### Phase 47: CJS Module Extensions
 **Goal**: Autopilot logic currently duplicated in bash exists as tested CJS functions callable from any JS context
@@ -188,6 +190,28 @@
 **Plans**: 2 plans
 - [ ] 51-01-PLAN.md — Phase navigation and verification status unit tests
 - [ ] 51-02-PLAN.md — Config defaults, dispatch, and autopilot dry-run tests
+
+### Phase 52: Fix Critical Integration Bugs
+**Goal**: The zx autopilot runs without runtime crashes — entrypoint invokes zx correctly and phase directory resolution uses the correct property name
+**Depends on**: Phase 51
+**Requirements**: REQ-10, REQ-11, REQ-22
+**Gap Closure**: Closes integration bugs from v2.3 audit
+**Success Criteria** (what must be TRUE):
+  1. `bin/gsd-autopilot` invokes `autopilot.mjs` via `npx zx` (not plain `node`), so zx globals are available
+  2. `autopilot.mjs` uses `phaseInfo.directory` (not `.dir`) at all 5 locations, so phase directory resolution works correctly
+  3. `autopilot.mjs --dry-run` completes without `ReferenceError` or `undefined` path errors
+**Plans**: TBD
+
+### Phase 53: Close Verification and Metadata Gaps
+**Goal**: All v2.3 requirements have verification evidence, correct SUMMARY frontmatter, and up-to-date traceability
+**Depends on**: Phase 52
+**Requirements**: REQ-14, REQ-15, REQ-16
+**Gap Closure**: Closes verification and metadata gaps from v2.3 audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 49 has a VERIFICATION.md confirming REQ-14 (debug retry), REQ-15 (verification gate), REQ-16 (milestone audit) are implemented
+  2. SUMMARY frontmatter for Phases 47, 48, 49 includes `requirements-completed` entries for all assigned requirements
+  3. REQUIREMENTS.md traceability table reflects actual status (Complete/Pending) for all 28 requirements
+**Plans**: TBD
 
 ## Progress
 
