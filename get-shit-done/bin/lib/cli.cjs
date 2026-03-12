@@ -699,6 +699,10 @@ function validateSetting(key, value) {
     if (!Number.isInteger(value) || value <= 0) {
       return `'autopilot.circuit_breaker_threshold' must be a positive integer`;
     }
+  } else if (key === 'autopilot.stall_timeout_ms') {
+    if (!Number.isInteger(value) || value <= 0) {
+      return `'autopilot.stall_timeout_ms' must be a positive integer`;
+    }
   }
 
   return null;
@@ -734,7 +738,7 @@ const KNOWN_SETTINGS_KEYS = [
   'workflow', 'workflow.research', 'workflow.plan_check', 'workflow.verifier',
   'workflow.auto_advance', 'workflow.nyquist_validation',
   'parallelization', 'brave_search',
-  'autopilot', 'autopilot.circuit_breaker_threshold',
+  'autopilot', 'autopilot.circuit_breaker_threshold', 'autopilot.stall_timeout_ms',
   'mode', 'depth', 'model_overrides',
   'research', 'plan_checker', 'verifier', 'nyquist_validation',
   'test', 'test.hard_gate', 'test.acceptance_tests', 'test.budget',

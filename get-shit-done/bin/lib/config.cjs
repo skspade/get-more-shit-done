@@ -11,6 +11,7 @@ const CONFIG_DEFAULTS = {
   'autopilot.max_debug_retries': 3,
   'autopilot.max_audit_fix_iterations': 3,
   'autopilot.auto_accept_tech_debt': true,
+  'autopilot.stall_timeout_ms': 300000,
 };
 
 function cmdConfigEnsureSection(cwd, raw) {
