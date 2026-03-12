@@ -594,9 +594,8 @@ async function runStepWithRetry(prompt, stepName) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
-    if (debugResult.stdout) process.stdout.write(debugResult.stdout);
-    if (debugResult.exitCode !== 0) {
+    const { exitCode: debugExitCode } = await runClaudeStreaming(debugPrompt);
+    if (debugExitCode !== 0) {
       console.error('WARNING: Debugger itself returned non-zero. Continuing to next retry.');
     }
   }
@@ -639,8 +638,7 @@ async function runVerifyWithDebugRetry(phase) {
       console.log('\u2501'.repeat(53));
       console.log('');
 
-      const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
-      if (debugResult.stdout) process.stdout.write(debugResult.stdout);
+      await runClaudeStreaming(debugPrompt);
       continue;
     }
 
@@ -678,8 +676,7 @@ async function runVerifyWithDebugRetry(phase) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
-    if (debugResult.stdout) process.stdout.write(debugResult.stdout);
+    await runClaudeStreaming(debugPrompt);
   }
 }
 
