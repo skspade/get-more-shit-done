@@ -124,11 +124,11 @@ describe('autopilot.mjs stdin redirect (regression)', () => {
     }
   });
 
-  test('there are exactly 5 claude -p shell invocations', () => {
+  test('there are exactly 7 claude -p shell invocations', () => {
     assert.strictEqual(
       shellInvocationLines.length,
-      5,
-      `Expected 5 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
+      7,
+      `Expected 7 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
         shellInvocationLines.map((l, i) => `  ${i + 1}: ${l.trim()}`).join('\n')
     );
   });
@@ -192,5 +192,84 @@ describe('autopilot.mjs argument validation', () => {
         `Expected stderr to contain "Unknown argument", got: ${stderr}`
       );
     }
+  });
+});
+
+// ─── Static Analysis: streaming functions (Phase 54) ─────────────────────────
+
+describe('autopilot.mjs streaming functions (static analysis)', () => {
+  const source = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
+
+  test('runClaudeStreaming function exists', () => {
+    assert.ok(
+      source.includes('function runClaudeStreaming'),
+      'autopilot.mjs should contain runClaudeStreaming function'
+    );
+  });
+
+  test('displayStreamEvent function exists', () => {
+    assert.ok(
+      source.includes('function displayStreamEvent'),
+      'autopilot.mjs should contain displayStreamEvent function'
+    );
+  });
+
+  test('--quiet flag is in knownFlags', () => {
+    const knownFlagsLine = source.split('\n').find(l => l.includes('knownFlags') && l.includes('new Set'));
+    assert.ok(knownFlagsLine, 'knownFlags Set declaration should exist');
+    assert.ok(
+      knownFlagsLine.includes('quiet'),
+      `knownFlags should include 'quiet', got: ${knownFlagsLine.trim()}`
+    );
+  });
+
+  test('QUIET constant is defined', () => {
+    assert.ok(
+      source.includes('const QUIET'),
+      'autopilot.mjs should define QUIET constant'
+    );
+  });
+
+  test('stall timer uses getConfig for timeout', () => {
+    assert.ok(
+      source.includes('stall_timeout_ms'),
+      'autopilot.mjs should reference stall_timeout_ms config key'
+    );
+  });
+
+  test('streaming path uses --output-format stream-json', () => {
+    assert.ok(
+      source.includes('stream-json'),
+      'autopilot.mjs should use --output-format stream-json'
+    );
+  });
+
+  test('displayStreamEvent handles assistant events', () => {
+    assert.ok(
+      source.includes("event.type === 'assistant'") || source.includes('event.type === "assistant"'),
+      'displayStreamEvent should handle assistant event type'
+    );
+  });
+
+  test('displayStreamEvent handles tool_use events', () => {
+    assert.ok(
+      source.includes("event.type === 'tool_use'") || source.includes('event.type === "tool_use"'),
+      'displayStreamEvent should handle tool_use event type'
+    );
+  });
+
+  test('stall timer uses unref to prevent blocking exit', () => {
+    assert.ok(
+      source.includes('.unref()'),
+      'Stall timer should call .unref() to prevent blocking process exit'
+    );
+  });
+
+  test('runClaudeStreaming returns exitCode and stdout', () => {
+    const returnPattern = /return\s*\{\s*exitCode.*stdout|return\s*\{\s*stdout.*exitCode/;
+    assert.ok(
+      returnPattern.test(source),
+      'runClaudeStreaming should return { exitCode, stdout }'
+    );
   });
 });
