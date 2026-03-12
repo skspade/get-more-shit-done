@@ -414,4 +414,25 @@ describe('CONFIG_DEFAULTS fallback', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
     assert.strictEqual(JSON.parse(result.output), 3);
   });
+
+  test('returns default for unset autopilot.stall_timeout_ms', () => {
+    const result = runGsdTools('config-get autopilot.stall_timeout_ms', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 300000);
+  });
+
+  test('returns configured value for autopilot.stall_timeout_ms when set', () => {
+    runGsdTools('config-ensure-section', tmpDir);
+    runGsdTools('config-set autopilot.stall_timeout_ms 60000', tmpDir);
+    const result = runGsdTools('config-get autopilot.stall_timeout_ms', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 60000);
+  });
+
+  test('returns default for stall_timeout_ms when config exists but key absent', () => {
+    runGsdTools('config-ensure-section', tmpDir);
+    const result = runGsdTools('config-get autopilot.stall_timeout_ms', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), 300000);
+  });
 });

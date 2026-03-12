@@ -797,6 +797,15 @@ describe('handleSettings', () => {
     assert.strictEqual(config.autopilot.circuit_breaker_threshold, 3);
   });
 
+  test('set mode validates autopilot.stall_timeout_ms is positive integer', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ autopilot: { stall_timeout_ms: 300000 } }, null, 2));
+    const result = routeCommand('settings', tmpDir, ['set', 'autopilot.stall_timeout_ms', '0'], 'json');
+    assert.strictEqual(result.error, true);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, '.planning', 'config.json'), 'utf-8'));
+    assert.strictEqual(config.autopilot.stall_timeout_ms, 300000);
+  });
+
   test('set mode allows unknown keys with info notice (SETT-02)', () => {
     const result = routeCommand('settings', tmpDir, ['set', 'custom_key', 'custom_value'], 'json');
     assert.strictEqual(result.updated, true);
