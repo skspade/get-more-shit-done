@@ -345,12 +345,9 @@ async function runStep(prompt, stepName) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
+  const { exitCode } = await runClaudeStreaming(prompt);
 
-  const exitCode = result.exitCode;
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
-
-  if (result.stdout) process.stdout.write(result.stdout);
 
   const snapshotAfter = await takeProgressSnapshot();
   checkProgress(snapshotBefore, snapshotAfter, stepName);
@@ -536,15 +533,9 @@ async function runStepCaptured(prompt, stepName, outputFile) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
+  const { exitCode } = await runClaudeStreaming(prompt, { outputFile });
 
-  const exitCode = result.exitCode;
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
-
-  if (result.stdout) {
-    process.stdout.write(result.stdout);
-    fs.appendFileSync(outputFile, result.stdout);
-  }
 
   const snapshotAfter = await takeProgressSnapshot();
   checkProgress(snapshotBefore, snapshotAfter, stepName);
