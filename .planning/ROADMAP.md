@@ -143,7 +143,7 @@
 - [x] **Phase 54: Core Streaming Function** - Discovery, NDJSON parsing, event display, stall detection, quiet mode, and stdin preservation in a single `runClaudeStreaming()` function (completed 2026-03-12)
 - [x] **Phase 55: Step Function Integration** - Wire `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` with real-time output file capture (completed 2026-03-12)
 - [x] **Phase 56: Debug Retry Integration** - Route all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live debugger output (completed 2026-03-12)
-- [ ] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior
+- [x] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior (completed 2026-03-12)
 
 ## Phase Details
 
@@ -223,4 +223,4 @@ Phases execute in numeric order: 54 -> 55 -> 56 -> 57
 | 54. Core Streaming Function | 2/2 | Complete    | 2026-03-12 | - |
 | 55. Step Function Integration | 1/1 | Complete    | 2026-03-12 | - |
 | 56. Debug Retry Integration | 1/1 | Complete    | 2026-03-12 | - |
-| 57. Config Schema and Verification | v2.4 | 0/? | Not started | - |
+| 57. Config Schema and Verification | 1/1 | Complete    | 2026-03-12 | - |
