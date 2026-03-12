@@ -84,7 +84,11 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- Real-time streaming output via `--output-format stream-json` replacing buffered JSON — v2.4
+- Core `runClaudeStreaming()` function consolidating all 5 `claude -p` invocation sites — v2.4
+- Stream event display: assistant text to stdout, tool calls as compact indicators to stderr — v2.4
+- Configurable stall detection timer with repeated warnings when no output received — v2.4
+- `--quiet` CLI flag restoring original JSON behavior for CI/scripted use — v2.4
 
 ### Out of Scope
 
@@ -161,10 +165,21 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 Shipped v2.3 with autopilot CJS consolidation. 11 milestones shipped (v1.0-v2.3) across 53 phases, 81 plans. 720 tests (budget at 90%).
 
+**Current Milestone: v2.4 Autopilot Streaming**
+
+**Goal:** Add real-time streaming output to the GSD autopilot via `--output-format stream-json`, with stall detection and `--quiet` fallback.
+
+**Target features:**
+- Stream-JSON NDJSON parsing with line-by-line event processing
+- Core `runClaudeStreaming()` function replacing all buffered invocation sites
+- Real-time assistant text + tool call indicators to terminal
+- Configurable stall detection timer (default 5 min) with repeated warnings
+- `--quiet` flag for CI/scripted JSON-only mode
+
 **Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP
 **Codebase:** ~65,500 LOC JavaScript/CJS/Bash/Markdown
 **Known tech debt:** Test budget at 90% (720/800) — 3 redundancy findings with 2 consolidation proposals; 2 pre-existing test failures (roadmap.test.cjs, verify-health.test.cjs) unrelated to v2.3; `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-10 after v2.3 milestone*
+*Last updated: 2026-03-12 after v2.4 milestone started*

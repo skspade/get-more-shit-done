@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.3
-milestone_name: Autopilot CJS Consolidation
-status: complete
-last_updated: "2026-03-10T18:10:00.000Z"
+milestone: v2.4
+milestone_name: Autopilot Streaming
+status: active
+last_updated: "2026-03-12T17:11:58.158Z"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 16
-  completed_plans: 16
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** v2.4 Autopilot Streaming — real-time output via stream-json
 
 ## Current Position
 
-Milestone: v2.3 Autopilot CJS Consolidation — SHIPPED 2026-03-10
-Phase: All complete
-Status: Milestone archived
-Last activity: 2026-03-12 - Completed quick task 8: Test GSD autopilot node script
+Milestone: v2.4 Autopilot Streaming
+Phase: Not started (defining requirements)
+Status: Defining requirements
+Last activity: 2026-03-12 — Milestone v2.4 started
 
-Progress: [##########] 100%
+Progress: [..........] 0%
 
 ## Performance Metrics
 
