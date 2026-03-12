@@ -140,7 +140,7 @@
 
 **Milestone Goal:** Add real-time streaming output to the autopilot via `--output-format stream-json`, replacing buffered JSON with live assistant text and tool call indicators, with stall detection and `--quiet` fallback.
 
-- [ ] **Phase 54: Core Streaming Function** - Discovery, NDJSON parsing, event display, stall detection, quiet mode, and stdin preservation in a single `runClaudeStreaming()` function
+- [x] **Phase 54: Core Streaming Function** - Discovery, NDJSON parsing, event display, stall detection, quiet mode, and stdin preservation in a single `runClaudeStreaming()` function (completed 2026-03-12)
 - [ ] **Phase 55: Step Function Integration** - Wire `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` with real-time output file capture
 - [ ] **Phase 56: Debug Retry Integration** - Route all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live debugger output
 - [ ] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior
@@ -220,7 +220,7 @@ Phases execute in numeric order: 54 -> 55 -> 56 -> 57
 | 38-39 | v2.1 | 2/2 | Complete | 2026-03-06 |
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
-| 54. Core Streaming Function | v2.4 | 0/? | Not started | - |
+| 54. Core Streaming Function | 2/2 | Complete    | 2026-03-12 | - |
 | 55. Step Function Integration | v2.4 | 0/? | Not started | - |
 | 56. Debug Retry Integration | v2.4 | 0/? | Not started | - |
 | 57. Config Schema and Verification | v2.4 | 0/? | Not started | - |
