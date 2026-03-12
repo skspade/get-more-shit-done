@@ -124,11 +124,11 @@ describe('autopilot.mjs stdin redirect (regression)', () => {
     }
   });
 
-  test('there are exactly 7 claude -p shell invocations', () => {
+  test('there are exactly 5 claude -p shell invocations', () => {
     assert.strictEqual(
       shellInvocationLines.length,
-      7,
-      `Expected 7 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
+      5,
+      `Expected 5 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
         shellInvocationLines.map((l, i) => `  ${i + 1}: ${l.trim()}`).join('\n')
     );
   });
