@@ -1,347 +1,294 @@
-# Stack Research: Dual-Layer Test Architecture
+# Stack Research: Autopilot Streaming (v2.4)
 
-**Domain:** Test architecture additions for autonomous AI agent orchestration framework
-**Researched:** 2026-03-05
+**Domain:** Real-time streaming output for zx-based autopilot CLI
+**Researched:** 2026-03-12
 **Confidence:** HIGH
-**Scope:** NEW capabilities only -- test steward, acceptance test execution, hard test gates, test budget counting, test framework auto-detection
 
-## Executive Decision
+## Scope
 
-**Zero new npm dependencies.** Every capability in the v1.6 design is implementable with Node.js built-ins, shell commands (grep/find), and the existing `gsd-tools.cjs` extension pattern. This is not a compromise -- it is the correct approach for a workflow/agent project that already runs with zero runtime dependencies.
+This research covers ONLY the new capabilities needed for v2.4 streaming features. The existing validated stack (zx v8, createRequire, --output-format json, process.stdout.write, circuit breaker) is not re-evaluated.
 
-## What Already Exists (Do NOT Rebuild, Do NOT Re-Research)
+## Recommended Stack
 
-| Existing Component | v1.6 Relevance |
-|---|---|
-| `gsd-tools.cjs` CLI router (600 LOC) | New `test-count`, `test-detect` subcommands plug into existing switch/case dispatcher |
-| `config.cjs` module (config-get/config-set/config-ensure) | Already supports dot-notation paths -- `test.command`, `test.budget.max_tests_per_phase` work out of the box |
-| `node:test` runner + `scripts/run-tests.cjs` | GSD's own test suite (15 files, 618 test cases) validates that new lib modules don't break anything |
-| `verify.cjs` module | Acceptance test verification extends existing verification patterns |
-| `execute-plan.md` workflow | Hard gate inserts after existing task-commit step |
-| `discuss-phase.md` workflow | Acceptance test gathering adds a new step after decision gathering |
-| `audit-milestone.md` workflow | Test steward spawns as a Task subagent at audit time |
-| `add-tests.md` workflow | Repurposed as "fill gaps" for pre-v1.6 phases |
+### Core Technologies (NEW for v2.4)
 
-**Confidence: HIGH** -- Direct codebase inspection. All 12 lib modules, 15 test files, package.json, dispatcher examined.
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Node.js `readline` (built-in) | Node 22+ (already in use) | Line-by-line NDJSON parsing from child process stdout | Built-in, zero dependencies, async iterable via `for await`, already imported in autopilot.mjs for TTY input |
+| `JSON.parse()` (built-in) | N/A | Parse each NDJSON line into structured event objects | Native, fast, no schema validation needed for known event shapes |
+| `setTimeout` / `clearTimeout` (built-in) | N/A | Stall detection timer with repeated re-arming | Native timer API, no external scheduler needed for single-timer pattern |
 
-## New Capabilities: Implementation Stack
+### No New Dependencies Required
 
-### 1. Test Framework Auto-Detection
+Zero npm packages need to be added. The entire streaming feature is implementable with Node.js built-ins and the existing zx dependency.
 
-**What:** Detect the project's test framework (jest, vitest, mocha, node:test, pytest, go test, etc.) from project files.
+**Rationale:** The NDJSON protocol is trivial (one JSON object per newline). Libraries like `ndjson`, `stream-json`, or `JSONStream` add dependency weight for parsing that `readline` + `JSON.parse()` handles in ~5 lines. The autopilot already imports `readline` for TTY input (`createInterface`).
 
-**Implementation:** New function in a new `get-shit-done/bin/lib/testing.cjs` module. Pure Node.js, no dependencies.
+## Critical Finding: Claude CLI Stream-JSON Event Format
 
-**Detection algorithm (ordered by specificity):**
+**The design doc's assumed event format is WRONG.** The design doc assumes top-level `{"type": "assistant", ...}` events. The actual Claude CLI `--output-format stream-json` emits a DIFFERENT format.
+
+### Actual Event Format (without --include-partial-messages)
+
+Without `--include-partial-messages`, the CLI emits complete turn-level messages as NDJSON:
+
+```jsonl
+{"type": "system", "subtype": "init", "data": {...}, "session_id": "..."}
+{"type": "assistant", "data": {"message": {"content": [...]}}, "session_id": "..."}
+{"type": "result", "subtype": "success", "data": {"total_cost_usd": 0.xx, "duration_ms": nnn, "num_turns": n}, "session_id": "..."}
+```
+
+These arrive as COMPLETE messages after each turn finishes. This means assistant text does NOT stream token-by-token -- it arrives as a single complete message per turn.
+
+### Actual Event Format (with --include-partial-messages)
+
+With `--include-partial-messages`, the CLI ALSO emits `stream_event` messages wrapping raw Anthropic API events:
+
+```jsonl
+{"type": "stream_event", "event": {"type": "message_start", ...}}
+{"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "text", ...}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Hello"}}}
+{"type": "stream_event", "event": {"type": "content_block_stop"}}
+{"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Edit"}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "input_json_delta", "partial_json": "..."}}}
+{"type": "stream_event", "event": {"type": "content_block_stop"}}
+{"type": "stream_event", "event": {"type": "message_delta", ...}}
+{"type": "stream_event", "event": {"type": "message_stop"}}
+{"type": "assistant", "data": {"message": {"content": [...]}}, "session_id": "..."}
+{"type": "result", "subtype": "success", "data": {...}, "session_id": "..."}
+```
+
+### Implications for Design
+
+1. **Must use `--include-partial-messages`** flag in addition to `--output-format stream-json` to get real-time token streaming
+2. **Must also use `--verbose`** to see tool calls (per official docs example)
+3. **Event dispatch must check TWO layers:** top-level `type` field, then for `stream_event` type, check `event.type` and `event.delta.type`
+4. **The design doc's `displayStreamEvent()` switch must be rewritten** to handle the actual nested event structure
+
+### Corrected CLI Invocation
 
 ```javascript
-function detectTestFramework(cwd) {
-  // 1. Check config.json for explicit override
-  const config = loadConfig(cwd);
-  if (config.test?.framework && config.test.framework !== 'auto') {
-    return config.test.framework;
-  }
+// Design doc assumed:
+claude -p --output-format stream-json ${prompt}
 
-  // 2. Check package.json devDependencies (most reliable for JS projects)
-  const pkg = safeReadJson(path.join(cwd, 'package.json'));
-  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (deps.vitest) return 'vitest';
-  if (deps.jest) return 'jest';
-  if (deps.mocha) return 'mocha';
-
-  // 3. Check for framework config files
-  if (exists('vitest.config.*')) return 'vitest';
-  if (exists('jest.config.*') || pkg.jest) return 'jest';
-  if (exists('.mocharc.*')) return 'mocha';
-
-  // 4. Check test script content
-  const testCmd = pkg.scripts?.test || '';
-  if (testCmd.includes('vitest')) return 'vitest';
-  if (testCmd.includes('jest')) return 'jest';
-  if (testCmd.includes('mocha')) return 'mocha';
-  if (testCmd.includes('node --test') || testCmd.includes('node:test')) return 'node:test';
-  if (testCmd.includes('pytest')) return 'pytest';
-  if (testCmd.includes('go test')) return 'go';
-
-  // 5. Check for node:test usage in test files (GSD's own pattern)
-  if (hasNodeTestImports(cwd)) return 'node:test';
-
-  return 'unknown';
-}
+// Actual correct invocation:
+claude -p --output-format stream-json --verbose --include-partial-messages ${prompt}
 ```
 
-**Why this approach over an npm package:** No "detect-test-framework" package exists that covers this use case well. The detection logic is ~40 lines, stable, and specific to what GSD needs. Adding a dependency for this would be absurd.
-
-**Confidence: HIGH** -- The detection signals (devDependencies keys, config file names, script content) are stable across framework versions and well-documented in each framework's official docs.
-
-### 2. Test Case Counting
-
-**What:** Count individual test cases (not files) across the project and optionally per-phase.
-
-**Implementation:** Shell-based grep in `testing.cjs`, exposed as `gsd-tools.cjs test-count`.
-
-**Counting patterns by framework:**
-
-| Framework | Pattern | Notes |
-|---|---|---|
-| jest/vitest/mocha | `it(`, `test(`, `it.only(`, `test.only(` | Standard across all three |
-| node:test | Same as above (node:test uses identical `test()`/`it()` API) | Verified against GSD's own 15 test files |
-| pytest | `def test_` | Python convention |
-| go | `func Test` | Go convention |
-
-**Implementation approach:**
+### Corrected Event Display Logic
 
 ```javascript
-function countTests(cwd, framework) {
-  const patterns = getTestPatterns(framework);  // file globs for test files
-  const countRegex = getCountRegex(framework);  // what to grep for
+function displayStreamEvent(line) {
+  try {
+    const msg = JSON.parse(line);
 
-  // Use grep -r with --include for file filtering
-  // This is what the design doc already specifies and it works
-  const result = execSync(
-    `grep -r -c "${countRegex}" ${testDirs} ${includeFlags} 2>/dev/null | awk -F: '{sum+=$2} END{print sum}'`,
-    { cwd, encoding: 'utf-8' }
-  ).trim();
+    if (msg.type === 'stream_event') {
+      const event = msg.event;
 
-  return parseInt(result, 10) || 0;
-}
-```
+      if (event.type === 'content_block_delta') {
+        if (event.delta?.type === 'text_delta') {
+          process.stdout.write(event.delta.text);
+        }
+        // input_json_delta for tool inputs -- skip (too verbose)
+      }
 
-**Why grep over AST parsing:** The design doc's grep approach is correct. AST parsing would require `@babel/parser` or `acorn` (new dependencies) and would be slower for a simple count. Grep handles 99% of cases -- the 1% edge case (test name containing `test(` as a string) is noise in a count used for budget advisory, not billing.
-
-**Per-phase counting:** The design mentions "by commit attribution" but this is complex (git log parsing per file, mapping commits to phases). Simpler alternative: count tests in files that live under phase directories, or count tests in files modified during a phase's commits. The commit-based approach adds complexity without proportional value for a budget advisory. Recommend: count all tests project-wide for budget, defer per-phase attribution to the steward's analysis.
-
-**Confidence: HIGH** -- Verified the grep pattern against GSD's own 618 test cases. `grep -r -c "it(\|test(" tests/ --include="*.test.*"` returns correct counts.
-
-### 3. Hard Test Gate in execute-plan
-
-**What:** After each task commit during plan execution, run the project's full test suite. Fail = trigger debug-retry.
-
-**Implementation:** Pure shell in the execute-plan workflow. Zero new code in gsd-tools.cjs.
-
-```bash
-# Fetch test command from config (existing config-get works today)
-TEST_CMD=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get test.command 2>/dev/null)
-
-if [ -n "$TEST_CMD" ] && [ "$TEST_CMD" != "null" ]; then
-  eval "$TEST_CMD"
-  if [ $? -ne 0 ]; then
-    echo "HARD GATE: Test suite failed after task ${TASK_NUM}"
-    # Existing Rule 1 deviation handling kicks in
-  fi
-else
-  echo "Warning: No test command configured -- test gates inactive"
-fi
-```
-
-**Why no wrapper library:** The hard gate is 8 lines of bash in a markdown workflow file. It uses `config-get` which already exists. Adding a "test runner abstraction" would be over-engineering.
-
-**What about `test.hard_gate` config toggle:** The workflow should also check `config-get test.hard_gate` before running. If false, skip the gate. This is a one-line addition.
-
-**Confidence: HIGH** -- `config-get` tested and working. Shell eval of test commands is the standard pattern used by npm, CI systems, and every task runner.
-
-### 4. Acceptance Test Execution (Given/When/Then/Verify)
-
-**What:** Parse `<acceptance_tests>` blocks from CONTEXT.md, execute `Verify:` shell commands, report pass/fail.
-
-**Implementation:** New functions in `testing.cjs`, exposed as `gsd-tools.cjs test-acceptance --phase N`.
-
-**Parser approach:**
-
-```javascript
-function parseAcceptanceTests(contextMdContent) {
-  // Extract <acceptance_tests>...</acceptance_tests> block
-  const match = contextMdContent.match(/<acceptance_tests>([\s\S]*?)<\/acceptance_tests>/);
-  if (!match) return [];
-
-  // Parse AT-NN sections with regex
-  const tests = [];
-  const atRegex = /### (AT-\d+):\s*(.+)\n([\s\S]*?)(?=### AT-|\z)/g;
-  // Extract Given/When/Then/Verify from each section
-  // ...
-  return tests;
-}
-
-function runAcceptanceTests(tests, cwd) {
-  const results = [];
-  for (const at of tests) {
-    const { stdout, stderr, status } = spawnSync('sh', ['-c', at.verify], {
-      cwd, timeout: 30000, encoding: 'utf-8'
-    });
-    results.push({
-      id: at.id,
-      name: at.name,
-      passed: status === 0,
-      output: stdout || stderr
-    });
-  }
-  return results;
-}
-```
-
-**Why `spawnSync` over `exec`:** Synchronous execution is correct here -- acceptance tests run sequentially, each must complete before the next. `spawnSync` with a 30-second timeout prevents hanging commands from blocking the workflow.
-
-**Why not a BDD library (cucumber, gherkin):** The acceptance tests are human-readable markdown with a `Verify:` shell command. The Given/When/Then is for humans to read; only the `Verify:` line is executable. Bringing in cucumber would require a gherkin parser, step definitions, a runner -- massive complexity for what is fundamentally `sh -c "$VERIFY_CMD" && echo PASS || echo FAIL`.
-
-**Confidence: HIGH** -- The format is defined in the design doc. Regex parsing of markdown sections is a well-established pattern in this codebase (see `frontmatter.cjs`, `state.cjs`).
-
-### 5. Test Steward Agent
-
-**What:** Analysis agent that detects redundancy, counts budgets, proposes consolidation.
-
-**Implementation:** A new GSD agent file (`agents/gsd-test-steward.md`) + supporting functions in `testing.cjs`.
-
-**What testing.cjs provides to the steward:**
-
-| Function | Purpose | Implementation |
-|---|---|---|
-| `countTests(cwd, framework)` | Total test count for budget check | grep-based (see #2 above) |
-| `detectTestFramework(cwd)` | Framework detection for pattern matching | file-inspection (see #1 above) |
-| `listTestFiles(cwd)` | Enumerate all test files | `glob` via `fs.readdirSync` recursive |
-| `getTestBudget(cwd)` | Read budget config | `config-get test.budget.*` |
-
-**What the steward does as an AI agent (not code):**
-- Reads test files (using its Read tool)
-- Identifies redundancy through semantic analysis (AI is better at this than AST diffing)
-- Produces markdown consolidation proposals
-- Reports budget status
-
-**Why AI-driven redundancy detection over static analysis:** Tools like `jscpd` (copy-paste detector) find syntactic duplication, not semantic redundancy. Two tests that test the same behavior with different code structures are semantically redundant but syntactically unique. The AI agent reads the tests, understands intent, and identifies overlap -- which is exactly what this codebase already does with its other agents (gsd-researcher, gsd-verifier). No new dependency needed.
-
-**Confidence: HIGH** -- Agent-as-markdown is the established GSD pattern. The steward's supporting functions are trivial Node.js.
-
-### 6. Test Budget Management
-
-**What:** Track test counts against configurable per-phase and project-wide limits.
-
-**Implementation:** Functions in `testing.cjs` + `gsd-tools.cjs test-budget` subcommand.
-
-```javascript
-function getTestBudgetStatus(cwd) {
-  const framework = detectTestFramework(cwd);
-  const total = countTests(cwd, framework);
-  const config = loadConfig(cwd);
-  const budget = config.test?.budget || { max_total_tests: 200, warn_at_percentage: 80 };
-
-  return {
-    total,
-    max: budget.max_total_tests,
-    percentage: Math.round((total / budget.max_total_tests) * 100),
-    warning: total >= budget.max_total_tests * (budget.warn_at_percentage / 100),
-    exceeded: total >= budget.max_total_tests
-  };
-}
-```
-
-**Exposed as:** `node gsd-tools.cjs test-budget` (returns JSON with budget status).
-
-**Confidence: HIGH** -- Composition of counting + config reading, both already validated.
-
-## New Module: `testing.cjs`
-
-All test-related functions consolidated in one new lib module, following the existing pattern (one module per domain: `state.cjs`, `phase.cjs`, `verify.cjs`, etc.).
-
-| Export | CLI Command | Purpose |
-|---|---|---|
-| `cmdTestCount` | `test-count [--framework F]` | Count test cases project-wide |
-| `cmdTestDetect` | `test-detect` | Auto-detect test framework |
-| `cmdTestBudget` | `test-budget` | Budget status (count vs limits) |
-| `cmdTestAcceptance` | `test-acceptance --phase N` | Parse and run acceptance tests from CONTEXT.md |
-| `detectTestFramework` | (internal) | Framework detection logic |
-| `countTests` | (internal) | Grep-based counting |
-| `parseAcceptanceTests` | (internal) | CONTEXT.md AT block parser |
-| `runAcceptanceTests` | (internal) | Execute Verify commands |
-| `getTestBudgetStatus` | (internal) | Budget calculation |
-
-**Integration with gsd-tools.cjs dispatcher:** Add 4 new cases to the switch statement (lines 180-600), following the exact same pattern as existing commands. Import `testing` module alongside `config`, `state`, etc.
-
-## New Config Schema Keys
-
-Added to `config-ensure-section` defaults in `config.cjs`:
-
-```json
-{
-  "test": {
-    "command": null,
-    "framework": "auto",
-    "hard_gate": true,
-    "acceptance_tests": true,
-    "budget": {
-      "max_tests_per_phase": 30,
-      "max_total_tests": 200,
-      "warn_at_percentage": 80
-    },
-    "steward": {
-      "enabled": true,
-      "redundancy_threshold": 0.15,
-      "stale_threshold": 0.05,
-      "auto_consolidate": false
+      if (event.type === 'content_block_start') {
+        if (event.content_block?.type === 'tool_use') {
+          process.stderr.write(`  * ${event.content_block.name}\n`);
+        }
+      }
     }
+
+    if (msg.type === 'result') {
+      // Final result -- capture for exit code / cost tracking
+      return msg;
+    }
+  } catch {
+    // Non-JSON line -- write raw to terminal as fallback
+    process.stdout.write(line + '\n');
   }
+  return null;
 }
 ```
 
-**Backward compatibility:** Existing `config-ensure-section` only writes config.json if it does not exist. Existing projects keep their current config. New projects get the test defaults. Projects upgrading can add the `test` key via `config-set` or `/gsd:settings`.
+## zx Async Iterator for Line Streaming
+
+### How It Works
+
+zx `ProcessPromise` implements `Symbol.asyncIterator`, yielding lines from stdout by default (newline-delimited). This is the PREFERRED approach over `readline.createInterface` for zx child processes.
+
+```javascript
+// zx native async iteration -- yields lines from stdout
+const child = $`claude -p --output-format stream-json --verbose --include-partial-messages ${prompt} < /dev/null`.nothrow();
+
+for await (const line of child) {
+  // Each `line` is a string (one NDJSON line)
+  displayStreamEvent(line);
+}
+
+const result = await child; // Get exit code after iteration completes
+```
+
+**Key behaviors (verified from zx docs):**
+- Yields **lines** by default (split on `\n`), not raw chunks
+- Custom delimiters supported via `$({delimiter: '\0'})`
+- `.nothrow()` works with async iteration (no exception on non-zero exit)
+- After iteration completes, `await child` resolves with the ProcessOutput
+- Buffering handled internally -- no data loss between iteration start and process output
+
+### Alternative: zx `.stdout` Property
+
+For chunk-level (not line-level) streaming:
+
+```javascript
+const child = $`...`.nothrow();
+for await (const chunk of child.stdout) {
+  // Raw chunks, NOT lines -- would need manual line buffering
+}
+```
+
+**Recommendation:** Use the default async iterator (line-level), NOT `.stdout` (chunk-level). NDJSON is line-delimited, and zx's default iterator already handles line splitting. Using `.stdout` would require reimplementing line buffering that zx already does.
+
+## readline vs zx Async Iterator
+
+| Aspect | `readline.createInterface` | zx `for await (of $\`...\`)` |
+|--------|---------------------------|------------------------------|
+| Line splitting | Built-in | Built-in |
+| Async iterable | Yes | Yes |
+| Already in codebase | Yes (TTY input) | Yes (zx dependency) |
+| Extra setup | Need to pass child.stdout as input | Zero -- works directly |
+| Error handling | Separate | Integrated with .nothrow() |
+| Exit code access | Separate child.on('exit') | `await child` after loop |
+
+**Recommendation:** Use zx's native async iterator. It is simpler because it directly yields lines from the `$` tagged template with zero additional setup. No need to extract the child process handle, create a readline interface, and wire them together. The `readline` import stays for TTY input only.
+
+## Stall Detection Timer Pattern
+
+Node.js `setTimeout` with re-arming is the correct approach. No external library needed.
+
+```javascript
+let stallTimer = null;
+let stallCount = 0;
+const STALL_TIMEOUT = getConfig('autopilot.stall_timeout_ms', 300000);
+
+function resetStallTimer() {
+  if (stallTimer) clearTimeout(stallTimer);
+  stallCount = 0;
+
+  function warn() {
+    stallCount++;
+    const mins = (STALL_TIMEOUT * stallCount) / 60000;
+    process.stderr.write(`\nWARN: No output for ${mins} minutes -- step may be stalled\n`);
+    logMsg(`STALL WARNING: no output for ${mins}m`);
+    stallTimer = setTimeout(warn, STALL_TIMEOUT);
+  }
+
+  stallTimer = setTimeout(warn, STALL_TIMEOUT);
+}
+
+function clearStallTimer() {
+  if (stallTimer) clearTimeout(stallTimer);
+  stallTimer = null;
+}
+```
+
+**Key design note:** The design doc used `arguments.callee` for re-arming which is deprecated in strict mode and unavailable in ES modules. Use a named function reference instead.
 
 ## What NOT to Add
 
-| Temptation | Why NOT | Instead |
-|---|---|---|
-| `@babel/parser` or `acorn` for AST-based test counting | Adds 2+ MB of dependencies for a count that grep handles in <100ms. Test counting is advisory, not billing-grade. | grep with `--include` patterns |
-| `cucumber` / `@cucumber/cucumber` for BDD | Acceptance tests have one executable line (`Verify:`), not step definitions. Cucumber's value is in parameterized step reuse across scenarios -- GSD ATs are standalone shell commands. | Regex parse + `spawnSync('sh', ['-c', cmd])` |
-| `jscpd` for copy-paste detection in tests | Finds syntactic duplication only. AI steward agent finds semantic redundancy, which is what actually matters for test consolidation. | gsd-test-steward agent reads tests, proposes consolidation |
-| `istanbul` / `nyc` for coverage | GSD already has `c8` in devDependencies for coverage. The test steward doesn't need coverage data -- it analyzes test intent, not line coverage. | Existing `c8` if coverage is ever needed |
-| `jest` or `vitest` as GSD's test runner | GSD uses `node:test` (built-in, zero-dep). All 15 test files, 618 cases run via `node --test`. Switching frameworks adds dependency and migration cost for no benefit. | Keep `node:test` + `scripts/run-tests.cjs` |
-| A generic "test runner adapter" abstraction | The hard gate just runs `eval "$TEST_CMD"`. The project's test command is configured once in `test.command`. Abstracting over different runners adds complexity for a single `eval` call. | `config-get test.command` + `eval` |
-| `glob` npm package for test file discovery | Node.js `fs.readdirSync` with `recursive: true` (stable since Node 18.17) handles this. The project requires Node >=16.7.0 but runs on v25.6.1 in practice. | `fs.readdirSync(dir, { recursive: true })` |
-| Separate test database/state file | Test counts are derived from source files on demand. Caching counts in a state file creates staleness bugs. The grep-based count runs in <100ms for typical projects. | Compute on demand, never cache |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `ndjson` npm package | Adds dependency for trivial parsing (JSON.parse per line) | `JSON.parse()` on each line from zx iterator |
+| `stream-json` npm package | Heavy streaming JSON parser designed for large JSON documents, not NDJSON | `JSON.parse()` per line |
+| `JSONStream` npm package | SAX-style parser for streaming large JSON -- wrong abstraction for NDJSON | `JSON.parse()` per line |
+| `split2` npm package | Stream transform that splits on newlines -- zx already does this | zx async iterator |
+| `highland` / `rxjs` | Reactive stream libraries -- massive overkill for sequential line processing | `for await...of` loop |
+| `readline` for child process | Extra wiring when zx already provides line-level async iteration | zx `for await (of $\`...\`)` |
+| External timer libraries | `setTimeout` is sufficient for single-timer stall detection | Built-in `setTimeout`/`clearTimeout` |
 
-## File Changes Summary
+## Alternatives Considered
 
-| File | Change Type | Scope |
-|---|---|---|
-| `get-shit-done/bin/lib/testing.cjs` | **NEW** | ~200-300 LOC. All test functions. |
-| `get-shit-done/bin/gsd-tools.cjs` | MODIFY | Add `require('./lib/testing.cjs')` + 4 switch cases (~30 LOC) |
-| `get-shit-done/bin/lib/config.cjs` | MODIFY | Add test defaults to `cmdConfigEnsureSection` (~15 LOC) |
-| `get-shit-done/agents/gsd-test-steward.md` | **NEW** | Agent markdown file (~200-300 lines) |
-| `get-shit-done/workflows/execute-plan.md` | MODIFY | Add hard gate step (~15 LOC markdown) |
-| `get-shit-done/workflows/discuss-phase.md` | MODIFY | Add acceptance test gathering step (~30 LOC markdown) |
-| `get-shit-done/workflows/verify-phase.md` | MODIFY | Add AT execution in verification (~20 LOC markdown) |
-| `get-shit-done/workflows/audit-milestone.md` | MODIFY | Spawn test steward step (~15 LOC markdown) |
-| `tests/testing.test.cjs` | **NEW** | Tests for testing.cjs module |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| zx async iterator | `readline.createInterface(child.stdout)` | Only if zx iterator has bugs with specific edge cases (none known) |
+| `JSON.parse()` per line | `ndjson` package | Only if you need backpressure-aware transform streams (we do not) |
+| `setTimeout` re-arming | `setInterval` | Never for stall detection -- setInterval continues even after events resume, setTimeout resets cleanly |
+| `--include-partial-messages` | Without (turn-level messages only) | Only if you want turn-level granularity (defeats purpose of streaming) |
+
+## Version Compatibility
+
+| Package | Version | Compatible With | Notes |
+|---------|---------|-----------------|-------|
+| zx | ^8.0.0 (latest 8.8.5) | Node.js 16.7+ | Async iterator on ProcessPromise available since zx 7.x, stable in 8.x |
+| Node.js | 22.x (in use) | zx 8.x | Full async iterator support, native ES modules, `createRequire` |
+| Claude CLI | Current | `--output-format stream-json --include-partial-messages --verbose` | All three flags needed for token-level streaming |
 
 ## Installation
 
 ```bash
-# No new npm packages needed.
-# The only new code artifacts are:
-#   1. testing.cjs (Node.js lib module)
-#   2. gsd-test-steward.md (agent markdown)
-#   3. Workflow modifications (markdown edits)
-#   4. testing.test.cjs (tests)
-
-# Verify existing tests still pass after changes:
-npm test
+# No new packages to install.
+# Existing dependency is sufficient:
+#   "zx": "^8.0.0"
 ```
 
-## Version Compatibility
+## Integration Points with Existing Autopilot
 
-| Component | Required | Actual | Notes |
-|---|---|---|---|
-| Node.js | >=16.7.0 (package.json) | v25.6.1 (installed) | `fs.readdirSync` recursive needs 18.17+, but actual Node version is well above |
-| `node:test` | Node >=18 (stable) | v25.6.1 | Built-in, zero-dep. All 15 existing test files use it. |
-| `child_process.spawnSync` | Node >=0.12 | v25.6.1 | For acceptance test execution |
-| `child_process.execSync` | Node >=0.12 | v25.6.1 | For grep-based test counting |
-| grep | Any POSIX grep | System grep | For test case counting. Available on all dev machines. |
-| c8 | ^11.0.0 (devDep) | Installed | Existing coverage tool, unchanged |
+### Where Streaming Replaces Buffered Calls
+
+All 5 `claude -p` invocation sites in `autopilot.mjs` use this pattern today:
+
+```javascript
+const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
+```
+
+These are at:
+1. `runStep()` -- line 278
+2. `runStepCaptured()` -- line 469
+3. `runStepWithRetry()` debug invocation -- line 536
+4. `runVerifyWithDebugRetry()` debug invocations -- lines 581, 620
+
+All 5 converge into `runClaudeStreaming()` which switches between:
+- **Streaming mode:** `--output-format stream-json --verbose --include-partial-messages` with `for await` line processing
+- **Quiet mode (--quiet flag):** `--output-format json` with `await` (current behavior preserved)
+
+### Data Flow
+
+```
+runStep() / runStepCaptured()
+  |
+  v
+runClaudeStreaming(prompt, { outputFile, quiet })
+  |
+  +-- quiet=true: await $`claude ... --output-format json ...` (unchanged)
+  |
+  +-- quiet=false: for await (line of $`claude ... --output-format stream-json ...`)
+                     |
+                     +-- resetStallTimer()
+                     +-- lines.push(line)
+                     +-- appendToOutputFile(line)
+                     +-- displayStreamEvent(line) --> stdout/stderr
+                     |
+                   clearStallTimer()
+                   await child --> exitCode
+```
+
+### Backwards Compatibility
+
+- `runStepCaptured()` still writes to outputFile (line-by-line instead of end-batch)
+- `result.stdout` still available as accumulated `lines.join('\n')` for debug retry error context extraction
+- Exit code handling unchanged
+- Progress circuit breaker snapshots unchanged (taken before/after step)
 
 ## Sources
 
-- GSD codebase direct inspection: `package.json` (zero runtime deps, devDeps: c8 + esbuild), `gsd-tools.cjs` (600 LOC dispatcher), `lib/config.cjs` (dot-notation config-get/set), `scripts/run-tests.cjs` (node:test runner), all 15 `tests/*.test.cjs` files (618 test cases using `require('node:test')`). **HIGH confidence.**
-- [Node.js test runner API](https://nodejs.org/api/test.html) -- Verified `test()` / `it()` / `describe()` API matches grep counting patterns. Built-in reporters (spec, tap, junit) available. No dry-run/list-tests API exists. **HIGH confidence.**
-- [Jest CLI docs](https://jestjs.io/docs/cli) -- Confirmed `test(` / `it(` as universal test case markers. **HIGH confidence.**
-- Design doc (`.planning/designs/2026-03-05-dual-layer-test-architecture-design.md`) -- All requirements, config schema, workflow integration points defined. **HIGH confidence** (first-party design).
+- [zx ProcessPromise docs](https://google.github.io/zx/process-promise) -- async iterator yields lines, .nothrow() compatibility (HIGH confidence)
+- [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference) -- `--include-partial-messages` flag, `--output-format stream-json` (HIGH confidence)
+- [Claude Code headless/programmatic docs](https://code.claude.com/docs/en/headless) -- jq example confirming `stream_event` + `text_delta` event nesting (HIGH confidence)
+- [Agent SDK streaming output docs](https://platform.claude.com/docs/en/agent-sdk/streaming-output) -- complete event type reference: message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop (HIGH confidence)
+- [Claude Code issue #24596](https://github.com/anthropics/claude-code/issues/24596) -- confirms stream-json event types including `system`, `stream_event`, `assistant`, `result` top-level types (MEDIUM confidence -- community source, but matches official docs)
+- [Node.js readline documentation](https://nodejs.org/api/readline.html) -- async iterator support, `crlfDelay`, performance notes (HIGH confidence)
+- [zx npm registry](https://www.npmjs.com/package/zx) -- latest version 8.8.5 (HIGH confidence)
 
 ---
-*Stack research for: GSD Dual-Layer Test Architecture (v1.6)*
-*Researched: 2026-03-05*
+*Stack research for: Autopilot Streaming v2.4*
+*Researched: 2026-03-12*

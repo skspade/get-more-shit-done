@@ -1,177 +1,162 @@
-# Feature Landscape: Dual-Layer Test Architecture
+# Feature Landscape: Autopilot Real-Time Streaming Output
 
-**Domain:** AI agent test orchestration — human-owned acceptance gates + AI-managed unit/regression tests
-**Researched:** 2026-03-05
-**Overall confidence:** HIGH (patterns well-established in BDD/CI literature; agentic testing patterns emerging but directionally clear)
+**Domain:** CLI streaming output for autonomous coding orchestrator -- NDJSON parsing, stall detection, verbosity toggling
+**Researched:** 2026-03-12
+**Overall confidence:** HIGH (NDJSON is a mature standard; Claude CLI stream-json is documented; watchdog timers are well-understood; quiet/verbose patterns are CLI conventions)
 
 ## Table Stakes
 
-Features users expect from a dual-layer test architecture integrated into an autonomous coding orchestrator. Missing any of these makes the test architecture feel incomplete or untrustworthy.
+Features users expect from a streaming CLI orchestrator. Missing any of these makes the streaming mode feel broken or unfinished.
 
-### Acceptance Test Layer (Layer 1 — Human-Owned)
-
-| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
-|---------|--------------|------------|------------------------|-------|
-| Given/When/Then acceptance test format in CONTEXT.md | Industry-standard BDD format (Martin Fowler's bliki, Cucumber, SpecFlow). Users already think in this structure. The format directly translates to executable verification. | LOW | `discuss-phase.md` — adds a new question pass after existing decision gathering | The `<acceptance_tests>` block in CONTEXT.md is structurally sound. Given/When/Then + `Verify` shell command is the right format because it bridges human-readable spec to machine-executable check. Confidence: HIGH (BDD is 15+ years mature). |
-| Human ownership rule — AI cannot add/modify/remove acceptance tests | The whole point of Layer 1. Simon Willison's agentic engineering patterns emphasize that tests are the contract the AI works against. If the AI can modify its own acceptance criteria, the contract is meaningless. This is the "spec-driven development" principle: the spec is human-owned, the implementation is AI-owned. | LOW | `discuss-phase.md` ownership boundary; `execute-plan.md` must respect immutability | Enforcement is documentation + workflow design, not runtime enforcement. The AI is instructed never to touch `<acceptance_tests>` blocks after discuss-phase approval. No code-level lock needed — workflow instruction is sufficient for Claude. Confidence: HIGH. |
-| Acceptance test execution during verify-phase | Acceptance tests that are never run are documentation, not tests. The `Verify` line must be executed as a shell command during `verify-phase`, with pass/fail mapped to verification truths. This replaces the current "derive truths from phase goal" fallback with concrete, executable checks. | MEDIUM | `verify-phase.md` — modifies `verify_truths` step to run AT Verify commands and map results | Key integration: each `AT-{NN}` Verify command runs as `eval "$VERIFY_CMD"`. Exit code 0 = VERIFIED, non-zero = FAILED. Results feed directly into existing truth status system (VERIFIED/FAILED/UNCERTAIN). Falls back to current behavior when no `<acceptance_tests>` block exists. Confidence: HIGH. |
-| Graceful degradation when no acceptance tests exist | Phases planned before this architecture, or projects that don't opt in, must continue working. This is a progressive enhancement, not a breaking change. | LOW | All existing workflows — backward compatibility is a hard requirement | When `<acceptance_tests>` is absent from CONTEXT.md, verification falls back to current behavior (grep/file-existence/derived truths). When `test.acceptance_tests` is false in config, skip the acceptance test gathering pass in discuss-phase. Zero-config degradation. Confidence: HIGH. |
-
-### Unit/Regression Test Layer (Layer 2 — AI-Owned)
+### NDJSON Stream Parsing
 
 | Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
 |---------|--------------|------------|------------------------|-------|
-| `<tests>` blocks in PLAN.md task definitions | The planner needs to specify what tests to write alongside what code to write. TDD is already supported in GSD via `tdd="true"` tasks and `<behavior>`/`<implementation>` blocks. Adding `<tests>` blocks is a natural extension of the existing TDD plan structure. | LOW | `plan-phase.md` (planner generates plans); existing `tdd.md` reference | The `<tests>` block format in the design doc (test name, input, expected) is a lightweight test spec. It supplements, not replaces, the existing `<behavior>` block in TDD plans. For non-TDD tasks that happen to be testable, `<tests>` enables test generation without the full RED-GREEN-REFACTOR cycle. Confidence: HIGH. |
-| Hard test gate after each task commit | Simon Willison's "first run the tests" pattern, applied as a hard gate: after every task commit during execute-plan, run the full project test suite. If any test fails, trigger Rule 1 (Bug) deviation handling. This is the regression prevention mechanism. | MEDIUM | `execute-plan.md` — adds a new step after task commit; `config.json` for `test.command`; existing deviation Rule 1 for failure handling | The gate runs `eval "$TEST_CMD"` after each task commit. Non-zero exit triggers existing deviation handling (debug, fix, retry, escalate). This is the single most impactful feature for code quality in autonomous execution. Without it, the AI can silently break existing tests while implementing new features. Confidence: HIGH (CI/CD hard gates are universal practice). |
-| Test command discovery from config | The system must know how to run tests. `test.command` in config.json (default: null) is the explicit configuration. When null, all test gates degrade gracefully with warnings. | LOW | `config.json` schema; `gsd-tools.cjs config-get` for retrieval | Auto-detection from `package.json` scripts.test is tempting but unreliable (many projects have `"test": "echo 'no tests'"` as a placeholder). Explicit configuration via `test.command` is the right call. The `gsd settings` command surfaces the current value. Confidence: HIGH. |
-| TDD RED-GREEN-REFACTOR preservation | The existing TDD workflow must continue working unchanged. The `<tests>` block is additive — tasks with `tdd="true"` still follow the full RED (write failing test) -> GREEN (implement to pass) -> REFACTOR cycle from `tdd.md`. | LOW | `execute-plan.md` TDD execution flow; `tdd.md` reference | No changes to the existing TDD cycle. The `<tests>` block provides input to the RED phase (what tests to write), but the RED-GREEN-REFACTOR discipline is unchanged. The hard gate (run full suite after GREEN) is the only addition to the TDD flow. Confidence: HIGH. |
-| Regression suite run (not just current test) | Today, TDD tasks only verify their own tests pass. The hard gate runs the FULL project test suite after each task. This catches regressions where new code breaks unrelated tests. | MEDIUM | `execute-plan.md` — extends TDD execution from "run this test" to "run all tests" | This is the key behavioral change. Current flow: write test -> implement -> run test -> pass -> commit. New flow: write test -> implement -> run test -> pass -> run ALL tests -> pass -> commit. The "run ALL tests" step is the regression gate. If it fails, the executor debugs and fixes before proceeding. Confidence: HIGH (standard CI/CD pattern). |
+| Line-by-line NDJSON parsing from child process stdout | NDJSON is defined as "one JSON object per line, separated by newline characters." Every NDJSON consumer processes line-by-line -- buffering the entire stream defeats the purpose. The [NDJSON spec](https://github.com/ndjson/ndjson-spec) and [JSON streaming conventions](https://en.wikipedia.org/wiki/JSON_streaming) make this the baseline expectation. zx provides `for await (const line of p)` which splits on newline by default. | LOW | `autopilot.mjs` -- replaces `await $\`...\`.nothrow()` pattern at 5 invocation sites (lines 278, 469, 536, 581, 620) | zx's async iterator uses `Symbol.asyncIterator` with line buffering. Default delimiter is `\n`, matching NDJSON. No external library needed. Confidence: HIGH -- [zx docs](https://google.github.io/zx/process-promise) confirm async iteration yields lines. |
+| Defensive handling of non-JSON lines | Stream may contain non-JSON output (stderr leaks, partial lines on process crash). Silently dropping or crashing on parse failure is unacceptable. The [NDJSON guide](https://thetexttool.com/blog/complete-guide-ndjson-newline-delimited-json) recommends "use streaming parsers that process one line at a time" with error tolerance. | LOW | None -- new code | `try { JSON.parse(line) } catch { process.stdout.write(line) }` -- write unparseable lines to stdout as raw text. This is the design doc's stated approach and matches the defensive pattern every NDJSON consumer uses. Confidence: HIGH. |
+| Event type routing by top-level `type` field | Claude CLI `--output-format stream-json` emits NDJSON where each line has a top-level `type` field. Without `--verbose --include-partial-messages`, the types are: `system`, `assistant`, `result`. With those flags, `stream_event` is also emitted containing low-level API deltas (`content_block_delta`, `content_block_start`, etc.). The design doc routes on `type` which is the documented pattern. | LOW | None -- new `displayStreamEvent()` function | The design doc's event model (`assistant` for text, `tool_use` for tools, `result` for final) is a simplification. Actual events without `--verbose` are `system`, `assistant` (complete turns), and `result`. With `--verbose --include-partial-messages`, you get `stream_event` wrapping `content_block_delta` with `text_delta` for real-time tokens. **Decision needed:** use `--verbose --include-partial-messages` for true token-by-token streaming, or accept turn-level `assistant` events. Confidence: MEDIUM -- the exact event types without `--verbose` need empirical verification. |
+| Accumulate all output for downstream compatibility | The `runStepCaptured()` function's output file is read by the debug retry loop for error context extraction (lines 519-523). Streaming must not break this: every NDJSON line must be appended to the output file as it arrives, and the full stdout must be returned for `result.stdout` compatibility. | LOW | `runStepCaptured()` (line 452), `constructDebugPrompt()` error context extraction (line 519-523) | Design doc addresses this: `lines.push(line)` accumulates, `fs.appendFileSync(outputFile, line + '\n')` writes incrementally. The returned `{ exitCode, stdout: lines.join('\n') }` maintains the interface. Confidence: HIGH. |
+| Real-time output file writes (not buffered until end) | Current behavior writes output file only after process completes (`fs.appendFileSync(outputFile, result.stdout)` on line 476). Streaming should write each line as it arrives so that if the process crashes, partial output is preserved for debug context. | LOW | `runStepCaptured()` output file pattern | `fs.appendFileSync(outputFile, line + '\n')` per line. This is the standard pattern for streaming log files. Appending per-line has negligible overhead compared to the Claude API call. Confidence: HIGH. |
 
-### Test Budget and Bloat Management
-
-| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
-|---------|--------------|------------|------------------------|-------|
-| Per-phase and project-level test count limits | AI-generated tests grow without bound. Without a budget, 6 milestones of autonomous execution could produce 500+ tests with significant redundancy. The budget model (30 per phase, 200 total) provides a ceiling that forces consolidation. | LOW | `config.json` schema for `test.budget.*`; `plan-phase.md` receives budget status | The counting mechanism (`grep -r -c "it(\|test("`) is simple and framework-agnostic for Jest/Vitest/Mocha. Budget is advisory during planning, not a hard block during execution (you cannot unwrite tests mid-execution). The planner sees "Warning: 160/200 tests used" and plans within limits. Confidence: MEDIUM (test budgeting is novel — no standard tooling exists, but the concept is sound). |
-| Test count tracking via gsd-tools | A `test-count` subcommand in gsd-tools.cjs that counts test cases (individual `it`/`test` blocks, not files) project-wide and per-phase. | LOW | `gsd-tools.cjs` — new subcommand; `config.json` for framework detection | Counting by grep is sufficient for v1. More sophisticated counting (AST parsing) is over-engineering for the initial implementation. Phase attribution by commit history (`git log --all --oneline -- tests/` filtered by phase tag) enables per-phase counting. Confidence: HIGH (implementation is straightforward). |
-| Budget status visible to planner during plan-phase | The planner must know the current test count and remaining budget before generating `<tests>` blocks. Without this, the planner generates tests blindly and hits the ceiling only at audit time. | LOW | `plan-phase.md` — planner prompt includes budget context | A single line in the planner prompt: "Current test budget: 145/200 (72%). Per-phase max: 30. Plan tests accordingly." The planner adjusts its test generation to stay within limits. Confidence: HIGH. |
-
-### Workflow Integration
+### Stall Detection
 
 | Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
 |---------|--------------|------------|------------------------|-------|
-| discuss-phase acceptance test gathering pass | The interactive discuss-phase must gain a new step: after gathering implementation decisions, ask "What observable behavior proves this works?" for each requirement, then structure responses into AT-{NN} format. | MEDIUM | `discuss-phase.md` — new step after existing decision gathering; CONTEXT.md template gains `<acceptance_tests>` block | This is the highest-touch workflow change. The discuss-phase must present requirements, ask for acceptance criteria, suggest Verify commands, and get human approval. In `--auto` mode, the auto-context agent generates acceptance tests from ROADMAP success criteria (no human input). Confidence: MEDIUM (the interactive UX needs careful design). |
-| Auto-context acceptance test generation | When discuss-phase runs with `--auto`, the auto-context agent must generate acceptance tests from ROADMAP.md success criteria and REQUIREMENTS.md. No human input available. | MEDIUM | `gsd-auto-context` agent; ROADMAP.md success criteria | The auto-context agent reads success criteria ("User can create a new project") and generates Given/When/Then + Verify. This is feasible because success criteria are already written as observable behaviors. The Verify commands are AI-generated (no human approval in auto mode), which is a controlled deviation from the ownership rule — acceptable because the auto-context agent IS the discuss-phase replacement. Confidence: MEDIUM. |
-| verify-phase acceptance test execution | verify-phase runs each AT-{NN} Verify command and maps results to truths. This replaces or augments the current truth derivation logic. | MEDIUM | `verify-phase.md` — modifies `verify_truths` step | Acceptance tests become the primary truth source when present. Each AT Verify command runs via `eval`, exit code maps to truth status. Existing artifact/wiring verification continues alongside. When ATs are absent, current behavior is unchanged. Confidence: HIGH. |
-| audit-milestone test steward integration | The test steward agent runs during audit-milestone, after phase verifications and before the final audit report. It produces a test health section for the audit report. | MEDIUM | `audit-milestone.md` — new step to spawn test steward | The steward is a read-only analysis agent. It counts tests, detects redundancy, identifies stale tests, and produces a consolidation proposal. It does NOT modify any files. The audit report gains a "Test Suite Health" section. Confidence: HIGH (analysis-only is low risk). |
-| Configuration schema with zero-config degradation | The `test` key in config.json with sensible defaults. Every feature degrades gracefully when config is absent or `test.command` is null. | LOW | `config.json` schema; `gsd-tools.cjs config-get/config-set`; `gsd settings` display | The design doc's config schema is complete and well-reasoned. `test.command: null` means all test gates skip with warnings. `test.hard_gate: true` is the right default (strict by default, loosen per-project). `test.steward.auto_consolidate: false` enforces human approval. Confidence: HIGH. |
+| Watchdog timer that resets on every stream event | The [watchdog timer pattern](https://dev.to/gajus/ensuring-healthy-node-js-program-using-watchdog-timer-4pjd) is the standard approach for detecting hung processes. Reset the timer on every line of output. If no output arrives within the timeout, emit a warning. Claude operations can legitimately take several minutes (large file edits, complex reasoning), so the timer must be generous. | LOW | `getConfig()` function (line 172) for configurable timeout | `setTimeout` / `clearTimeout` pair. Reset on every NDJSON line. This is in-process (not external), which is fine because the watchdog monitors the child process stdout, not the Node.js event loop itself. If the event loop blocks, setTimeout won't fire -- but that cannot happen here because the blocking work is in the child process, not the parent. Confidence: HIGH. |
+| Configurable timeout (default 5 minutes) | Different environments have different expectations. CI might want 2 minutes. Local dev might tolerate 10 minutes. Claude tool operations (running test suites, large file reads) can legitimately take minutes without producing text output. 5 minutes is a reasonable default that avoids false positives while catching genuine stalls. | LOW | `config.json` schema -- `autopilot.stall_timeout_ms: 300000`; existing `CONFIG_DEFAULTS` pattern (line 186) | Follows the same pattern as `autopilot.circuit_breaker_threshold` and `autopilot.max_debug_retries`. Read from config with fallback to default. Confidence: HIGH. |
+| Repeated warnings at fixed intervals | A single warning is easy to miss. The design doc specifies re-arming the timer so warnings repeat every interval (5min, 10min, 15min). This escalating visibility pattern matches how CI systems handle long-running jobs (GitHub Actions warns at 6hr intervals). | LOW | `logMsg()` function for log file entries (line 107) | Design doc uses `setTimeout(arguments.callee, STALL_TIMEOUT)` for re-arming. Note: `arguments.callee` is deprecated in strict mode. Use a named function reference instead. Warning goes to stderr + log file. Confidence: HIGH. |
+| Stall timer cleared on process exit | Timer must be cleared when the child process completes normally. Failing to clear would trigger a spurious warning after the process exits. | LOW | None -- cleanup in `runClaudeStreaming()` | `clearTimeout(stallTimer)` after the `for await` loop completes and before `await child`. Confidence: HIGH. |
+| Stall warnings to stderr, not stdout | Stall warnings are diagnostic metadata, not program output. The [CLI Guidelines](https://clig.dev/) specify: "Send messaging to stderr for logs, errors, and status updates." Mixing stall warnings into stdout would corrupt NDJSON output and confuse downstream consumers. | LOW | Existing pattern: `console.error()` for warnings throughout autopilot.mjs (lines 218, 294, 516, etc.) | `console.error()` writes to stderr. Consistent with existing warning pattern in autopilot.mjs. Confidence: HIGH. |
+
+### Quiet Mode
+
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| `--quiet` flag that restores buffered JSON behavior | CI/scripted consumers need deterministic, parseable output. Streaming text + tool indicators to stdout breaks machine consumption. `--quiet` is a universal CLI convention ([CLI Guidelines](https://clig.dev/), [Ubuntu CLI verbosity](https://discourse.ubuntu.com/t/cli-verbosity-levels/26973), [Microsoft CLI guidance](https://learn.microsoft.com/en-us/dotnet/standard/commandline/design-guidance)). The `--json` flag (line 41 of existing gsd CLI) already establishes this pattern for deterministic output in the project. | LOW | `argv` parsing (line 34) -- add `'quiet'` to `knownFlags` Set | When `--quiet` is true, `runClaudeStreaming()` uses `--output-format json` instead of `stream-json`, waits for process completion, and returns buffered result. This is the current behavior -- `--quiet` is effectively "keep doing what you were doing before streaming was added." Confidence: HIGH. |
+| Quiet mode falls back to `--output-format json` | The design doc correctly identifies that quiet mode should use the existing `json` format, not `stream-json` with suppressed display. Using `json` means the Claude CLI handles buffering and returns a single JSON object with `result` field -- no NDJSON parsing needed. | LOW | Current `--output-format json` invocations (lines 278, 469, 536, 581, 620) | This is zero-change for quiet mode. The existing code path continues to work. Only non-quiet mode adds streaming. Confidence: HIGH. |
+| Banners and progress UI still visible in quiet mode | `--quiet` suppresses streaming text, not autopilot's own operational output (banners, phase transitions, circuit breaker warnings). The autopilot's operational messages go to stdout/stderr separate from Claude's output. `--quiet` controls Claude output format, not autopilot verbosity. | LOW | `printBanner()` (line 156), `printHaltReport()` (line 226), `printVerificationGate()` (line 660) | These are autopilot-level messages, not Claude output. They remain unchanged regardless of `--quiet`. This distinction is important: `--quiet` is not `--silent`. Confidence: HIGH. |
+
+### Consolidated Invocation Function
+
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| Single `runClaudeStreaming()` replacing all 5 `claude -p` sites | The existing codebase has 5 separate `$\`claude -p ...\`` invocations (lines 278, 469, 536, 581, 620) with duplicated patterns. Consolidation into one function is standard refactoring hygiene and is required so that streaming behavior is consistent across all invocation types (normal steps, captured steps, debug retries). | MEDIUM | `runStep()` (line 262), `runStepCaptured()` (line 452), `runStepWithRetry()` debug invocation (line 536), `runVerifyWithDebugRetry()` verify invocations (lines 581, 620) | The function must handle: (1) quiet vs streaming format selection, (2) line-by-line reading and event display, (3) output file capture when provided, (4) stall timer management, (5) exit code propagation. `runStep` and `runStepCaptured` become thin wrappers. Debug retry invocations (3 sites) also route through this function. Confidence: HIGH. |
+| Streaming during debug retry invocations | The debug retry loop spawns additional `claude -p` processes for the debugger agent. These should also stream by default -- watching the debugger work in real-time is valuable for understanding failure diagnosis. | LOW | `runStepWithRetry()` debug prompt (line 536), `runVerifyWithDebugRetry()` debug prompts (lines 581, 620) | All 3 debug invocation sites route through `runClaudeStreaming()`, so streaming comes for free once the function exists. No special handling needed. Confidence: HIGH. |
+
+### Stream Event Display
+
+| Feature | Why Expected | Complexity | Existing GSD Dependency | Notes |
+|---------|--------------|------------|------------------------|-------|
+| Assistant text written to stdout in real-time | This is the entire point of streaming. Users want to see Claude "thinking out loud" as it processes each phase. Without text display, streaming mode provides no visible benefit over buffered mode. | LOW | None -- new `displayStreamEvent()` function | For `assistant` events: extract text from `message.content[].text` and write to stdout. For `stream_event` with `content_block_delta` / `text_delta`: write `event.delta.text` to stdout. The approach depends on whether `--verbose --include-partial-messages` is used. Confidence: HIGH. |
+| Tool call indicators to stderr | Users need activity signals when Claude is using tools (editing files, running commands). Without tool indicators, long tool executions appear as silence, which is indistinguishable from a stall. Writing to stderr keeps stdout clean for piping. | LOW | None -- new code in `displayStreamEvent()` | Design doc proposes `process.stderr.write(\`  ◆ ${toolName}\n\`)`. This is compact (one line per tool call) and non-intrusive. Tool names are short (`Edit`, `Bash`, `Read`, `Grep`, `Glob`). Confidence: HIGH. |
+| Result events captured but not displayed | The `result` event contains the final output, session metadata, and cost info. It should be captured programmatically for exit code determination but not printed to terminal (the caller handles result processing). | LOW | Exit code handling in `runStep()` (line 288-298) | Route `result` events to the accumulator only. No display. The exit code comes from the child process exit, not from the result event. Confidence: HIGH. |
+| Tool results suppressed (too verbose) | Tool results (file contents, command output) are typically large and already summarized by the assistant's subsequent text. Displaying them would flood the terminal with noise. | LOW | None | Silent by default. This matches the [Agent SDK streaming UI example](https://platform.claude.com/docs/en/agent-sdk/streaming-output): tool calls show `[Using Read...]` but results are suppressed, and `done` is shown when the tool completes. Confidence: HIGH. |
 
 ## Differentiators
 
-Features that set this test architecture apart from standard CI/CD test gates or other AI coding agent test approaches.
+Features that set this implementation apart from a basic "pipe stdout to terminal" approach.
 
 | Feature | Value Proposition | Complexity | Existing GSD Dependency | Notes |
 |---------|-------------------|------------|------------------------|-------|
-| Dual ownership model (human specs, AI implementation) | No other AI coding orchestrator cleanly separates "what to test" (human) from "how to test" (AI). Spec-driven development literature (TestCollab, GitHub Spec Kit) validates this pattern: the spec is the contract, the AI implements against it. This prevents the "AI tests its own work" trust problem. | LOW | Entire dual-layer architecture enforces this | The ownership boundary is the core innovation. Acceptance tests (Layer 1) are the human's contract. Unit tests (Layer 2) are the AI's implementation verification. Neither layer can modify the other. This is not just a testing pattern — it is a governance pattern for autonomous AI execution. Confidence: HIGH. |
-| Test steward agent with consolidation proposals | No standard CI/CD tool provides an AI agent that analyzes test suite health and proposes specific consolidation actions. Tools like Stryker detect redundancy via mutation testing, but they do not propose fixes. The steward bridges detection and action while keeping human approval in the loop. | HIGH | New `gsd-test-steward` agent; `audit-milestone.md` integration | The steward combines multiple analysis techniques: grep-based duplicate detection, stale test identification (references to deleted functions), and budget tracking. The consolidation proposal format (specific file:line references, specific merge/delete recommendations) is actionable, not just a report. Confidence: MEDIUM (the analysis is feasible; the quality of proposals depends on implementation). |
-| Progressive opt-in across project lifecycle | Projects can adopt the test architecture incrementally: start with no test command (gates skip), add test command (hard gate activates), start writing acceptance tests (Layer 1 activates), let the planner generate test specs (Layer 2 activates), enable the steward (audit-time analysis activates). No big-bang adoption required. | LOW | Config schema with null defaults; workflow fallbacks at every integration point | This is a design property, not a feature to build. Every integration point has a "when absent" fallback. The design doc explicitly documents each fallback. Confidence: HIGH. |
-| Acceptance tests as verification truths | Acceptance tests do double duty: they are human-defined specs AND they are the verification criteria for verify-phase. This eliminates the disconnect between "what should we verify?" and "what did the user say they want?" — they are the same thing. | MEDIUM | `verify-phase.md` truth derivation system | Currently, verify-phase derives truths from phase goals or must_haves in PLAN frontmatter. With acceptance tests, truths come directly from the human's own words. This is strictly better because it eliminates the AI's interpretation of what the human wanted. Confidence: HIGH. |
-| Budget-aware planning | The planner sees test budget status before generating tests. No other AI coding tool plans tests with awareness of suite-wide constraints. This is proactive bloat prevention rather than reactive cleanup. | LOW | `plan-phase.md` prompt enrichment | A single context line changes planner behavior. When the planner knows "145/200 tests used, 30 max per phase", it generates fewer, more targeted tests. This is the "shift left" principle applied to test bloat. Confidence: MEDIUM (depends on planner actually respecting the budget — needs testing). |
+| Stall detection with repeated escalating warnings | Most CLI tools either have a hard timeout (kill after N minutes) or no timeout. A soft warning that repeats at intervals is more appropriate for long-running AI operations where legitimate work may take 10+ minutes but genuine stalls should be visible. The design doc's repeating timer pattern is better than a one-shot warning. | LOW | `getConfig()` for `autopilot.stall_timeout_ms` | The key insight is that Claude tool operations (running test suites, large `git diff`) can legitimately take minutes. A hard kill would be destructive. Repeated warnings let the user decide whether to wait or interrupt (Ctrl+C hits the existing SIGINT handler on line 128). Confidence: HIGH. |
+| Seamless debug retry streaming | Existing tools that add streaming often only stream the "happy path." Streaming debug retry invocations means users see the debugger's analysis and fix attempts in real-time -- not just "debug retry 1/3..." followed by silence. This is a significant DX improvement for failure scenarios. | LOW | All 5 invocation sites route through `runClaudeStreaming()` | This comes for free from the consolidated function. The debug prompt is just another prompt string passed to `runClaudeStreaming()`. Confidence: HIGH. |
+| Zero-migration quiet mode | The `--quiet` flag does not degrade functionality -- it exactly reproduces the pre-streaming behavior. CI scripts that parse autopilot output today continue working unchanged by adding `--quiet`. No output format changes, no behavioral differences. | LOW | Entire existing test suite (`autopilot.test.cjs`) | Tests written against the current buffered JSON behavior should pass unchanged in quiet mode. This is not just a feature -- it is a migration safety net. Confidence: HIGH. |
+| Channel separation (stdout for content, stderr for metadata) | Following [CLI Guidelines](https://clig.dev/) best practice: assistant text (the program's "result") goes to stdout, tool indicators and stall warnings (diagnostic metadata) go to stderr. This means `autopilot.mjs 2>/dev/null` shows clean Claude output, and `autopilot.mjs > /dev/null` shows only tool/stall activity. | LOW | Existing pattern: operational messages use `console.log()` (stdout) and `console.error()` (stderr) throughout | The design doc's `process.stdout.write()` for text and `process.stderr.write()` for tool indicators follows this pattern. Confidence: HIGH. |
 
 ## Anti-Features
 
-Features to explicitly NOT build. These are tempting but would hurt the architecture.
+Features to explicitly NOT build.
 
-| Anti-Feature | Why Tempting | Why Avoid | What to Do Instead |
-|--------------|-------------|-----------|-------------------|
-| Coverage percentage targets | "We should aim for 80% code coverage." Feels like a measurable quality goal. | Coverage is a vanity metric for AI-generated code. An AI can trivially generate tests that hit 100% coverage without testing meaningful behavior. Coverage incentivizes quantity over quality. The budget model (count tests, not coverage) combined with the steward (detect redundancy) is strictly better. | Use test budgets (count-based) + steward redundancy detection. Quality comes from the acceptance test layer (human-defined behavior) not from coverage percentages. |
-| Auto-consolidation of tests without human approval | "The steward should automatically merge redundant tests." Reduces manual overhead. | Tests are a trust artifact. If the AI deletes or modifies tests without human approval, the human loses confidence in the test suite. The "never auto-delete" principle is critical for trust. Even if the consolidation is correct, the human needs to see and approve it. | Steward produces proposals. Human reviews during milestone audit. "Approve all" / "Cherry-pick" / "Reject" flow. Config key `test.steward.auto_consolidate: false` (default) enforces this. |
-| Runtime test isolation / sandboxing | "Tests should run in isolated containers to prevent side effects." Adds reliability. | Over-engineering for a CLI-based coding orchestrator. GSD runs in the developer's local environment. Adding container orchestration for test isolation introduces Docker/Podman dependencies, startup overhead, and environment parity issues. The target users are running `npm test` locally. | Run tests in the developer's existing environment. If tests have side effects, that is a test quality issue (fix the test), not an infrastructure issue (add containers). |
-| AI-generated acceptance tests (Layer 1) | "Let the AI write acceptance tests too, then the human just approves." Reduces discuss-phase friction. | This inverts the ownership model. If the AI writes the acceptance criteria and the human just rubber-stamps them, the human is not actually defining what "done" means. The whole point of Layer 1 is that the HUMAN specifies observable behavior. The AI may SUGGEST Verify commands, but the Given/When/Then is human-authored. | In `--auto` mode, the auto-context agent generates acceptance tests from ROADMAP success criteria. This is acceptable because success criteria are human-authored (in ROADMAP.md). The auto-context agent translates human-authored criteria into AT format, not inventing new criteria. |
-| Flaky test detection and quarantine | "Detect flaky tests and quarantine them automatically." Standard in enterprise CI/CD. | Flaky test detection requires running each test multiple times and tracking pass/fail rates over time. GSD runs tests once per task commit — there is no historical pass/fail data to analyze. Flaky test management is a CI/CD infrastructure concern, not an orchestrator concern. | If a test is flaky, the hard gate will catch it (test fails -> debug -> fix). The fix is to fix the flaky test, not to quarantine it. The steward can flag tests that failed once and passed on retry as potentially flaky, but this is advisory, not automated quarantine. |
-| Visual test reports / dashboards | "Generate an HTML test report with charts and trends." Looks professional. | GSD is markdown-native. All artifacts are .md files in .planning/. Adding HTML report generation introduces a rendering dependency and breaks the "everything is readable in a text editor" principle. | Test results go into VERIFICATION.md (markdown) and MILESTONE-AUDIT.md (markdown). The `gsd progress` command can show test budget status in the terminal. No HTML needed. |
-| Per-file or per-function test mapping | "Map each source file to its test file(s) for precise test selection." Enables targeted test runs. | Maintaining a source-to-test mapping is brittle and high-maintenance. File renames, refactors, and test reorganization break the mapping. Running the full suite is simpler and catches cross-file regressions that targeted runs miss. | Run the full test suite via `test.command`. If the suite is slow, the developer can configure a faster subset command. The steward can recommend test file consolidation to reduce suite runtime. |
-| Mandatory test generation for all tasks | "Every task should have tests, not just TDD tasks." Maximizes coverage. | Many tasks are not meaningfully testable (UI styling, config changes, documentation, migrations). Forcing test generation for these tasks produces low-value tests that consume budget. The existing TDD heuristic ("Can you write `expect(fn(input)).toBe(output)` before writing `fn`?") is the right filter. | Tasks with `tdd="true"` or `<tests>` blocks get test generation. Tasks without are executed normally. The `add-tests` command fills gaps post-hoc for phases that need additional coverage. |
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Token-level streaming without `--verbose --include-partial-messages` | The Claude CLI without these flags emits complete `assistant` turn events, not token-by-token deltas. Forcing token-level streaming requires adding `--verbose --include-partial-messages` flags which changes the event format and may emit significantly more NDJSON lines (every delta, every tool input chunk). This adds parsing complexity for marginal UX benefit -- turn-level events already provide real-time visibility for multi-minute operations. | Use `--output-format stream-json` without `--verbose --include-partial-messages`. Accept turn-level granularity. If empirical testing shows turns are too coarse (multi-minute silence between turns), add `--verbose --include-partial-messages` in a follow-up with the corresponding `stream_event` / `content_block_delta` parsing. |
+| Progress bars for streaming | Claude's output is not progress-measurable -- there is no "total tokens" or "percentage complete" to display. A progress bar would require knowing the answer length in advance, which is impossible for LLM generation. | Use tool call indicators as activity signals instead. Each `◆ Edit` / `◆ Bash` line proves the process is alive and working. Combined with stall detection, this provides sufficient liveness feedback. |
+| Verbose mode (`--verbose` / `-v` flag) | Adding a verbose mode that shows tool results, raw NDJSON events, or additional metadata is scope creep. The streaming mode IS the verbose mode compared to the current buffered behavior. Adding a third verbosity level (quiet < default < verbose) introduces a configuration matrix that complicates testing. | Two modes only: `--quiet` (buffered JSON, current behavior) and default (streaming with text + tool indicators). If users need raw events, they can pipe `claude -p --output-format stream-json` directly without autopilot. |
+| Kill-on-stall (automatic SIGTERM after timeout) | Automatically killing a Claude process that appears stalled would destroy work in progress. Claude may be in the middle of a large edit or waiting for a slow API. The existing circuit breaker (line 213) handles genuine stuck-in-a-loop scenarios at the phase level. Stall detection should warn, not kill. | Warn to stderr + log file. Let the user decide whether to Ctrl+C. The circuit breaker catches phase-level loops. Stall detection catches within-step silence. Together they cover both failure modes without destructive action. |
+| Colored/formatted streaming output | Adding ANSI color codes to streamed assistant text or tool indicators adds complexity (TTY detection, `NO_COLOR` env var, Windows compatibility) for minimal value. The existing autopilot banners use raw unicode box-drawing characters (line 235-237), not ANSI colors. | Plain text for streamed content. Unicode symbols (`◆` for tool calls, `⚠` for stall warnings) provide visual differentiation without color codes. |
+| Stream input format (`--input-format stream-json`) | Claude CLI supports `--input-format stream-json` for piping NDJSON into Claude. This enables stream chaining (agent-to-agent piping). This is entirely out of scope -- the autopilot sends simple string prompts, not NDJSON streams. | Continue passing prompts as string arguments to `claude -p`. Stream chaining is a different architectural pattern (Agent SDK territory) not needed for autopilot phases. |
+| Structured output extraction from stream | Attempting to parse the `result` event for structured fields (cost, duration, session_id) is tempting but unnecessary. The autopilot only needs the exit code (from process exit) and the accumulated stdout (for debug retry error context). | Capture the exit code from `child.exitCode` and the stdout from accumulated lines. Ignore `result` event fields. If cost tracking is needed later, it is a separate feature. |
 
 ## Feature Dependencies
 
 ```
-[discuss-phase acceptance test gathering]
-    |-- produces --> <acceptance_tests> in CONTEXT.md
-    |-- consumed by --> [verify-phase AT execution]
-    |-- consumed by --> [execute-plan hard gate] (AT Verify commands as regression checks)
-
-[plan-phase <tests> block generation]
-    |-- requires --> test budget status (gsd-tools test-count)
-    |-- produces --> <tests> blocks in PLAN.md
-    |-- consumed by --> [execute-plan TDD execution]
-
-[execute-plan hard test gate]
-    |-- requires --> test.command in config.json
-    |-- requires --> existing deviation Rule 1 (Bug) handling
-    |-- produces --> test pass/fail per task commit
-    |-- feeds into --> SUMMARY.md test results
-
-[verify-phase acceptance test execution]
-    |-- requires --> <acceptance_tests> in CONTEXT.md
-    |-- produces --> truth statuses in VERIFICATION.md
-    |-- falls back to --> current verify_truths behavior when ATs absent
-
-[test steward agent]
-    |-- requires --> test.command (to count tests)
-    |-- requires --> test files on disk (to analyze)
-    |-- produces --> consolidation proposals in audit report
-    |-- triggered by --> audit-milestone.md
-    |-- depends on --> test budget config
-
-[config schema]
-    |-- consumed by --> all features above
-    |-- managed by --> gsd settings command
-    |-- zero-config default --> all gates skip with warnings
-
-[gsd-tools test-count]
-    |-- consumed by --> plan-phase (budget display)
-    |-- consumed by --> test steward (budget analysis)
-    |-- consumed by --> gsd settings (test budget display)
+--quiet flag parsing
+    |
+    v
+runClaudeStreaming() core function  <-- stall timer (setTimeout/clearTimeout)
+    |                                        |
+    |                                        v
+    +-- format selection (json vs stream-json)
+    |
+    +-- line-by-line reading (zx async iterator)
+    |       |
+    |       v
+    |   displayStreamEvent()
+    |       |
+    |       +-- assistant text -> stdout
+    |       +-- tool_use -> stderr indicator
+    |       +-- result -> capture only
+    |       +-- unknown -> silent
+    |
+    +-- output file capture (appendFileSync per line)
+    |
+    +-- stdout accumulation (lines array -> join)
+    |
+    v
+runStep() wrapper  ------> uses runClaudeStreaming()
+runStepCaptured() wrapper -> uses runClaudeStreaming() with outputFile
+debug retry sites (3) ----> use runClaudeStreaming()
 ```
 
-### Critical Path
+**Critical path:** `runClaudeStreaming()` is the foundation. Everything else depends on it.
 
-1. **Config schema** (everything else reads from it)
-2. **gsd-tools test-count** (budget features need counting)
-3. **discuss-phase AT gathering** + **plan-phase `<tests>` blocks** (can be parallel — independent workflow changes)
-4. **execute-plan hard gate** (depends on config, consumes both layers)
-5. **verify-phase AT execution** (depends on discuss-phase producing ATs)
-6. **test steward** (depends on everything else being in place; runs at audit time)
+**No circular dependencies.** The dependency graph is a tree rooted at the CLI flag parsing.
 
 ## MVP Recommendation
 
-### Phase 1: Foundation (Config + Counting + Hard Gate)
+Prioritize (in implementation order):
 
-Build the infrastructure that all other features depend on.
+1. **`runClaudeStreaming()` core function** -- the single function that replaces all 5 invocation sites. This is the foundation for everything else. Start with `--output-format stream-json` (without `--verbose --include-partial-messages`) to use the simpler turn-level event model.
+2. **`displayStreamEvent()` with assistant text + tool indicators** -- the display function that routes events to stdout/stderr. Without this, streaming provides no visible benefit.
+3. **`--quiet` flag + format selection** -- add the flag, wire it to format selection. This is the safety net that preserves backward compatibility.
+4. **Stall detection timer** -- add the watchdog timer with configurable timeout and repeated warnings.
+5. **Wire all 5 invocation sites** -- convert `runStep()`, `runStepCaptured()`, and all 3 debug retry sites to use the new function.
 
-1. **Config schema addition** — Add `test.*` keys to config.json with defaults. Integrate with `gsd settings` display.
-2. **gsd-tools test-count** — New subcommand for counting test cases.
-3. **Execute-plan hard test gate** — Run `test.command` after each task commit. Fail -> Rule 1 deviation.
+**Defer:**
+- Token-level streaming (`--verbose --include-partial-messages`): evaluate after MVP whether turn-level events provide sufficient real-time feedback. If turns are too coarse, add this as a fast-follow.
 
-Rationale: The hard gate is the single highest-value feature. It prevents regressions during autonomous execution. Everything else is enhancement.
+## Event Format Decision
 
-### Phase 2: Acceptance Layer (discuss + verify integration)
+**Critical implementation detail:** The design doc's event model (`assistant`, `tool_use`, `tool_result`, `result`) is a simplified view. The actual stream-json format depends on flags:
 
-Build the human-owned acceptance test lifecycle.
+**Without `--verbose --include-partial-messages`:**
+- Top-level types: `system`, `assistant`, `result`
+- `assistant` events contain complete turn content (all text + tool calls for that turn)
+- Coarser granularity -- you get output after each complete turn, not per-token
 
-4. **discuss-phase acceptance test gathering** — New question pass in interactive mode. Auto-context generation in auto mode.
-5. **verify-phase acceptance test execution** — Run AT Verify commands, map to truths.
-6. **plan-phase budget awareness** — Planner sees test count in prompt.
+**With `--verbose --include-partial-messages`:**
+- Additional type: `stream_event` wrapping raw API events
+- `stream_event` contains `content_block_delta` with `text_delta` for per-token text
+- `content_block_start` with `tool_use` type for tool call starts
+- Much finer granularity -- true token-by-token streaming
 
-Rationale: The acceptance layer is the governance innovation. It gives humans a concrete, executable spec for what "done" means.
+**Recommendation:** Start without `--verbose --include-partial-messages`. The turn-level `assistant` events already provide real-time feedback for multi-minute operations (each assistant turn is emitted as it completes, not buffered until the entire session ends). If empirical testing reveals unacceptable silence gaps between turns, add the flags. The display function should be written to handle both models (check for `stream_event` type in addition to `assistant` type) so the upgrade path is clean.
 
-### Phase 3: Stewardship (test health + audit integration)
-
-Build the long-term health management.
-
-7. **Test steward agent** — Redundancy detection, stale test identification, consolidation proposals.
-8. **audit-milestone integration** — Steward runs during audit, produces test health section.
-9. **add-tests evolution** — Becomes "fill gaps" command for pre-existing phases.
-
-Rationale: The steward is valuable but not urgent. It matters at milestone audit time, not during day-to-day execution.
-
-**Defer:** Coverage tracking, visual reports, per-file mapping, flaky test detection.
+**Confidence:** MEDIUM -- the exact event types and their content structure without `--verbose` need empirical verification by running `claude -p --output-format stream-json` and inspecting the actual NDJSON output. The [documentation gap issue](https://github.com/anthropics/claude-code/issues/24596) confirms this is under-documented.
 
 ## Sources
 
-- [Simon Willison: First Run the Tests (Agentic Engineering Patterns)](https://simonwillison.net/guides/agentic-engineering-patterns/first-run-the-tests/) — PRIMARY. Validates "tests are non-negotiable for AI-generated code" and "first run the tests puts the agent in a testing mindset." HIGH confidence.
-- [Simon Willison: Agentic Engineering Patterns](https://simonwillison.net/guides/agentic-engineering-patterns/) — Broader context on coding agent patterns. HIGH confidence.
-- [Martin Fowler: Given When Then (bliki)](https://martinfowler.com/bliki/GivenWhenThen.html) — Canonical reference for BDD format. HIGH confidence.
-- [TestCollab: From Vibe Coding to Spec-Driven Development](https://testcollab.com/blog/from-vibe-coding-to-spec-driven-development) — Validates spec-driven approach: specification as contract, tests from spec, AI implements against spec. MEDIUM confidence.
-- [Stryker Mutator](https://stryker-mutator.io/) — JavaScript mutation testing framework. Detects redundant/ineffective tests via mutant analysis. HIGH confidence (established tool).
-- [Sander van Beek: Automatically Detecting Redundant Tests](https://lakitna.medium.com/automatically-detecting-redundant-tests-be9151fdd855) — Techniques for automated redundancy detection using mutation analysis. MEDIUM confidence.
-- [Semaphore: Accelerate CI/CD with BDD and Acceptance Testing](https://semaphore.io/blog/bdd-acceptance-testing) — BDD scenarios as automated gates in CI/CD pipelines. HIGH confidence.
-- [Permit.io: Human-in-the-Loop for AI Agents](https://www.permit.io/blog/human-in-the-loop-for-ai-agents-best-practices-frameworks-use-cases-and-demo) — HITL patterns: approve/edit/reject middleware for agent tool calls. MEDIUM confidence.
-- [GitHub: Accelerate TDD with AI (Copilot at Automattic)](https://github.com/readme/guides/github-copilot-automattic) — AI-assisted TDD workflow patterns. MEDIUM confidence.
-- [Testrig: Reducing Redundant Tests Using AI-Powered Analysis](https://testrig.medium.com/reducing-redundant-tests-using-ai-powered-test-analysis-81bacf32db37) — Clustering and cosine similarity for test overlap detection. LOW confidence (single source).
-- [Arxiv: Fine-Grained Approach for Detecting Redundant Test Cases](https://arxiv.org/pdf/2210.01661) — Tscope approach achieving 91.8% precision on NL test redundancy. MEDIUM confidence (academic).
-- Existing GSD codebase analysis (execute-plan.md, verify-phase.md, discuss-phase.md, add-tests.md, tdd.md, audit-milestone.md, config.json) — PRIMARY. Direct code inspection of all integration points. HIGH confidence.
-
----
-*Feature research for: Dual-Layer Test Architecture (GSD v1.6)*
-*Researched: 2026-03-05*
+- [Claude Code CLI Reference](https://code.claude.com/docs/en/cli-reference) -- `--output-format`, `--verbose`, `--include-partial-messages` flag documentation
+- [Claude Code Headless/Agent SDK CLI](https://code.claude.com/docs/en/headless) -- stream-json usage examples, jq filtering patterns
+- [Agent SDK Streaming Output](https://platform.claude.com/docs/en/agent-sdk/streaming-output) -- StreamEvent reference, event type table, message flow diagram
+- [Claude Code Issue #24596](https://github.com/anthropics/claude-code/issues/24596) -- documentation gap for stream-json event types
+- [NDJSON Specification](https://github.com/ndjson/ndjson-spec) -- format specification (one JSON per line, `\n` delimiter)
+- [Complete Guide to NDJSON](https://thetexttool.com/blog/complete-guide-ndjson-newline-delimited-json) -- best practices for streaming NDJSON
+- [zx ProcessPromise](https://google.github.io/zx/process-promise) -- async iterator, `Symbol.asyncIterator`, line-by-line reading
+- [CLI Guidelines](https://clig.dev/) -- stdout/stderr separation, quiet flags, machine-readable output
+- [Ubuntu CLI Verbosity Levels](https://discourse.ubuntu.com/t/cli-verbosity-levels/26973) -- quiet/verbose conventions
+- [Microsoft CLI Design Guidance](https://learn.microsoft.com/en-us/dotnet/standard/commandline/design-guidance) -- verbosity levels (Quiet, Normal, Diagnostic)
+- [Watchdog Timer Pattern](https://dev.to/gajus/ensuring-healthy-node-js-program-using-watchdog-timer-4pjd) -- stall detection in Node.js
+- [Node.js Readline](https://nodejs.org/api/readline.html) -- async iterator for line-by-line stream reading
+- [Khan/format-claude-stream](https://github.com/Khan/format-claude-stream) -- community tool for formatting Claude stream-json output
+- [ytyng: Extract Text from Claude Stream JSON](https://www.ytyng.com/en/blog/claude-stream-json-jq) -- actual stream-json event structure examples
