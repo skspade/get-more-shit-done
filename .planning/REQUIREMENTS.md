@@ -39,18 +39,18 @@
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| STREAM-01 | — | — | — |
-| STREAM-02 | — | — | — |
-| STREAM-03 | — | — | — |
-| STREAM-04 | — | — | — |
-| STREAM-05 | — | — | — |
-| STREAM-06 | — | — | — |
-| STALL-01 | — | — | — |
-| STALL-02 | — | — | — |
-| STALL-03 | — | — | — |
-| STALL-04 | — | — | — |
-| CLI-01 | — | — | — |
-| CLI-02 | — | — | — |
-| CLI-03 | — | — | — |
-| CLI-04 | — | — | — |
-| CLI-05 | — | — | — |
+| STREAM-01 | Phase 54 | — | Pending |
+| STREAM-02 | Phase 54 | — | Pending |
+| STREAM-03 | Phase 54 | — | Pending |
+| STREAM-04 | Phase 54 | — | Pending |
+| STREAM-05 | Phase 54 | — | Pending |
+| STREAM-06 | Phase 54 | — | Pending |
+| STALL-01 | Phase 54 | — | Pending |
+| STALL-02 | Phase 54 | — | Pending |
+| STALL-03 | Phase 54 | — | Pending |
+| STALL-04 | Phase 54 | — | Pending |
+| CLI-01 | Phase 54 | — | Pending |
+| CLI-02 | Phase 55 | — | Pending |
+| CLI-03 | Phase 56 | — | Pending |
+| CLI-04 | Phase 57 | — | Pending |
+| CLI-05 | Phase 54 | — | Pending |

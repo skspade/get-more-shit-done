@@ -13,6 +13,7 @@
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
+- 🚧 **v2.4 Autopilot Streaming** — Phases 54-57 (in progress)
 
 ## Phases
 
@@ -135,7 +136,76 @@
 
 </details>
 
+### 🚧 v2.4 Autopilot Streaming (In Progress)
+
+**Milestone Goal:** Add real-time streaming output to the autopilot via `--output-format stream-json`, replacing buffered JSON with live assistant text and tool call indicators, with stall detection and `--quiet` fallback.
+
+- [ ] **Phase 54: Core Streaming Function** - Discovery, NDJSON parsing, event display, stall detection, quiet mode, and stdin preservation in a single `runClaudeStreaming()` function
+- [ ] **Phase 55: Step Function Integration** - Wire `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` with real-time output file capture
+- [ ] **Phase 56: Debug Retry Integration** - Route all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live debugger output
+- [ ] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior
+
+## Phase Details
+
+### Phase 54: Core Streaming Function
+**Goal**: Users observe real-time streaming output from Claude CLI invocations instead of waiting for buffered JSON
+**Depends on**: Phase 53 (v2.3 complete)
+**Requirements**: STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06, STALL-01, STALL-02, STALL-03, STALL-04, CLI-01, CLI-05
+**Success Criteria** (what must be TRUE):
+  1. Running autopilot with a streaming-capable Claude CLI displays assistant text to stdout in real-time as tokens arrive, not after the process completes
+  2. Tool call events appear as compact indicators on stderr, separate from assistant text on stdout
+  3. When no stream events arrive for 5 minutes, a warning appears on stderr and re-arms for repeated warnings at each subsequent interval
+  4. Running autopilot with `--quiet` produces the original buffered JSON output with no streaming behavior
+  5. The `< /dev/null` stdin redirect is preserved in the consolidated function, preventing Claude from hanging on stdin
+**Plans**: TBD
+
+Plans:
+- [ ] 54-01: TBD
+- [ ] 54-02: TBD
+
+### Phase 55: Step Function Integration
+**Goal**: All normal autopilot phase steps (discuss, plan, execute, verify) stream output in real-time through the consolidated function
+**Depends on**: Phase 54
+**Requirements**: CLI-02
+**Success Criteria** (what must be TRUE):
+  1. `runStep()` delegates to `runClaudeStreaming()` and displays live output during each autopilot phase step
+  2. `runStepCaptured()` delegates to `runClaudeStreaming()` with output file receiving every NDJSON line in real-time (not buffered to process exit)
+  3. Debug retry error context extraction continues to work with NDJSON stdout (last-100-lines still provides useful context)
+**Plans**: TBD
+
+Plans:
+- [ ] 55-01: TBD
+
+### Phase 56: Debug Retry Integration
+**Goal**: Debug retry cycles show live streaming output so users can watch the debugger work in real-time
+**Depends on**: Phase 54
+**Requirements**: CLI-03
+**Success Criteria** (what must be TRUE):
+  1. All 3 debug retry `claude -p` invocations route through `runClaudeStreaming()` instead of direct `$` template literals
+  2. During a debug retry cycle, assistant text and tool call indicators stream to the terminal in real-time
+**Plans**: TBD
+
+Plans:
+- [ ] 56-01: TBD
+
+### Phase 57: Config Schema and Verification
+**Goal**: Stall timeout is configurable via the existing config system and the full streaming pipeline works end-to-end
+**Depends on**: Phase 55, Phase 56
+**Requirements**: CLI-04
+**Success Criteria** (what must be TRUE):
+  1. `autopilot.stall_timeout_ms` appears in the config schema with default value 300000
+  2. `gsd settings` displays the stall timeout setting and `gsd settings set autopilot.stall_timeout_ms <value>` updates it
+  3. Changing the stall timeout value via config affects the actual stall detection interval used by `runClaudeStreaming()`
+**Plans**: TBD
+
+Plans:
+- [ ] 57-01: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 54 -> 55 -> 56 -> 57
+(Note: Phases 55 and 56 depend only on Phase 54 and could execute in either order.)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -150,3 +220,7 @@
 | 38-39 | v2.1 | 2/2 | Complete | 2026-03-06 |
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
+| 54. Core Streaming Function | v2.4 | 0/? | Not started | - |
+| 55. Step Function Integration | v2.4 | 0/? | Not started | - |
+| 56. Debug Retry Integration | v2.4 | 0/? | Not started | - |
+| 57. Config Schema and Verification | v2.4 | 0/? | Not started | - |
