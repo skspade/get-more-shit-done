@@ -99,3 +99,98 @@ describe('autopilot.mjs --dry-run', () => {
     assert.ok(logContent.includes('Dry-run: true'), 'Log should indicate dry-run mode');
   });
 });
+
+// ─── Static Analysis: stdin redirect regression ─────────────────────────────
+
+describe('autopilot.mjs stdin redirect (regression)', () => {
+  const source = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
+  const lines = source.split('\n');
+
+  // Shell invocation lines: contain both "$`" (zx tagged template) and "claude -p"
+  // Exclude comment lines (trimmed starts with //) and console.log lines
+  const shellInvocationLines = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('//')) return false;
+    if (trimmed.includes('console.log')) return false;
+    return line.includes('$`') && line.includes('claude -p');
+  });
+
+  test('every claude -p shell invocation includes < /dev/null', () => {
+    for (const line of shellInvocationLines) {
+      assert.ok(
+        line.includes('< /dev/null'),
+        `Missing < /dev/null in shell invocation: ${line.trim()}`
+      );
+    }
+  });
+
+  test('there are exactly 5 claude -p shell invocations', () => {
+    assert.strictEqual(
+      shellInvocationLines.length,
+      5,
+      `Expected 5 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
+        shellInvocationLines.map((l, i) => `  ${i + 1}: ${l.trim()}`).join('\n')
+    );
+  });
+
+  test('count of < /dev/null matches count of claude -p invocations', () => {
+    const devNullCount = shellInvocationLines.filter((l) => l.includes('< /dev/null')).length;
+    assert.strictEqual(
+      devNullCount,
+      shellInvocationLines.length,
+      `< /dev/null count (${devNullCount}) does not match invocation count (${shellInvocationLines.length})`
+    );
+  });
+
+  test('comment and console.log lines with claude -p are not flagged', () => {
+    const nonInvocationLines = lines.filter((line) => {
+      const trimmed = line.trim();
+      if (!line.includes('claude -p')) return false;
+      return trimmed.startsWith('//') || trimmed.includes('console.log');
+    });
+    // These lines should exist but should NOT be in our invocation set
+    assert.ok(nonInvocationLines.length > 0, 'Expected at least one comment/log line with claude -p');
+    for (const line of nonInvocationLines) {
+      assert.ok(
+        !shellInvocationLines.includes(line),
+        `Non-invocation line incorrectly included: ${line.trim()}`
+      );
+    }
+  });
+});
+
+// ─── Argument Validation ────────────────────────────────────────────────────
+
+describe('autopilot.mjs argument validation', () => {
+  test('unknown positional argument causes exit code 1', { timeout: 15000, skip: !hasClaude ? 'claude CLI not found as binary on PATH' : false }, () => {
+    try {
+      execSync(
+        `npx zx "${AUTOPILOT_PATH}" badarg`,
+        { encoding: 'utf-8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      assert.fail('Expected non-zero exit code for unknown positional argument');
+    } catch (err) {
+      const stderr = err.stderr?.toString() || '';
+      assert.ok(
+        stderr.includes('Unknown argument'),
+        `Expected stderr to contain "Unknown argument", got: ${stderr}`
+      );
+    }
+  });
+
+  test('unknown flag causes exit code 1', { timeout: 15000, skip: !hasClaude ? 'claude CLI not found as binary on PATH' : false }, () => {
+    try {
+      execSync(
+        `npx zx "${AUTOPILOT_PATH}" --bad-flag`,
+        { encoding: 'utf-8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      assert.fail('Expected non-zero exit code for unknown flag');
+    } catch (err) {
+      const stderr = err.stderr?.toString() || '';
+      assert.ok(
+        stderr.includes('Unknown argument'),
+        `Expected stderr to contain "Unknown argument", got: ${stderr}`
+      );
+    }
+  });
+});
