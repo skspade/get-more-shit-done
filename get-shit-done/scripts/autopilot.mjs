@@ -31,12 +31,12 @@ const { getVerificationStatus, getGapsSummary } = require('../bin/lib/verify.cjs
 
 // ─── Argument Parsing ─────────────────────────────────────────────────────────
 
-const knownFlags = new Set(['from-phase', 'fromPhase', 'project-dir', 'projectDir', 'dry-run', 'dryRun']);
+const knownFlags = new Set(['from-phase', 'fromPhase', 'project-dir', 'projectDir', 'dry-run', 'dryRun', 'quiet']);
 
 // Check for positional args (unknown)
 if (argv._.length > 0) {
   console.error(`Unknown argument: ${argv._[0]}`);
-  console.error('Usage: autopilot.mjs [--from-phase N] [--project-dir PATH] [--dry-run]');
+  console.error('Usage: autopilot.mjs [--from-phase N] [--project-dir PATH] [--dry-run] [--quiet]');
   process.exit(1);
 }
 
@@ -45,7 +45,7 @@ for (const key of Object.keys(argv)) {
   if (key === '_') continue;
   if (!knownFlags.has(key)) {
     console.error(`Unknown argument: --${key}`);
-    console.error('Usage: autopilot.mjs [--from-phase N] [--project-dir PATH] [--dry-run]');
+    console.error('Usage: autopilot.mjs [--from-phase N] [--project-dir PATH] [--dry-run] [--quiet]');
     process.exit(1);
   }
 }
@@ -53,6 +53,7 @@ for (const key of Object.keys(argv)) {
 const FROM_PHASE = argv['from-phase'] || argv.fromPhase || '';
 const PROJECT_DIR = argv['project-dir'] || argv.projectDir || process.cwd();
 const DRY_RUN = !!(argv['dry-run'] || argv.dryRun);
+const QUIET = !!(argv.quiet);
 
 // ─── Prerequisites ────────────────────────────────────────────────────────────
 
@@ -190,6 +191,75 @@ function getConfig(key, defaultVal) {
 const CIRCUIT_BREAKER_THRESHOLD = getConfig('autopilot.circuit_breaker_threshold', 3);
 const MAX_DEBUG_RETRIES = getConfig('autopilot.max_debug_retries', 3);
 
+// ─── Streaming Functions ─────────────────────────────────────────────────────
+
+function displayStreamEvent(event) {
+  if (event.type === 'assistant') {
+    const blocks = event.message?.content || [];
+    for (const block of blocks) {
+      if (block.type === 'text') {
+        process.stdout.write(block.text);
+      }
+    }
+  } else if (event.type === 'tool_use') {
+    const toolName = event.name || event.tool_name || 'unknown';
+    process.stderr.write(`  \u25c6 ${toolName}\n`);
+  }
+  // result and other event types: silent (accumulated in output but not displayed)
+}
+
+async function runClaudeStreaming(prompt, { outputFile, quiet } = {}) {
+  // Quiet mode: use original buffered JSON behavior
+  if (quiet || QUIET) {
+    const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
+    return { exitCode: result.exitCode, stdout: result.stdout };
+  }
+
+  // Streaming mode: NDJSON line-by-line parsing
+  const lines = [];
+  const stallTimeout = getConfig('autopilot.stall_timeout_ms', 300000);
+  let stallTimer = null;
+  let stallCount = 0;
+
+  function armStallTimer() {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(function onStall() {
+      stallCount++;
+      const mins = (stallTimeout * stallCount) / 60000;
+      process.stderr.write(`\u26a0 No output for ${mins} minutes -- step may be stalled\n`);
+      logMsg(`STALL WARNING: no output for ${mins} minutes`);
+      // Re-arm for repeated warnings at each subsequent interval
+      stallTimer = setTimeout(onStall, stallTimeout);
+      stallTimer.unref();
+    }, stallTimeout);
+    stallTimer.unref();
+  }
+
+  const proc = $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format stream-json ${prompt} < /dev/null`.nothrow();
+  const rl = createInterface({ input: proc.stdout });
+
+  try {
+    armStallTimer();
+    for await (const line of rl) {
+      lines.push(line);
+      armStallTimer();
+      if (outputFile) fs.appendFileSync(outputFile, line + '\n');
+      try {
+        const event = JSON.parse(line);
+        displayStreamEvent(event);
+      } catch {
+        // Non-JSON line: write to stdout as defensive fallback
+        process.stdout.write(line + '\n');
+      }
+    }
+  } finally {
+    if (stallTimer) clearTimeout(stallTimer);
+  }
+
+  const result = await proc;
+  return { exitCode: result.exitCode, stdout: lines.join('\n') };
+}
+
 // ─── Progress Tracking (Circuit Breaker) ──────────────────────────────────────
 
 async function takeProgressSnapshot() {
@@ -275,7 +345,7 @@ async function runStep(prompt, stepName) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt}`.nothrow();
+  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
 
   const exitCode = result.exitCode;
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
@@ -466,7 +536,7 @@ async function runStepCaptured(prompt, stepName, outputFile) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt}`.nothrow();
+  const result = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${prompt} < /dev/null`.nothrow();
 
   const exitCode = result.exitCode;
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
@@ -533,7 +603,7 @@ async function runStepWithRetry(prompt, stepName) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
     if (debugResult.stdout) process.stdout.write(debugResult.stdout);
     if (debugResult.exitCode !== 0) {
       console.error('WARNING: Debugger itself returned non-zero. Continuing to next retry.');
@@ -578,7 +648,7 @@ async function runVerifyWithDebugRetry(phase) {
       console.log('\u2501'.repeat(53));
       console.log('');
 
-      const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+      const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
       if (debugResult.stdout) process.stdout.write(debugResult.stdout);
       continue;
     }
@@ -617,7 +687,7 @@ async function runVerifyWithDebugRetry(phase) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt}`.nothrow();
+    const debugResult = await $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format json ${debugPrompt} < /dev/null`.nothrow();
     if (debugResult.stdout) process.stdout.write(debugResult.stdout);
   }
 }
