@@ -13,7 +13,7 @@
 - ✅ **v2.1 Autopilot Result Parsing** — Phases 38-39 (shipped 2026-03-06)
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
-- 🚧 **v2.4 Autopilot Streaming** — Phases 54-57 (in progress)
+- 🚧 **v2.4 Autopilot Streaming** — Phases 54-58 (in progress)
 
 ## Phases
 
@@ -144,6 +144,7 @@
 - [x] **Phase 55: Step Function Integration** - Wire `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` with real-time output file capture (completed 2026-03-12)
 - [x] **Phase 56: Debug Retry Integration** - Route all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live debugger output (completed 2026-03-12)
 - [x] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior (completed 2026-03-12)
+- [ ] **Phase 58: Close Verification Gaps** - Create VERIFICATION.md for phases 54 and 56, verify all 13 orphaned requirements (Gap Closure)
 
 ## Phase Details
 
@@ -201,6 +202,20 @@ Plans:
 Plans:
 - [ ] 57-01: TBD
 
+### Phase 58: Close Verification Gaps
+**Goal**: All v2.4 requirements are formally verified with VERIFICATION.md documents for phases 54 and 56
+**Depends on**: Phase 54, Phase 56
+**Requirements**: STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06, STALL-01, STALL-02, STALL-03, STALL-04, CLI-01, CLI-03, CLI-05
+**Gap Closure**: Closes gaps from audit — 13 orphaned requirements due to missing VERIFICATION.md
+**Success Criteria** (what must be TRUE):
+  1. Phase 54 has a VERIFICATION.md confirming all 12 assigned requirements against actual codebase evidence
+  2. Phase 56 has a VERIFICATION.md confirming CLI-03 against actual codebase evidence
+  3. All 13 orphaned requirements are checked off in REQUIREMENTS.md with verification evidence
+**Plans**: TBD
+
+Plans:
+- [ ] 58-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -224,3 +239,4 @@ Phases execute in numeric order: 54 -> 55 -> 56 -> 57
 | 55. Step Function Integration | 1/1 | Complete    | 2026-03-12 | - |
 | 56. Debug Retry Integration | 1/1 | Complete    | 2026-03-12 | - |
 | 57. Config Schema and Verification | 1/1 | Complete    | 2026-03-12 | - |
+| 58. Close Verification Gaps | 0/1 | Pending     | — | — |

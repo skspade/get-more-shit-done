@@ -20,7 +20,7 @@
 
 - [ ] **CLI-01**: New `--quiet` flag selects `--output-format json` (original behavior) for CI/scripted use
 - [ ] **CLI-02**: `runStep()` and `runStepCaptured()` delegate to `runClaudeStreaming()` instead of direct `$` invocations
-- [x] **CLI-03**: All 3 debug retry `claude -p` invocations route through `runClaudeStreaming()`
+- [ ] **CLI-03**: All 3 debug retry `claude -p` invocations route through `runClaudeStreaming()`
 - [ ] **CLI-04**: `autopilot.stall_timeout_ms` added to config schema with default 300000
 - [ ] **CLI-05**: `< /dev/null` stdin fix preserved in consolidated `runClaudeStreaming()` function
 
@@ -39,18 +39,18 @@
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| STREAM-01 | Phase 54 | — | Pending |
-| STREAM-02 | Phase 54 | — | Pending |
-| STREAM-03 | Phase 54 | — | Pending |
-| STREAM-04 | Phase 54 | — | Pending |
-| STREAM-05 | Phase 54 | — | Pending |
-| STREAM-06 | Phase 54 | — | Pending |
-| STALL-01 | Phase 54 | — | Pending |
-| STALL-02 | Phase 54 | — | Pending |
-| STALL-03 | Phase 54 | — | Pending |
-| STALL-04 | Phase 54 | — | Pending |
-| CLI-01 | Phase 54 | — | Pending |
+| STREAM-01 | Phase 58 | — | Pending |
+| STREAM-02 | Phase 58 | — | Pending |
+| STREAM-03 | Phase 58 | — | Pending |
+| STREAM-04 | Phase 58 | — | Pending |
+| STREAM-05 | Phase 58 | — | Pending |
+| STREAM-06 | Phase 58 | — | Pending |
+| STALL-01 | Phase 58 | — | Pending |
+| STALL-02 | Phase 58 | — | Pending |
+| STALL-03 | Phase 58 | — | Pending |
+| STALL-04 | Phase 58 | — | Pending |
+| CLI-01 | Phase 58 | — | Pending |
 | CLI-02 | Phase 55 | — | Pending |
-| CLI-03 | Phase 56 | 56-01 | Complete |
+| CLI-03 | Phase 58 | — | Pending |
 | CLI-04 | Phase 57 | — | Pending |
-| CLI-05 | Phase 54 | — | Pending |
+| CLI-05 | Phase 58 | — | Pending |
