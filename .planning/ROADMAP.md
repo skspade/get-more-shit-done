@@ -144,7 +144,7 @@
 - [x] **Phase 55: Step Function Integration** - Wire `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` with real-time output file capture (completed 2026-03-12)
 - [x] **Phase 56: Debug Retry Integration** - Route all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live debugger output (completed 2026-03-12)
 - [x] **Phase 57: Config Schema and Verification** - Add `autopilot.stall_timeout_ms` to config schema and verify end-to-end streaming behavior (completed 2026-03-12)
-- [ ] **Phase 58: Close Verification Gaps** - Create VERIFICATION.md for phases 54 and 56, verify all 13 orphaned requirements (Gap Closure)
+- [x] **Phase 58: Close Verification Gaps** - Create VERIFICATION.md for phases 54 and 56, verify all 13 orphaned requirements (Gap Closure) (completed 2026-03-13)
 
 ## Phase Details
 
@@ -239,4 +239,4 @@ Phases execute in numeric order: 54 -> 55 -> 56 -> 57
 | 55. Step Function Integration | 1/1 | Complete    | 2026-03-12 | - |
 | 56. Debug Retry Integration | 1/1 | Complete    | 2026-03-12 | - |
 | 57. Config Schema and Verification | 1/1 | Complete    | 2026-03-12 | - |
-| 58. Close Verification Gaps | 0/1 | Pending     | — | — |
+| 58. Close Verification Gaps | 1/1 | Complete    | 2026-03-13 | — |
