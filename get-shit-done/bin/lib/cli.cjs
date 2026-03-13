@@ -970,7 +970,7 @@ function handleHelp(projectRoot, args) {
 
 // ─── Test Count Command ─────────────────────────────────────────────────────
 
-function handleTestCount(projectRoot, args) {
+function handleTestCount(projectRoot) {
   // Parse --phase flag from process.argv
   let phaseArg = null;
   const argv = process.argv;

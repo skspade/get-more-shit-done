@@ -235,7 +235,7 @@ async function runClaudeStreaming(prompt, { outputFile, quiet } = {}) {
     stallTimer.unref();
   }
 
-  const proc = $`cd ${PROJECT_DIR} && claude -p --dangerously-skip-permissions --output-format stream-json ${prompt} < /dev/null`.nothrow();
+  const proc = $`cd ${PROJECT_DIR} && claude -p --verbose --dangerously-skip-permissions --output-format stream-json ${prompt} < /dev/null`.nothrow();
   const rl = createInterface({ input: proc.stdout });
 
   try {
