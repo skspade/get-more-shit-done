@@ -2,27 +2,27 @@
 
 ## Streaming Core
 
-- [ ] **STREAM-01**: Autopilot discovers Claude CLI `stream-json` event format empirically before implementing display logic
-- [ ] **STREAM-02**: New `runClaudeStreaming()` function reads child process stdout as NDJSON lines via zx async iterator (`for await (const line of child)`)
-- [ ] **STREAM-03**: `displayStreamEvent()` writes assistant text to stdout and tool call indicators to stderr in real-time
-- [ ] **STREAM-04**: All NDJSON lines accumulated for `result.stdout` compatibility with debug retry error context
-- [ ] **STREAM-05**: Output file receives every NDJSON line in real-time (not buffered until process exit)
-- [ ] **STREAM-06**: `runClaudeStreaming()` uses `--output-format stream-json` with required flags for token-level streaming
+- [x] **STREAM-01**: Autopilot discovers Claude CLI `stream-json` event format empirically before implementing display logic
+- [x] **STREAM-02**: New `runClaudeStreaming()` function reads child process stdout as NDJSON lines via zx async iterator (`for await (const line of child)`)
+- [x] **STREAM-03**: `displayStreamEvent()` writes assistant text to stdout and tool call indicators to stderr in real-time
+- [x] **STREAM-04**: All NDJSON lines accumulated for `result.stdout` compatibility with debug retry error context
+- [x] **STREAM-05**: Output file receives every NDJSON line in real-time (not buffered until process exit)
+- [x] **STREAM-06**: `runClaudeStreaming()` uses `--output-format stream-json` with required flags for token-level streaming
 
 ## Stall Detection
 
-- [ ] **STALL-01**: Configurable stall timer resets on every stream event received
-- [ ] **STALL-02**: Warning printed to stderr and logged when no output arrives within timeout (default 5 min)
-- [ ] **STALL-03**: Warning re-arms for repeated warnings at each interval (5min, 10min, 15min, etc.)
-- [ ] **STALL-04**: Timer cleaned up on all exit paths including stream errors (try/finally + unref)
+- [x] **STALL-01**: Configurable stall timer resets on every stream event received
+- [x] **STALL-02**: Warning printed to stderr and logged when no output arrives within timeout (default 5 min)
+- [x] **STALL-03**: Warning re-arms for repeated warnings at each interval (5min, 10min, 15min, etc.)
+- [x] **STALL-04**: Timer cleaned up on all exit paths including stream errors (try/finally + unref)
 
 ## CLI & Integration
 
-- [ ] **CLI-01**: New `--quiet` flag selects `--output-format json` (original behavior) for CI/scripted use
-- [ ] **CLI-02**: `runStep()` and `runStepCaptured()` delegate to `runClaudeStreaming()` instead of direct `$` invocations
-- [ ] **CLI-03**: All 3 debug retry `claude -p` invocations route through `runClaudeStreaming()`
-- [ ] **CLI-04**: `autopilot.stall_timeout_ms` added to config schema with default 300000
-- [ ] **CLI-05**: `< /dev/null` stdin fix preserved in consolidated `runClaudeStreaming()` function
+- [x] **CLI-01**: New `--quiet` flag selects `--output-format json` (original behavior) for CI/scripted use
+- [x] **CLI-02**: `runStep()` and `runStepCaptured()` delegate to `runClaudeStreaming()` instead of direct `$` invocations
+- [x] **CLI-03**: All 3 debug retry `claude -p` invocations route through `runClaudeStreaming()`
+- [x] **CLI-04**: `autopilot.stall_timeout_ms` added to config schema with default 300000
+- [x] **CLI-05**: `< /dev/null` stdin fix preserved in consolidated `runClaudeStreaming()` function
 
 ## Future Requirements
 
@@ -39,18 +39,18 @@
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| STREAM-01 | Phase 58 | — | Pending |
-| STREAM-02 | Phase 58 | — | Pending |
-| STREAM-03 | Phase 58 | — | Pending |
-| STREAM-04 | Phase 58 | — | Pending |
-| STREAM-05 | Phase 58 | — | Pending |
-| STREAM-06 | Phase 58 | — | Pending |
-| STALL-01 | Phase 58 | — | Pending |
-| STALL-02 | Phase 58 | — | Pending |
-| STALL-03 | Phase 58 | — | Pending |
-| STALL-04 | Phase 58 | — | Pending |
-| CLI-01 | Phase 58 | — | Pending |
-| CLI-02 | Phase 55 | — | Pending |
-| CLI-03 | Phase 58 | — | Pending |
-| CLI-04 | Phase 57 | — | Pending |
-| CLI-05 | Phase 58 | — | Pending |
+| STREAM-01 | Phase 54 | 54-01 | Verified |
+| STREAM-02 | Phase 54 | 54-01 | Verified |
+| STREAM-03 | Phase 54 | 54-01 | Verified |
+| STREAM-04 | Phase 54 | 54-01 | Verified |
+| STREAM-05 | Phase 54 | 54-01 | Verified |
+| STREAM-06 | Phase 54 | 54-01 | Verified |
+| STALL-01 | Phase 54 | 54-02 | Verified |
+| STALL-02 | Phase 54 | 54-02 | Verified |
+| STALL-03 | Phase 54 | 54-02 | Verified |
+| STALL-04 | Phase 54 | 54-02 | Verified |
+| CLI-01 | Phase 54 | 54-01 | Verified |
+| CLI-02 | Phase 55 | 55-01 | Verified |
+| CLI-03 | Phase 56 | 56-01 | Verified |
+| CLI-04 | Phase 57 | 57-01 | Verified |
+| CLI-05 | Phase 54 | 54-01 | Verified |
