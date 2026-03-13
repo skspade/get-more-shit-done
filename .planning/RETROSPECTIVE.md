@@ -458,6 +458,52 @@
 
 ---
 
+## Milestone: v2.4 — Autopilot Streaming
+
+**Shipped:** 2026-03-13
+**Phases:** 5 | **Plans:** 6 | **Commits:** 45
+
+### What Was Built
+- `runClaudeStreaming()` — consolidated function for all Claude CLI invocations with NDJSON parsing via readline async iteration
+- `displayStreamEvent()` — real-time dispatch of assistant text to stdout and tool call indicators to stderr
+- Stall detection timer with configurable interval (default 5 min), repeating warnings, and try/finally cleanup
+- `--quiet` flag for buffered JSON fallback in CI/scripted environments
+- Wired `runStep()`, `runStepCaptured()`, and all 3 debug retry invocations through `runClaudeStreaming()`
+- Registered `autopilot.stall_timeout_ms` in config schema (CONFIG_DEFAULTS, KNOWN_SETTINGS_KEYS, validateSetting)
+- VERIFICATION.md for phases 54 and 56 with codebase line evidence
+
+### What Worked
+- Well-scoped phases: each phase (core function → step wiring → debug retry → config → verification) had clear, atomic deliverables
+- Phases 55 and 56 were independent after Phase 54 — could have run in parallel (executed sequentially, but unblocked)
+- Config registration followed the established 3-touch-point pattern (CONFIG_DEFAULTS, KNOWN_SETTINGS, validate) — mechanical and fast
+- Gap closure phase (58) was documentation-only — created VERIFICATION.md files, no code changes needed
+- Entire milestone completed in 1 day with 45 commits — autopilot-driven execution
+- Milestone audit passed clean on first run: 15/15 requirements, 15/15 integration, 3/3 E2E flows
+
+### What Was Inefficient
+- Phase 54 and 56 did not create VERIFICATION.md during execution — required Phase 58 gap closure (10th milestone with this pattern)
+- ROADMAP progress table had formatting inconsistency for phases 54-58 (missing milestone column in individual phase rows)
+- Summary files lacked `one_liner` field, requiring manual extraction from summary header text
+
+### Patterns Established
+- NDJSON streaming: `createInterface` wrapping `proc.stdout` for async for-await line iteration
+- Stall timer: `setTimeout` with `.unref()` and try/finally cleanup, named function expression for re-arm
+- Event dispatch: pure `displayStreamEvent()` with switch on `event.type`
+- Consolidated invocation: single `runClaudeStreaming()` replaces all direct `$` template literal Claude CLI calls
+
+### Key Lessons
+1. VERIFICATION.md gap continues (10th milestone) — truly an embedded pattern that the current system doesn't enforce during execution
+2. Consolidating scattered invocations into a single function dramatically simplifies subsequent integration (3 phases touched 1 function)
+3. Named function expressions (onStall) are the correct pattern for timer re-arm in strict mode — avoids arguments.callee
+4. Config registration is now a 2-minute mechanical task when following the 3-touch-point pattern established in v1.6
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents)
+- Sessions: 6 plan executions across 5 phases (autopilot-driven)
+- Notable: fastest per-plan execution — ~2.3 min/plan average, likely due to well-scoped atomic phases
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -475,12 +521,13 @@
 | v2.1 | 16 | 2 | First zero-gap-closure milestone — clean audit pass, TDD + sed-based bash testing |
 | v2.2 | 48 | 7 | PR review integration — pattern reuse from v1.4, file-proximity dedup, dual-path routing |
 | v2.3 | 49 | 7 | Autopilot CJS consolidation — zx rewrite with direct CJS imports, legacy bash preserved |
+| v2.4 | 45 | 5 | Autopilot streaming — NDJSON real-time output, stall detection, consolidated invocations |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 10 of 11 milestones (v2.1 is only clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 9 of 11 milestones; only v2.1 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 9 of 11 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 11 of 12 milestones (v2.1 is only clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 10 of 12 milestones; only v2.1 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 10 of 12 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -489,3 +536,4 @@
 9. TDD + structural grep tests provide strong verification for bash function wiring without requiring live CLI invocations (v2.1)
 10. Pattern reuse across milestones (v1.4 → v2.2) dramatically accelerates development — similar features share scoring, routing, and delegation patterns
 11. Integration testing (`--dry-run`) should happen immediately after implementation, not deferred to a later phase (v2.3 — real bugs caught only at audit time)
+12. Consolidating scattered invocations into a single function simplifies subsequent integration phases — each new consumer just calls the one function (v2.4)

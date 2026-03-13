@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A zx-based Node.js script (`autopilot.mjs`) reinvokes Claude Code with fresh context per phase, importing CJS modules directly for phase navigation, verification status, and config defaults — eliminating the JSON serialization boundary of the original bash implementation. An auto-context agent replaces interactive discuss, verification gates pause for human review via TTY, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Legacy bash autopilot preserved as `autopilot-legacy.sh` with `--legacy` flag fallback.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A zx-based Node.js script (`autopilot.mjs`) reinvokes Claude Code with fresh context per phase, importing CJS modules directly for phase navigation, verification status, and config defaults — eliminating the JSON serialization boundary of the original bash implementation. Real-time streaming output via `--output-format stream-json` replaces buffered JSON — `runClaudeStreaming()` consolidates all Claude CLI invocations with NDJSON parsing, live assistant text to stdout, tool call indicators to stderr, configurable stall detection (default 5 min with repeating warnings), and `--quiet` fallback for CI/scripted use. An auto-context agent replaces interactive discuss, verification gates pause for human review via TTY, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Legacy bash autopilot preserved as `autopilot-legacy.sh` with `--legacy` flag fallback.
 
 ## Core Value
 
@@ -81,14 +81,15 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Add gsd-tools dispatch entries: phase find-next, verify status, verify gaps — v2.3
 - ✓ Rename autopilot.sh to autopilot-legacy.sh with --legacy flag fallback — v2.3
 - ✓ Add zx runtime dependency — v2.3
+- ✓ Real-time streaming output via `--output-format stream-json` replacing buffered JSON — v2.4
+- ✓ Core `runClaudeStreaming()` function consolidating all Claude CLI invocation sites — v2.4
+- ✓ Stream event display: assistant text to stdout, tool calls as compact indicators to stderr — v2.4
+- ✓ Configurable stall detection timer with repeated warnings when no output received — v2.4
+- ✓ `--quiet` CLI flag restoring original JSON behavior for CI/scripted use — v2.4
 
 ### Active
 
-- Real-time streaming output via `--output-format stream-json` replacing buffered JSON — v2.4
-- Core `runClaudeStreaming()` function consolidating all 5 `claude -p` invocation sites — v2.4
-- Stream event display: assistant text to stdout, tool calls as compact indicators to stderr — v2.4
-- Configurable stall detection timer with repeated warnings when no output received — v2.4
-- `--quiet` CLI flag restoring original JSON behavior for CI/scripted use — v2.4
+(None — next milestone not yet planned)
 
 ### Out of Scope
 
@@ -118,6 +119,9 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - Automatic re-review after fixes — user can re-run manually
 - PR comment posting (like Linear comment-back) — no GitHub PR integration for v2.2
 - Cross-PR review aggregation — each invocation handles one review session
+- Token-level streaming UI (spinners, progress bars) — assistant text passthrough is sufficient
+- Interactive stream controls (pause/resume) — adds complexity without clear value
+- Automatic process kill on stall — warning-only; auto-kill adds risk of killing slow-but-working steps
 
 ## Constraints
 
@@ -160,26 +164,19 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | createRequire for CJS imports in ESM | Standard Node.js pattern for importing CJS from ESM; avoids dual-package hazard | ✓ Good |
 | npx zx over global zx install | Avoids requiring users to globally install zx; npx resolves from local node_modules | ✓ Good |
 | Legacy fallback via --legacy flag | Preserves bash autopilot as escape hatch; zero-risk migration path | ✓ Good |
+| NDJSON readline async iteration for streaming | createInterface wrapping proc.stdout gives clean async for-await line parsing | ✓ Good |
+| Named function expression for stall timer re-arm | Avoids arguments.callee in strict mode; setTimeout(onStall, interval) pattern | ✓ Good |
+| Consolidated runClaudeStreaming() for all invocations | Single function handles streaming, stall detection, quiet mode, stdin redirect — eliminates duplication across 5 call sites | ✓ Good |
+| Config registration 3-touch-point pattern | CONFIG_DEFAULTS + KNOWN_SETTINGS_KEYS + validateSetting ensures consistent config behavior | ✓ Good |
 
 ## Context
 
-Shipped v2.3 with autopilot CJS consolidation. 11 milestones shipped (v1.0-v2.3) across 53 phases, 81 plans. 720 tests (budget at 90%).
+Shipped v2.4 with real-time streaming output. 12 milestones shipped (v1.0-v2.4) across 58 phases, 87 plans. 746 tests (budget at 93.3%).
 
-**Current Milestone: v2.4 Autopilot Streaming**
-
-**Goal:** Add real-time streaming output to the GSD autopilot via `--output-format stream-json`, with stall detection and `--quiet` fallback.
-
-**Target features:**
-- Stream-JSON NDJSON parsing with line-by-line event processing
-- Core `runClaudeStreaming()` function replacing all buffered invocation sites
-- Real-time assistant text + tool call indicators to terminal
-- Configurable stall detection timer (default 5 min) with repeated warnings
-- `--quiet` flag for CI/scripted JSON-only mode
-
-**Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
+**Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~65,500 LOC JavaScript/CJS/Bash/Markdown
-**Known tech debt:** Test budget at 90% (720/800) — 3 redundancy findings with 2 consolidation proposals; 2 pre-existing test failures (roadmap.test.cjs, verify-health.test.cjs) unrelated to v2.3; `docs/CLI.md` line 14 contains upstream package name (pre-existing)
+**Codebase:** ~26,674 LOC JavaScript/CJS/MJS/Bash
+**Known tech debt:** Test budget at 93.3% (746/800) — 4 redundancy findings with 1 consolidation proposal; `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-12 after v2.4 milestone started*
+*Last updated: 2026-03-13 after v2.4 milestone*

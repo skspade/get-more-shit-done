@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.4 Autopilot Streaming (Shipped: 2026-03-13)
+
+**Phases completed:** 5 phases, 6 plans, 9 tasks
+**Timeline:** 1 day (2026-03-12)
+**Git range:** 8db1a94 → 6a2b374 (45 commits)
+**Files modified:** 53 (5,493 insertions, 1,446 deletions)
+
+**Key accomplishments:**
+- Created `runClaudeStreaming()` with NDJSON parsing via readline async iteration, `displayStreamEvent()` for real-time assistant text/tool call dispatch, stall detection with repeating warnings, and `--quiet` buffered JSON fallback
+- Wired `runStep()` and `runStepCaptured()` to delegate to `runClaudeStreaming()` for real-time streaming output during all autopilot phase steps
+- Routed all 3 debug retry `claude -p` invocations through `runClaudeStreaming()` for live streaming during failure recovery
+- Registered `autopilot.stall_timeout_ms` in config schema (CONFIG_DEFAULTS, KNOWN_SETTINGS_KEYS, validateSetting) with default 300000
+- Created VERIFICATION.md for phases 54 and 56 with codebase line evidence, marking all 15 requirements as verified
+- Milestone audit passed: 15/15 requirements satisfied, 15/15 integrations wired, 3/3 E2E flows verified
+
+---
+
 ## v2.3 Autopilot CJS Consolidation (Shipped: 2026-03-10)
 
 **Phases completed:** 7 phases, 16 plans
