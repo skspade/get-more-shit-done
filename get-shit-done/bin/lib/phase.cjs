@@ -8,6 +8,27 @@ const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, get
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
+/**
+ * extractPhaseNumbers — Extract all phase numbers from ROADMAP.md content.
+ * Matches both heading format (### Phase 73: Title) and bullet format (- [ ] **Phase 73: Title**).
+ * Returns deduplicated, sorted array of phase number strings.
+ */
+function extractPhaseNumbers(content) {
+  const seen = new Set();
+  // Heading format: ### Phase 73: Title
+  const headingPattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+  let match;
+  while ((match = headingPattern.exec(content)) !== null) {
+    seen.add(match[1]);
+  }
+  // Bullet format: - [ ] **Phase 73: Title** or - [x] **Phase 73: Title**
+  const bulletPattern = /-\s*\[[ x]\]\s*\*{0,2}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+  while ((match = bulletPattern.exec(content)) !== null) {
+    seen.add(match[1]);
+  }
+  return [...seen].sort((a, b) => comparePhaseNum(a, b));
+}
+
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const { type, phase, includeArchived } = options;
@@ -320,11 +341,10 @@ function cmdPhaseAdd(cwd, description, raw) {
   const slug = generateSlugInternal(description);
 
   // Find highest integer phase number
-  const phasePattern = /#{2,4}\s*Phase\s+(\d+)[A-Z]?(?:\.\d+)*:/gi;
+  const allPhaseNums = extractPhaseNumbers(content);
   let maxPhase = 0;
-  let m;
-  while ((m = phasePattern.exec(content)) !== null) {
-    const num = parseInt(m[1], 10);
+  for (const p of allPhaseNums) {
+    const num = parseInt(p, 10);
     if (num > maxPhase) maxPhase = num;
   }
 
@@ -904,7 +924,7 @@ function computePhaseStatus(cwd, phaseInfo) {
     phaseComplete = true;
   }
 
-  // Fallback: check ROADMAP.md checkbox
+  // Fallback: check ROADMAP.md checkbox (checked [x] with or without date)
   if (!phaseComplete) {
     const unpadded = phaseInfo.phase_number.replace(/^0+/, '') || '0';
     try {
@@ -912,7 +932,7 @@ function computePhaseStatus(cwd, phaseInfo) {
       if (fs.existsSync(roadmapPath)) {
         const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
         const completedPattern = new RegExp(
-          `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s].*\\(completed\\s+\\d{4}-\\d{2}-\\d{2}\\)`,
+          `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s]`,
           'i'
         );
         phaseComplete = completedPattern.test(roadmapContent);
@@ -997,6 +1017,18 @@ function cmdPhaseStatus(cwd, phaseArg, raw) {
 }
 
 /**
+ * isPhaseCheckedInRoadmap — Check if a phase has [x] checkbox in ROADMAP content.
+ */
+function isPhaseCheckedInRoadmap(roadmapContent, phaseNum) {
+  const unpadded = phaseNum.replace(/^0+/, '') || '0';
+  const pattern = new RegExp(
+    `-\\s*\\[x\\]\\s*.*Phase\\s+${escapeRegex(unpadded)}[:\\s]`,
+    'i'
+  );
+  return pattern.test(roadmapContent);
+}
+
+/**
  * findFirstIncompletePhase — Returns the first incomplete phase number (string) from the roadmap, or null.
  */
 function findFirstIncompletePhase(cwd) {
@@ -1004,20 +1036,13 @@ function findFirstIncompletePhase(cwd) {
   if (!fs.existsSync(roadmapPath)) return null;
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
-  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
-  const phases = [];
-  let match;
-
-  while ((match = phasePattern.exec(content)) !== null) {
-    phases.push(match[1]);
-  }
-
-  phases.sort((a, b) => comparePhaseNum(a, b));
+  const phases = extractPhaseNumbers(content);
 
   for (const phaseNum of phases) {
     const phaseInfo = findPhaseInternal(cwd, phaseNum);
     if (!phaseInfo) {
-      // No directory means not started — incomplete
+      // No directory — check if marked complete in ROADMAP (e.g. skipped/archived phases)
+      if (isPhaseCheckedInRoadmap(content, phaseNum)) continue;
       return phaseNum;
     }
     const status = computePhaseStatus(cwd, phaseInfo);
@@ -1037,21 +1062,14 @@ function nextIncompletePhase(cwd, currentPhase) {
   if (!fs.existsSync(roadmapPath)) return null;
 
   const content = fs.readFileSync(roadmapPath, 'utf-8');
-  const phasePattern = /#{2,4}\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:\s*([^\n]+)/gi;
-  const phases = [];
-  let match;
-
-  while ((match = phasePattern.exec(content)) !== null) {
-    phases.push(match[1]);
-  }
-
-  phases.sort((a, b) => comparePhaseNum(a, b));
+  const phases = extractPhaseNumbers(content);
 
   for (const phaseNum of phases) {
     if (comparePhaseNum(phaseNum, String(currentPhase)) <= 0) continue;
 
     const phaseInfo = findPhaseInternal(cwd, phaseNum);
     if (!phaseInfo) {
+      if (isPhaseCheckedInRoadmap(content, phaseNum)) continue;
       return phaseNum;
     }
     const status = computePhaseStatus(cwd, phaseInfo);
@@ -1074,6 +1092,7 @@ module.exports = {
   cmdPhaseComplete,
   cmdPhaseStatus,
   computePhaseStatus,
+  extractPhaseNumbers,
   findFirstIncompletePhase,
   nextIncompletePhase,
 };

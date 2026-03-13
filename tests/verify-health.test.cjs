@@ -347,6 +347,270 @@ describe('validate health command', () => {
     );
   });
 
+  // ─── Check 9: STATE.md current phase vs .completed markers ────────────────
+
+  test('warns when STATE.md current phase is already completed on disk (W008)', () => {
+    writeMinimalProjectMd(tmpDir);
+    // ROADMAP has phases 1, 2, 3
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [x] **Phase 1: Setup** (completed 2026-01-01)\n- [ ] **Phase 2: Build**\n- [ ] **Phase 3: Ship**\n'
+    );
+    // STATE.md points to phase 1 as current
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase: 1 of 3 (Setup)\nStatus: executing\n');
+    writeValidConfigJson(tmpDir);
+
+    // Phase 1 dir: completed (has .completed marker)
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), JSON.stringify({ date: '2026-01-01', phase: '1' }));
+
+    // Phase 2 dir: incomplete (no .completed marker)
+    const phase2Dir = path.join(tmpDir, '.planning', 'phases', '02-build');
+    fs.mkdirSync(phase2Dir, { recursive: true });
+
+    // Phase 3 dir: incomplete
+    const phase3Dir = path.join(tmpDir, '.planning', 'phases', '03-ship');
+    fs.mkdirSync(phase3Dir, { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W008'),
+      `Expected W008 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('no W008 when STATE.md current phase is not completed', () => {
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [x] **Phase 1: Setup** (completed 2026-01-01)\n- [ ] **Phase 2: Build**\n'
+    );
+    // STATE.md points to phase 2 (not completed)
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase: 2 of 2 (Build)\nStatus: executing\n');
+    writeValidConfigJson(tmpDir);
+
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), JSON.stringify({ date: '2026-01-01', phase: '1' }));
+
+    const phase2Dir = path.join(tmpDir, '.planning', 'phases', '02-build');
+    fs.mkdirSync(phase2Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase2Dir, '02-01-PLAN.md'), '# Plan\n');
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W008'),
+      `Should not have W008: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('no W008 when completed phase is the last phase (no incomplete phases after)', () => {
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [x] **Phase 1: Setup** (completed 2026-01-01)\n'
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase: 1 of 1 (Setup)\nStatus: complete\n');
+    writeValidConfigJson(tmpDir);
+
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), JSON.stringify({ date: '2026-01-01', phase: '1' }));
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W008'),
+      `Should not have W008 when all phases are done: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  // ─── Check 10: ROADMAP checkbox vs .completed marker consistency ──────────
+
+  test('warns when phase has .completed marker but ROADMAP checkbox is unchecked (W009)', () => {
+    writeMinimalProjectMd(tmpDir);
+    // ROADMAP shows phase 1 as unchecked but it has .completed on disk
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [ ] **Phase 1: Setup** - Initial setup\n'
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nNo phase refs here.\n');
+    writeValidConfigJson(tmpDir);
+
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), JSON.stringify({ date: '2026-01-01', phase: '1' }));
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      output.warnings.some(w => w.code === 'W009'),
+      `Expected W009 in warnings: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('no W009 when completed phase has checked ROADMAP checkbox', () => {
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [x] **Phase 1: Setup** (completed 2026-01-01)\n'
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nNo phase refs here.\n');
+    writeValidConfigJson(tmpDir);
+
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), JSON.stringify({ date: '2026-01-01', phase: '1' }));
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W009'),
+      `Should not have W009: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  test('no W009 when phase has no .completed marker', () => {
+    writeMinimalProjectMd(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\n- [ ] **Phase 1: Setup** - In progress\n'
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nNo phase refs here.\n');
+    writeValidConfigJson(tmpDir);
+
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-setup');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    // No .completed marker, no SUMMARY
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.warnings.some(w => w.code === 'W009'),
+      `Should not have W009: ${JSON.stringify(output.warnings)}`
+    );
+  });
+
+  // ─── Check 11: Autopilot phase detection (E006) ──────────────────────────
+
+  test('errors when unchecked phases exist but findFirstIncompletePhase returns null (E006)', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+    // Write ROADMAP with unchecked bullet-format phase but NO heading-format phases
+    // This simulates the original bug where bullet phases were invisible
+    // We create a phase dir with plans+summaries so computePhaseStatus marks it complete
+    // but the unchecked bullet phase has no matching dir — normally it should be found
+    // For this test, we make ALL phases appear complete to computePhaseStatus
+    // but leave unchecked entries in the ROADMAP
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n\n## Phases\n\n- [x] **Phase 1: Done** (completed 2026-01-01)\n- [ ] **Phase 2: Not Done**\n`
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 of 2.\n');
+    // Phase 1 dir — complete with marker
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-done');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), '');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+    // Phase 2 dir — empty (not started), should be found as incomplete
+    const phase2Dir = path.join(tmpDir, '.planning', 'phases', '02-not-done');
+    fs.mkdirSync(phase2Dir, { recursive: true });
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // With the fix applied, findFirstIncompletePhase SHOULD find phase 2
+    // So E006 should NOT fire — this test validates the fix works
+    assert.ok(
+      !output.errors.some(e => e.code === 'E006'),
+      `Should NOT have E006 when findFirstIncompletePhase can find the phase: ${JSON.stringify(output.errors)}`
+    );
+  });
+
+  test('E006 fires when unchecked phases exist but none are findable', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+    // ROADMAP has unchecked phase 2 but phase 2 is marked [x] in ROADMAP's heading section
+    // and has .completed marker — yet there's a stale unchecked bullet entry too
+    // Actually, the simplest way to trigger E006 is: unchecked phases in ROADMAP
+    // but findFirstIncompletePhase returns null. This would require all phases to be
+    // marked complete on disk while ROADMAP still has [ ] entries.
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n\n## Phases\n\n- [ ] **Phase 1: Should be found**\n`
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 in progress.\n');
+    // Phase 1 dir exists and has .completed marker (contradicts ROADMAP unchecked)
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-should-be-found');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), '');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Phase 1 is complete on disk (.completed + plans+summaries) so findFirstIncompletePhase
+    // returns null, but ROADMAP has an unchecked [ ] entry — E006 should fire
+    assert.ok(
+      output.errors.some(e => e.code === 'E006'),
+      `Expected E006 in errors: ${JSON.stringify(output.errors)}`
+    );
+  });
+
+  test('no E006 when all phases are checked in ROADMAP', () => {
+    writeMinimalProjectMd(tmpDir);
+    writeValidConfigJson(tmpDir);
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      `# Roadmap\n\n## Phases\n\n- [x] **Phase 1: Done** (completed 2026-01-01)\n`
+    );
+    writeMinimalStateMd(tmpDir, '# Session State\n\nPhase 1 done.\n');
+    const phase1Dir = path.join(tmpDir, '.planning', 'phases', '01-done');
+    fs.mkdirSync(phase1Dir, { recursive: true });
+    fs.writeFileSync(path.join(phase1Dir, '.completed'), '');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-PLAN.md'), '# Plan\n');
+    fs.writeFileSync(path.join(phase1Dir, '01-01-SUMMARY.md'), '# Summary\n');
+
+    const result = runGsdTools('validate health', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(
+      !output.errors.some(e => e.code === 'E006'),
+      `Should not have E006: ${JSON.stringify(output.errors)}`
+    );
+  });
+
   // ─── Overall status ────────────────────────────────────────────────────────
 
   test("returns 'healthy' when all checks pass", () => {

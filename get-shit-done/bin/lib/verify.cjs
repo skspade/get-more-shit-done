@@ -7,6 +7,7 @@ const path = require('path');
 const { safeReadFile, normalizePhaseName, execGit, findPhaseInternal, getMilestoneInfo, output, error } = require('./core.cjs');
 const { extractFrontmatter, parseMustHavesBlock } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
+const { findFirstIncompletePhase } = require('./phase.cjs');
 
 function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   if (!summaryPath) {
@@ -699,6 +700,97 @@ function cmdValidateHealth(cwd, options, raw) {
       const unpadded = String(parseInt(p, 10));
       if (!roadmapPhases.has(p) && !roadmapPhases.has(unpadded)) {
         addIssue('warning', 'W007', `Phase ${p} exists on disk but not in ROADMAP.md`, 'Add to roadmap or remove directory');
+      }
+    }
+  }
+
+  // ─── Check 9: STATE.md current phase vs .completed markers ───────────────
+  // Detects when STATE.md points to a phase that is already completed on disk
+  // while incomplete phases still exist (stale state).
+  if (fs.existsSync(statePath) && fs.existsSync(phasesDir)) {
+    const stateContent2 = fs.readFileSync(statePath, 'utf-8');
+    // Match "Phase: NN" or "Phase NN of" patterns (the "current position" line)
+    const currentPhaseMatch = stateContent2.match(/Phase:?\s+(\d+(?:\.\d+)*)\s+(?:of\b|in\b|\()/i)
+      || stateContent2.match(/\*\*Current phase:\*\*\s*(\d+(?:\.\d+)*)/i);
+    if (currentPhaseMatch) {
+      const currentPhaseNum = currentPhaseMatch[1];
+      const normalizedCurrent = String(parseInt(currentPhaseNum, 10)).padStart(2, '0');
+      // Find the matching phase directory
+      try {
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+        const currentDir = dirs.find(d => d.startsWith(normalizedCurrent + '-') || d === normalizedCurrent);
+        if (currentDir) {
+          const completedMarker = path.join(phasesDir, currentDir, '.completed');
+          if (fs.existsSync(completedMarker)) {
+            // Check if there are incomplete phases after this one
+            const hasIncomplete = dirs.some(d => {
+              const dm = d.match(/^(\d+)/);
+              if (!dm) return false;
+              const num = parseInt(dm[1], 10);
+              if (num <= parseInt(currentPhaseNum, 10)) return false;
+              return !fs.existsSync(path.join(phasesDir, d, '.completed'));
+            });
+            if (hasIncomplete) {
+              addIssue('warning', 'W008',
+                `STATE.md current phase ${currentPhaseNum} is already completed on disk but incomplete phases exist after it`,
+                'Run /gsd:health --repair to advance STATE.md to the next incomplete phase', true);
+              if (!repairs.includes('regenerateState')) repairs.push('regenerateState');
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // ─── Check 10: ROADMAP checkbox vs .completed marker consistency ─────────
+  // Detects when a phase has a .completed marker on disk but ROADMAP.md still
+  // shows it with an unchecked [ ] checkbox (stale roadmap).
+  if (fs.existsSync(roadmapPath) && fs.existsSync(phasesDir)) {
+    const roadmapContent2 = fs.readFileSync(roadmapPath, 'utf-8');
+    try {
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        const completedMarker = path.join(phasesDir, e.name, '.completed');
+        if (!fs.existsSync(completedMarker)) continue;
+        const dm = e.name.match(/^(\d+(?:\.\d+)*)/);
+        if (!dm) continue;
+        const phaseNum = dm[1];
+        const unpadded = String(parseInt(phaseNum, 10));
+        // Check if ROADMAP has an unchecked checkbox for this phase
+        const uncheckedPattern = new RegExp(
+          `-\\s*\\[ \\]\\s*.*Phase\\s+${unpadded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]`,
+          'i'
+        );
+        if (uncheckedPattern.test(roadmapContent2)) {
+          addIssue('warning', 'W009',
+            `Phase ${unpadded} has .completed marker on disk but ROADMAP.md checkbox is unchecked`,
+            'Run /gsd:health --repair or manually check the ROADMAP.md checkbox');
+        }
+      }
+    } catch {}
+  }
+
+  // ─── Check 11: Autopilot phase detection ────────────────────────────────
+  // Verifies that findFirstIncompletePhase can find unchecked phases in ROADMAP.
+  // This catches the bug where bullet-format phases were invisible to the autopilot.
+  if (fs.existsSync(roadmapPath)) {
+    const roadmapContent3 = fs.readFileSync(roadmapPath, 'utf-8');
+    // Count unchecked phases in ROADMAP
+    const uncheckedPattern = /-\s*\[ \]\s*(?:\*{0,2})\s*Phase\s+(\d+[A-Z]?(?:\.\d+)*)\s*:/gi;
+    const uncheckedPhases = [];
+    let um;
+    while ((um = uncheckedPattern.exec(roadmapContent3)) !== null) {
+      uncheckedPhases.push(um[1]);
+    }
+
+    if (uncheckedPhases.length > 0) {
+      const firstIncomplete = findFirstIncompletePhase(cwd);
+      if (!firstIncomplete) {
+        addIssue('error', 'E006',
+          `Autopilot would report "all phases complete" but ROADMAP has ${uncheckedPhases.length} unchecked phase(s): ${uncheckedPhases.join(', ')}`,
+          'Phase format in ROADMAP.md may not match what findFirstIncompletePhase expects — check heading vs bullet format');
       }
     }
   }
