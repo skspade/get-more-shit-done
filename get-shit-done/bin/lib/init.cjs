@@ -231,6 +231,7 @@ function cmdInitNewMilestone(cwd, raw) {
     // Config
     commit_docs: config.commit_docs,
     research_enabled: config.research,
+    auto_mode: config.auto_advance,
 
     // Current milestone
     current_milestone: milestone.version,

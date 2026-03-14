@@ -816,6 +816,23 @@ describe('cmdInitNewMilestone', () => {
     assert.strictEqual(output.project_path, '.planning/PROJECT.md');
     assert.strictEqual(output.roadmap_path, '.planning/ROADMAP.md');
     assert.strictEqual(output.state_path, '.planning/STATE.md');
+    assert.ok('auto_mode' in output, 'Should have auto_mode');
+  });
+
+  test('auto_mode reflects workflow.auto_advance config', () => {
+    // Default: no config set, auto_mode should be false
+    const result1 = runGsdTools('init new-milestone', tmpDir);
+    assert.ok(result1.success, `Command failed: ${result1.error}`);
+    const output1 = JSON.parse(result1.output);
+    assert.strictEqual(output1.auto_mode, false);
+
+    // Set workflow.auto_advance to true
+    runGsdTools('config-set workflow.auto_advance true', tmpDir);
+
+    const result2 = runGsdTools('init new-milestone', tmpDir);
+    assert.ok(result2.success, `Command failed: ${result2.error}`);
+    const output2 = JSON.parse(result2.output);
+    assert.strictEqual(output2.auto_mode, true);
   });
 
   test('file existence flags reflect actual state', () => {
