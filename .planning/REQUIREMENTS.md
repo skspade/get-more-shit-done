@@ -46,10 +46,24 @@
 
 ## Traceability
 
-| Requirement | Phase | Plan |
-|-------------|-------|------|
-| PARSE-01..03 | — | — |
-| CTX-01..05 | — | — |
-| SKIP-01..06 | — | — |
-| CHAIN-01..02 | — | — |
-| INT-01..03 | — | — |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PARSE-01 | Phase 59 | Pending |
+| PARSE-02 | Phase 59 | Pending |
+| PARSE-03 | Phase 59 | Pending |
+| CTX-01 | Phase 59 | Pending |
+| CTX-02 | Phase 59 | Pending |
+| CTX-03 | Phase 59 | Pending |
+| CTX-04 | Phase 59 | Pending |
+| CTX-05 | Phase 59 | Pending |
+| SKIP-01 | Phase 60 | Pending |
+| SKIP-02 | Phase 60 | Pending |
+| SKIP-03 | Phase 60 | Pending |
+| SKIP-04 | Phase 60 | Pending |
+| SKIP-05 | Phase 60 | Pending |
+| SKIP-06 | Phase 60 | Pending |
+| CHAIN-01 | Phase 61 | Pending |
+| CHAIN-02 | Phase 61 | Pending |
+| INT-01 | Phase 62 | Pending |
+| INT-02 | Phase 62 | Pending |
+| INT-03 | Phase 59 | Pending |

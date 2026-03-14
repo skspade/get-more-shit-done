@@ -14,6 +14,7 @@
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
 - ✅ **v2.4 Autopilot Streaming** — Phases 54-58 (shipped 2026-03-13)
+- [ ] **v2.5 New-Milestone Auto Mode** — Phases 59-62 (in progress)
 
 ## Phases
 
@@ -147,7 +148,75 @@
 
 </details>
 
+### v2.5 New-Milestone Auto Mode (In Progress)
+
+**Milestone Goal:** Users can invoke `/gsd:new-milestone --auto` to create milestones without interactive confirmation, completing the autonomous pipeline from brainstorm through execution.
+
+- [ ] **Phase 59: Flag Parsing and Context Resolution** - Parse --auto flag, resolve context from multiple sources, wire init.cjs
+- [ ] **Phase 60: Auto-Skip Decision Points** - Bypass all 6 interactive questions with sensible defaults
+- [ ] **Phase 61: Auto-Chain to Discuss Phase** - Chain milestone creation into autonomous phase execution
+- [ ] **Phase 62: Brainstorm Integration** - Simplify brainstorm routing to use --auto flag
+
+## Phase Details
+
+### Phase 59: Flag Parsing and Context Resolution
+**Goal**: Users can invoke new-milestone with --auto and have their context (MILESTONE-CONTEXT.md, @file, or inline) automatically detected and validated before any mutations occur
+**Depends on**: Nothing (first phase of v2.5)
+**Requirements**: PARSE-01, PARSE-02, PARSE-03, CTX-01, CTX-02, CTX-03, CTX-04, CTX-05, INT-03
+**Success Criteria** (what must be TRUE):
+  1. Running `/gsd:new-milestone --auto` with MILESTONE-CONTEXT.md present uses that file as context without prompting
+  2. Running `/gsd:new-milestone --auto @path/to/file.md` uses the referenced file as context
+  3. Running `/gsd:new-milestone --auto "build a feature"` uses the inline text as context
+  4. Running `/gsd:new-milestone --auto` with no context source errors with a usage message before any file mutations
+  5. `gsd-tools.cjs init new-milestone` output includes an `auto_mode` field reflecting flag and config state
+**Plans**: TBD
+
+Plans:
+- [ ] 59-01: TBD
+
+### Phase 60: Auto-Skip Decision Points
+**Goal**: In auto mode, all 6 interactive confirmation questions are bypassed with correct defaults, producing a complete milestone (requirements + roadmap) without human input
+**Depends on**: Phase 59
+**Requirements**: SKIP-01, SKIP-02, SKIP-03, SKIP-04, SKIP-05, SKIP-06
+**Success Criteria** (what must be TRUE):
+  1. Auto mode uses resolved context instead of asking "What do you want to build next?"
+  2. Auto mode accepts the suggested version (minor bump) without confirmation
+  3. Auto mode selects "Research first" and includes all features from context/research without prompting
+  4. Auto mode skips the "Identify gaps?" question and auto-approves the roadmap
+**Plans**: TBD
+
+Plans:
+- [ ] 60-01: TBD
+
+### Phase 61: Auto-Chain to Discuss Phase
+**Goal**: After auto-mode milestone creation completes, the workflow automatically chains into discuss-phase for the first phase, connecting milestone creation to the autonomous execution pipeline
+**Depends on**: Phase 60
+**Requirements**: CHAIN-01, CHAIN-02
+**Success Criteria** (what must be TRUE):
+  1. After roadmap creation in auto mode, `/gsd:discuss-phase {N} --auto` is invoked automatically
+  2. The first phase number is read from ROADMAP.md (not hardcoded to 1)
+**Plans**: TBD
+
+Plans:
+- [ ] 61-01: TBD
+
+### Phase 62: Brainstorm Integration
+**Goal**: Brainstorm workflow delegates milestone creation to `/gsd:new-milestone --auto` instead of inlining milestone creation steps, reducing code duplication and enabling the full brainstorm-to-execution pipeline
+**Depends on**: Phase 61
+**Requirements**: INT-01, INT-02
+**Success Criteria** (what must be TRUE):
+  1. Brainstorm step 10 milestone route invokes `/gsd:new-milestone --auto` via SlashCommand instead of inline steps
+  2. MILESTONE-CONTEXT.md is written and committed before the brainstorm-to-milestone handoff
+  3. The previous inline milestone creation code (~70 lines) is removed from brainstorm.md
+**Plans**: TBD
+
+Plans:
+- [ ] 62-01: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 59 → 60 → 61 → 62
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -163,3 +232,7 @@
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
+| 59. Flag Parsing and Context Resolution | v2.5 | 0/0 | Not started | - |
+| 60. Auto-Skip Decision Points | v2.5 | 0/0 | Not started | - |
+| 61. Auto-Chain to Discuss Phase | v2.5 | 0/0 | Not started | - |
+| 62. Brainstorm Integration | v2.5 | 0/0 | Not started | - |
