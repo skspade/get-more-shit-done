@@ -62,8 +62,8 @@
 | SKIP-04 | Phase 60 | Pending |
 | SKIP-05 | Phase 60 | Pending |
 | SKIP-06 | Phase 60 | Pending |
-| CHAIN-01 | Phase 61 | Pending |
-| CHAIN-02 | Phase 61 | Pending |
+| CHAIN-01 | Phase 61 | Done |
+| CHAIN-02 | Phase 61 | Done |
 | INT-01 | Phase 62 | Pending |
 | INT-02 | Phase 62 | Pending |
 | INT-03 | Phase 59 | Done |
