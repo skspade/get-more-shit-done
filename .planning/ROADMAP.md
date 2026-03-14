@@ -234,6 +234,6 @@ Phases execute in numeric order: 59 → 60 → 61 → 62
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
 | 59. Flag Parsing and Context Resolution | v2.5 | 0/0 | Not started | - |
-| 60. Auto-Skip Decision Points | 1/1 | Complete   | 2026-03-14 | - |
+| 60. Auto-Skip Decision Points | 1/1 | Complete    | 2026-03-14 | - |
 | 61. Auto-Chain to Discuss Phase | v2.5 | 0/0 | Not started | - |
 | 62. Brainstorm Integration | v2.5 | 0/0 | Not started | - |
