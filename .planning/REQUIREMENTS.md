@@ -48,14 +48,14 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARSE-01 | Phase 59 | Pending |
-| PARSE-02 | Phase 59 | Pending |
-| PARSE-03 | Phase 59 | Pending |
-| CTX-01 | Phase 59 | Pending |
-| CTX-02 | Phase 59 | Pending |
-| CTX-03 | Phase 59 | Pending |
-| CTX-04 | Phase 59 | Pending |
-| CTX-05 | Phase 59 | Pending |
+| PARSE-01 | Phase 59 | Done |
+| PARSE-02 | Phase 59 | Done |
+| PARSE-03 | Phase 59 | Done |
+| CTX-01 | Phase 59 | Done |
+| CTX-02 | Phase 59 | Done |
+| CTX-03 | Phase 59 | Done |
+| CTX-04 | Phase 59 | Done |
+| CTX-05 | Phase 59 | Done |
 | SKIP-01 | Phase 60 | Pending |
 | SKIP-02 | Phase 60 | Pending |
 | SKIP-03 | Phase 60 | Pending |
@@ -66,4 +66,4 @@
 | CHAIN-02 | Phase 61 | Pending |
 | INT-01 | Phase 62 | Pending |
 | INT-02 | Phase 62 | Pending |
-| INT-03 | Phase 59 | Pending |
+| INT-03 | Phase 59 | Done |

@@ -152,7 +152,7 @@
 
 **Milestone Goal:** Users can invoke `/gsd:new-milestone --auto` to create milestones without interactive confirmation, completing the autonomous pipeline from brainstorm through execution.
 
-- [ ] **Phase 59: Flag Parsing and Context Resolution** - Parse --auto flag, resolve context from multiple sources, wire init.cjs
+- [x] **Phase 59: Flag Parsing and Context Resolution** - Parse --auto flag, resolve context from multiple sources, wire init.cjs
 - [ ] **Phase 60: Auto-Skip Decision Points** - Bypass all 6 interactive questions with sensible defaults
 - [ ] **Phase 61: Auto-Chain to Discuss Phase** - Chain milestone creation into autonomous phase execution
 - [ ] **Phase 62: Brainstorm Integration** - Simplify brainstorm routing to use --auto flag
@@ -169,10 +169,11 @@
   3. Running `/gsd:new-milestone --auto "build a feature"` uses the inline text as context
   4. Running `/gsd:new-milestone --auto` with no context source errors with a usage message before any file mutations
   5. `gsd-tools.cjs init new-milestone` output includes an `auto_mode` field reflecting flag and config state
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 59-01: TBD
+- [x] 59-01: Add auto_mode to init new-milestone and loadConfig
+- [x] 59-02: Add auto mode and context resolution to new-milestone workflow
 
 ### Phase 60: Auto-Skip Decision Points
 **Goal**: In auto mode, all 6 interactive confirmation questions are bypassed with correct defaults, producing a complete milestone (requirements + roadmap) without human input
