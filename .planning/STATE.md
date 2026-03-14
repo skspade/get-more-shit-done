@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: New-Milestone Auto Mode
-status: in_progress
-last_updated: "2026-03-14T21:00:00.000Z"
+status: unknown
+last_updated: "2026-03-14T18:38:07.853Z"
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 4
+  total_phases: 4
+  completed_phases: 3
+  total_plans: 5
   completed_plans: 3
 ---
 
