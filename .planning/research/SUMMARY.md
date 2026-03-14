@@ -1,164 +1,143 @@
 # Project Research Summary
 
-**Project:** Autopilot Real-Time Streaming Output (v2.4)
-**Domain:** NDJSON streaming integration for zx-based CLI orchestrator
-**Researched:** 2026-03-12
+**Project:** GSD Autopilot v2.5 -- New-Milestone Auto Mode
+**Domain:** Autonomous workflow orchestration (CLI-based coding agent pipeline)
+**Researched:** 2026-03-14
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The v2.4 milestone adds real-time streaming output to the autopilot by replacing 5 buffered `claude -p --output-format json` invocations with a single `runClaudeStreaming()` function that uses `--output-format stream-json`. The implementation requires zero new dependencies -- zx's built-in async iterator provides line-by-line NDJSON parsing, `JSON.parse()` handles event deserialization, and `setTimeout`/`clearTimeout` powers stall detection. This is a well-scoped refactoring with a clear dependency chain and no architectural unknowns.
+This milestone adds `--auto` flag support to the `/gsd:new-milestone` workflow, completing the autonomous pipeline from brainstorm through execution. The work is pure pattern replication -- every behavior needed (flag parsing, config persistence, context resolution, question skipping, auto-chaining) already exists in discuss-phase, plan-phase, execute-phase, or new-project workflows. No new dependencies, libraries, or architectural components are required. The entire implementation consists of modifying three markdown workflow files and adding one field to an existing CJS module.
 
-The most critical finding from research is that the design doc's assumed event model is wrong. The Claude CLI `stream-json` format does not emit top-level `assistant`/`tool_use` events as the design doc assumes. Instead, it emits `stream_event` wrappers containing nested API events (`content_block_delta` with `text_delta` for text, `content_block_start` with `tool_use` for tools). Additionally, the `--include-partial-messages` flag (not mentioned in the design doc) is required to get token-level streaming -- without it, only complete turn-level `assistant` messages are emitted, defeating the purpose of streaming. The `--verbose` flag is also needed for full tool visibility. These corrections must be incorporated before implementation begins.
+The recommended approach is a four-phase build that follows the natural dependency chain: first wire up argument parsing and context resolution (the foundation), then add conditional bypasses at each of the 6 AskUserQuestion points (the core feature), then add auto-chaining to discuss-phase (the pipeline connector), and finally simplify brainstorm routing (the cleanup). This order ensures each phase is independently testable and avoids the primary risk of breaking existing interactive behavior.
 
-The primary risks are implementation-level, not architectural: iterating `child.stdout` instead of the ProcessPromise (yields chunks not lines, causing intermittent JSON parse failures), using `arguments.callee` for timer re-arming (crashes in ES modules), and failing to clear the stall timer on error paths (causes process hangs). All are preventable with the patterns documented in research. The `< /dev/null` stdin redirect from the v2.3 VoidStream fix must survive the refactoring -- dropping it silently hangs every Claude invocation.
+The key risks are config state leaking between milestones on failure (auto_advance persists to disk but only gets cleaned up at milestone completion), silent failure when --auto is invoked without context, and the brainstorm routing regression when simplifying step 10. All three are preventable with straightforward error handling and testing. The strongest recommendation from research: do NOT persist `workflow.auto_advance` in new-milestone itself -- pass `--auto` through to discuss-phase and let the existing persistence mechanism handle it. This eliminates the config leak risk entirely.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new dependencies are needed. The entire streaming feature is built with Node.js built-ins and the existing zx dependency.
+No new technologies. The entire implementation reuses existing infrastructure.
 
-**Core technologies:**
-- **zx async iterator (`for await (const line of proc)`)**: Line-by-line NDJSON parsing from child process stdout -- built into zx, splits on newlines automatically, integrates with `.nothrow()` for error handling
-- **`JSON.parse()` per line**: Event deserialization -- native, fast, sufficient for known NDJSON shapes
-- **`setTimeout` / `clearTimeout`**: Stall detection timer with re-arming -- no external scheduler needed for a single-timer watchdog pattern
-- **Claude CLI flags**: `--output-format stream-json --verbose --include-partial-messages` -- all three required for token-level streaming
-
-**Critical version requirement:** Claude CLI must support `--include-partial-messages` (current versions do). Without this flag, streaming is turn-level only.
+**Core components (all existing, zero changes needed to infrastructure):**
+- `gsd-tools.cjs config-get/config-set` -- reads and persists `workflow.auto_advance` boolean (already registered in KNOWN_SETTINGS_KEYS and booleanKeys)
+- `gsd-tools.cjs init new-milestone` -- resolves models for researcher/synthesizer/roadmapper agents (needs one new `auto_mode` field)
+- `SlashCommand` invocation pattern -- chains workflows across context windows without subagent nesting limits (proven in discuss-phase auto-chain)
 
 ### Expected Features
 
 **Must have (table stakes):**
-- NDJSON line-by-line parsing with defensive handling of non-JSON lines
-- Event type routing dispatching `stream_event` subtypes to display
-- Real-time assistant text to stdout via `content_block_delta` / `text_delta`
-- Tool call indicators to stderr via `content_block_start` / `tool_use`
-- Output file capture per-line (not buffered to end) for debug retry compatibility
-- Stall detection with configurable timeout (default 5 min) and repeated warnings
-- `--quiet` flag restoring exact pre-streaming buffered JSON behavior
-- Consolidated `runClaudeStreaming()` replacing all 5 invocation sites
+- `--auto` flag parsing from $ARGUMENTS (identical pattern to discuss-phase)
+- `workflow.auto_advance` config read and conditional persistence
+- Context resolution priority chain: MILESTONE-CONTEXT.md > @file > inline text > error
+- Skip all 6 AskUserQuestion calls with sensible defaults (use context, accept version, always research, select all features, skip gap question, approve roadmap)
+- Error with clear usage message when --auto has no context source
 
 **Should have (differentiators):**
-- Seamless debug retry streaming (watching debugger work in real-time)
-- Channel separation (stdout for content, stderr for metadata) enabling clean piping
-- Zero-migration quiet mode as a CI compatibility safety net
+- Auto-chain to `/gsd:discuss-phase 1 --auto` after milestone creation (completes the brainstorm-to-execution pipeline)
+- Brainstorm.md step 10 simplification (replace ~70 lines of inline milestone creation with single SlashCommand)
+- `auto_mode` field in gsd-tools init JSON output (centralizes flag + config resolution)
 
-**Defer (v2+):**
-- Progress bars (impossible for LLM generation -- no total to measure)
-- Colored/formatted output (ANSI codes add TTY detection complexity)
-- Kill-on-stall (circuit breaker handles phase-level loops; stall detection should warn, not kill)
-- Structured result extraction (cost, session_id -- separate feature if needed)
-- Verbose mode beyond streaming (two modes only: quiet and default)
+**Defer (explicitly NOT building):**
+- Partial feature selection (`--auto --only "auth,api"`) -- scope control belongs at the input level
+- Interactive fallback on context failure -- violates principle of least surprise
+- Skip-research option (`--auto --no-research`) -- always research in auto mode
+- Dry-run mode -- review inputs before running instead
+- Auto-approve verification checkpoint -- human judgment stays at verification by design
 
 ### Architecture Approach
 
-The architecture is a single new function (`runClaudeStreaming()`) that all 5 existing Claude invocation sites converge into, with a `displayStreamEvent()` helper for terminal output and a stall timer for hung process detection. The quiet-mode path is an early return that preserves the current buffered behavior exactly. No existing components change behavior -- the circuit breaker, debug retry context extraction, output file capture, and verification gate all continue to work because the function returns the same `{ exitCode, stdout }` shape.
+The architecture is inline conditional modification of the existing `new-milestone.md` workflow, not a separate auto workflow file. Six AskUserQuestion calls get wrapped in `if auto: {default} else: {interactive}` guards. The auto-chain at step 11 uses SlashCommand (not Task) to avoid subagent nesting limits. The init.cjs module gets one new field. Brainstorm.md step 10 shrinks from ~70 lines of inline execution to a 5-line SlashCommand delegation.
 
-**Major components:**
-1. **`runClaudeStreaming()`** -- Core function: format selection (json vs stream-json), zx async iteration, line accumulation, output file capture, stall timer lifecycle
-2. **`displayStreamEvent()`** -- Event router: `stream_event` with `text_delta` to stdout, `tool_use` to stderr, all other events silent
-3. **`resetStallTimer()` / `clearStallTimer()`** -- Watchdog: re-arming `setTimeout` with named function callback, repeated warnings at fixed intervals
-4. **`--quiet` flag** -- CLI flag parsed into `QUIET` constant, controls format selection in `runClaudeStreaming()`
+**Major components (by modification scope):**
+1. `workflows/new-milestone.md` -- add --auto parsing, 6 conditional bypasses, auto-chain (~80 lines of new conditional blocks)
+2. `workflows/brainstorm.md` -- replace step 10 inline execution with SlashCommand (~70 lines removed, ~5 added)
+3. `bin/lib/init.cjs` -- add `auto_mode` field to cmdInitNewMilestone output (~3 lines)
 
 ### Critical Pitfalls
 
-1. **`child.stdout` yields chunks, not lines** -- Using `for await (const chunk of proc.stdout)` instead of `for await (const line of proc)` causes intermittent JSON parse failures on chunk boundaries. Use the ProcessPromise iterator directly.
-2. **`arguments.callee` crashes in ES modules** -- The design doc's stall timer re-arm pattern uses `arguments.callee`, which is forbidden in strict mode (ESM). Use a named function reference. This bug is invisible until a real 5-minute stall occurs in production.
-3. **Stall timer prevents process exit** -- `setTimeout` keeps the event loop alive. Use `try/finally` around the `for await` loop to guarantee `clearTimeout`, and call `timer.unref()` as defense-in-depth.
-4. **`< /dev/null` must survive the refactor** -- The v2.3 VoidStream fix prevents Claude from hanging on stdin. If the shell redirect is accidentally dropped during consolidation, every invocation hangs silently.
-5. **stdout format changes from JSON to NDJSON** -- Debug retry error context extraction reads raw stdout. With streaming, stdout contains NDJSON lines instead of a single JSON blob. The last-100-lines extraction actually improves (more focused context), but verify empirically.
+1. **Config state leaking between milestones** -- `workflow.auto_advance` persists to disk but only clears at milestone completion via transition.md. If new-milestone fails mid-workflow, config stays dirty. Prevention: do NOT persist auto_advance in new-milestone; pass `--auto` through to discuss-phase and let it handle its own persistence.
+2. **Silent failure without context** -- `--auto` with no MILESTONE-CONTEXT.md, @file, or inline text must error BEFORE any file mutations (PROJECT.md, STATE.md). Prevention: validate context availability as the very first step in auto-mode path, before any writes.
+3. **Brainstorm routing regression** -- replacing brainstorm step 10 inline execution with SlashCommand is a one-way handoff, not a delegation. Prevention: ensure MILESTONE-CONTEXT.md is written and committed before the handoff; include origin context in error messages.
+4. **Unstoppable cascade** -- `/gsd:new-milestone --auto` chains to discuss-phase, which chains through the full pipeline. Prevention: document this behavior clearly in command help.
+5. **Research model resolution** -- init must return all model fields (researcher, synthesizer, roadmapper) regardless of config state. Prevention: verify init output includes all models before auto-spawning researchers.
 
 ## Implications for Roadmap
 
-Based on research, the implementation has a clear 4-phase dependency chain. Phases 2 and 3 can run in parallel after Phase 1 completes.
+Based on research, suggested phase structure:
 
-### Phase 1: Core Streaming Function
+### Phase 1: Argument Parsing and Context Resolution
+**Rationale:** Foundation for all auto-mode behavior. Nothing else works without flag detection and context.
+**Delivers:** --auto flag parsing, config read/persist, context resolution chain (MILESTONE-CONTEXT.md > @file > inline > error), init.cjs auto_mode field
+**Addresses:** Flag parsing, config persistence, context resolution, error handling (table stakes)
+**Avoids:** Config state leaking (Pitfall 1), silent failure without context (Pitfall 2), model resolution issues (Pitfall 5)
 
-**Rationale:** Everything depends on `runClaudeStreaming()`. No other work can be tested without it. This phase also contains ALL critical pitfall mitigations.
-**Delivers:** `runClaudeStreaming()`, `displayStreamEvent()`, stall detection, `--quiet` flag parsing
-**Addresses:** NDJSON parsing, event routing, stall detection, quiet mode, consolidated invocation
-**Avoids:** Chunk-boundary parse errors (Pitfall 1), `arguments.callee` crash (Pitfall 2), timer prevents exit (Pitfall 3), `< /dev/null` survival (Pitfall 6), event type mismatch (Pitfall 8)
-**First task:** Run `claude -p "hello" --output-format stream-json --verbose --include-partial-messages` empirically to discover actual event types before writing display logic.
+### Phase 2: Auto-Skip at Decision Points
+**Rationale:** Depends on Phase 1 (needs parsed auto flag and resolved context). This is the core value delivery -- skipping interactive questions.
+**Delivers:** Conditional bypasses at all 6 AskUserQuestion calls with correct defaults
+**Addresses:** Version auto-accept, always-research, select-all-features, roadmap auto-approve (table stakes)
+**Avoids:** MILESTONE-CONTEXT.md not consumed (must still delete after use), requirement over-scoping (select-all includes research anti-features)
 
-### Phase 2: Step Function Integration
+### Phase 3: Auto-Chain to Discuss Phase
+**Rationale:** Depends on Phase 2 (milestone must be fully created before chaining). This is the differentiating capability that connects milestone creation to execution.
+**Delivers:** SlashCommand invocation of `/gsd:discuss-phase {FIRST_PHASE} --auto` at step 11
+**Addresses:** Auto-chain (differentiator), full pipeline from brainstorm to human checkpoint
+**Avoids:** Unstoppable cascade (Pitfall 4) -- must document the chaining behavior
 
-**Rationale:** `runStep()` and `runStepCaptured()` are the primary invocation wrappers. Debug retry depends on `runStepCaptured()` working correctly.
-**Delivers:** All normal autopilot steps streaming by default, output file capture working in streaming mode
-**Addresses:** Real-time output file writes, backward compatibility for debug retry context extraction
-**Avoids:** stdout format mismatch (Pitfall 5), quiet mode regression (Pitfall 10)
-**Implements:** Step function wrappers become thin delegates to `runClaudeStreaming()`
-
-### Phase 3: Debug Retry Integration
-
-**Rationale:** Can run in parallel with Phase 2. The 3 debug retry `$`claude...`` sites are independent of step functions.
-**Delivers:** Real-time streaming during debug retry cycles (watching debugger work live)
-**Addresses:** Seamless debug retry streaming (differentiator)
-**Avoids:** Verify debug retry loop still works with NDJSON output format
-
-### Phase 4: Config and Polish
-
-**Rationale:** Config has a hardcoded default, so this is polish, not blocking. End-to-end verification ensures everything works together.
-**Delivers:** `autopilot.stall_timeout_ms` in config schema, `gsd settings` display, end-to-end verification
-**Addresses:** Configurable stall timeout, documentation of output format change
+### Phase 4: Brainstorm Integration
+**Rationale:** Depends on Phases 1-3 (new-milestone --auto must work end-to-end before brainstorm delegates to it). Simplification and integration testing.
+**Delivers:** Brainstorm.md step 10 simplification, end-to-end brainstorm-to-milestone testing
+**Addresses:** Brainstorm simplification (differentiator), code duplication removal (~70 lines removed)
+**Avoids:** Brainstorm routing regression (Pitfall 3)
 
 ### Phase Ordering Rationale
 
-- Phase 1 is the sole dependency for everything. It is greenfield code with no risk of breaking existing behavior (existing invocation sites are not yet modified).
-- Phases 2 and 3 can run in parallel because step functions and debug retry sites are independent code paths. Sequencing them reduces risk if preferred.
-- Phase 4 is pure polish and config wiring. The stall timer works with a hardcoded default from Phase 1.
-- All critical pitfalls (1-6) are addressed in Phase 1, preventing them from compounding in later phases.
+- **Dependency-driven:** Each phase depends on the previous one. Flag parsing before question skipping before chaining before integration.
+- **Risk-front-loaded:** The two critical pitfalls (config leaking, silent failure) are addressed in Phase 1 where they can be caught early.
+- **Incremental value:** Phases 1-2 alone deliver a useful "skip confirmations" mode even without chaining. Phase 3 adds autonomous pipeline. Phase 4 is cleanup.
+- **Safe brainstorm modification last:** Changing brainstorm.md last ensures the existing inline milestone creation works until --auto is proven.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 1:** The `stream_event` nested event format needs empirical verification. Run the actual Claude CLI with streaming flags and capture real output before writing the `displayStreamEvent()` switch logic. The exact event types are not fully documented (GitHub issue #24596 confirms this gap).
-
 Phases with standard patterns (skip research-phase):
-- **Phase 2:** Standard refactoring -- replace direct `$`...`` calls with function delegation. Well-understood pattern.
-- **Phase 3:** Identical pattern to Phase 2, applied to debug retry sites.
-- **Phase 4:** Standard config wiring following existing `CONFIG_DEFAULTS` pattern.
+- **All phases:** Every behavior is pattern replication from existing --auto implementations. discuss-phase.md is the reference implementation. No novel patterns, no external APIs, no unfamiliar domains.
+
+Phases that need careful testing but not research:
+- **Phase 1:** Config leaking edge cases need integration testing, not more research
+- **Phase 4:** Brainstorm handoff needs end-to-end testing, not more research
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Zero new dependencies. zx async iterator verified in official docs. All Node.js built-ins. |
-| Features | HIGH | NDJSON is a mature standard. Stall detection is a well-understood watchdog pattern. `--quiet` is CLI convention. |
-| Architecture | HIGH | Verified against existing codebase -- all 5 invocation sites identified, all consumers of stdout audited. |
-| Pitfalls | HIGH | Grounded in zx docs, Node.js stream semantics, ESM strict mode rules, and prior VoidStream bug experience. |
+| Stack | HIGH | No new dependencies; all existing infrastructure verified by direct codebase reading |
+| Features | HIGH | Every feature is pattern replication from existing workflows; design doc reviewed |
+| Architecture | HIGH | Modification points precisely identified with line numbers; no ambiguity |
+| Pitfalls | HIGH | Grounded in real bug history (CHANGELOG), existing --auto edge cases, and design doc analysis |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Claude CLI `stream-json` event format**: The exact event types and nesting structure need empirical verification by running real streaming commands. Documentation is incomplete (confirmed by GitHub issue #24596). Must be the first task in Phase 1.
-- **Turn-level vs token-level granularity decision**: Features research recommends starting WITHOUT `--verbose --include-partial-messages` for simpler turn-level events, while Stack and Architecture research recommend WITH those flags for true token-level streaming. Resolve empirically: try both approaches and measure the silence gap between turn-level events. The display function should handle both event models from day one so the upgrade path is clean.
-- **`fs.appendFileSync` vs write stream**: `appendFileSync` per line may cause event loop blocking during burst output. Acceptable for MVP; monitor during integration testing and replace with `fs.createWriteStream` if stuttering is observed.
-- **Memory growth from line accumulation**: The `lines[]` array grows linearly with session length. Acceptable for v2.4. Consider capping to last N lines plus the result event in a future version if multi-hour sessions cause issues.
+- **Config cleanup on error:** The exact mechanism needs a decision during Phase 1 planning. Recommendation: do not persist auto_advance in new-milestone; let discuss-phase handle it. This eliminates the problem.
+- **First phase number for auto-chain:** The auto-chain must invoke discuss-phase with the correct first phase number of the newly created milestone. Verify this is deterministic (always phase 1 of the new milestone) or needs parsing from ROADMAP.md.
+- **pr-review.md and linear.md milestone routes:** These also create milestones inline and could benefit from the same simplification as brainstorm.md. Out of scope for v2.5 but worth noting for future work.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [zx ProcessPromise docs](https://google.github.io/zx/process-promise) -- async iterator, line splitting, .nothrow() behavior
-- [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference) -- `--output-format stream-json`, `--include-partial-messages`, `--verbose` flags
-- [Claude Code headless mode docs](https://code.claude.com/docs/en/headless) -- stream-json usage with `-p` flag, jq examples
-- [Agent SDK streaming output docs](https://platform.claude.com/docs/en/agent-sdk/streaming-output) -- StreamEvent reference, complete event type table
-- [Node.js Timers documentation](https://nodejs.org/api/timers.html) -- unref() prevents timer from keeping process alive
-- [MDN arguments.callee](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/arguments/callee) -- forbidden in strict mode
-- Direct reading: `autopilot.mjs` source code -- all 5 invocation sites, debug retry, circuit breaker
-
-### Secondary (MEDIUM confidence)
-- [Claude Code issue #24596](https://github.com/anthropics/claude-code/issues/24596) -- stream-json event types discussion, confirms documentation gap
-- [Khan/format-claude-stream](https://github.com/Khan/format-claude-stream) -- community tool confirming real-world stream-json parsing patterns
-- [ytyng blog](https://www.ytyng.com/en/blog/claude-stream-json-jq) -- actual stream-json event structure examples
-- [NDJSON specification](https://github.com/ndjson/ndjson-spec) -- format specification
-- [CLI Guidelines](https://clig.dev/) -- stdout/stderr separation, quiet flags
-- [Watchdog timer pattern](https://dev.to/gajus/ensuring-healthy-node-js-program-using-watchdog-timer-4pjd) -- stall detection in Node.js
-
-### Tertiary (LOW confidence)
-- [Node.js readline issues #33463, #42454](https://github.com/nodejs/node/issues/33463) -- edge cases with readline async iterator (relevant if readline is used as fallback)
+- `get-shit-done/workflows/new-milestone.md` -- current interactive workflow (11 steps, 6 AskUserQuestion calls)
+- `get-shit-done/workflows/discuss-phase.md` -- reference --auto implementation (flag parsing, config, auto-chain)
+- `get-shit-done/workflows/plan-phase.md` -- reference --auto chain (auto-advance to execute-phase)
+- `get-shit-done/workflows/execute-phase.md` -- reference --auto chain (auto-advance to transition)
+- `get-shit-done/workflows/new-project.md` -- reference --auto context resolution (@file, inline, error)
+- `get-shit-done/workflows/brainstorm.md` -- step 10 milestone routing (simplification target)
+- `get-shit-done/workflows/transition.md` -- auto_advance reset at milestone boundary
+- `get-shit-done/bin/lib/init.cjs` -- cmdInitNewMilestone function
+- `get-shit-done/bin/lib/config.cjs` -- CONFIG_DEFAULTS, config-get, config-set
+- `get-shit-done/bin/lib/cli.cjs` -- KNOWN_SETTINGS_KEYS, validateSetting (workflow.auto_advance registered)
+- `.planning/designs/2026-03-14-new-milestone-auto-mode-design.md` -- approved design document
 
 ---
-*Research completed: 2026-03-12*
+*Research completed: 2026-03-14*
 *Ready for roadmap: yes*

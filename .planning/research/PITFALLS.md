@@ -1,383 +1,195 @@
-# Domain Pitfalls: Adding NDJSON Streaming to zx-Based Autopilot
+# Domain Pitfalls: Adding --auto Mode to new-milestone Workflow
 
-**Domain:** Adding real-time streaming output to an existing zx-based CLI tool that spawns child processes
-**Researched:** 2026-03-12
-**Overall confidence:** HIGH (grounded in existing codebase analysis, design doc review, zx documentation, Node.js stream semantics, and prior VoidStream bug experience)
+**Domain:** Adding autonomous (--auto) flag to an existing interactive milestone creation workflow
+**Researched:** 2026-03-14
+**Confidence:** HIGH (grounded in existing --auto implementations in discuss-phase, plan-phase, execute-phase; real bug history from CHANGELOG; design doc review; codebase analysis)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause hangs, data loss, silent corruption, or require significant rework.
-
----
-
-### Pitfall 1: `child.stdout` Yields Raw Chunks, Not Lines — JSON.parse Will Fail on Chunk Boundaries
+### Pitfall 1: Config State Leaking Between Milestones
 
 **What goes wrong:**
-The design doc iterates `for await (const line of child.stdout)` and calls `JSON.parse(line)` on each iteration. This is wrong. `child.stdout` is a raw readable stream that yields arbitrary byte chunks aligned to pipe buffer boundaries (typically 64KB), NOT newline-delimited lines. A single NDJSON line can be split across two chunks, or a single chunk can contain multiple NDJSON lines. `JSON.parse()` on a partial chunk produces a syntax error. Multiple JSON objects in one chunk means only the first parses and the rest are silently discarded.
+`workflow.auto_advance` persisted to config.json survives beyond the milestone boundary. If new-milestone sets `auto_advance = true` and the workflow fails partway through (e.g., research agent errors out, roadmapper returns BLOCKED), the config remains `true`. The next interactive `/gsd:new-milestone` invocation silently runs in auto mode, skipping all confirmation questions without the user realizing it.
 
 **Why it happens:**
-The zx ProcessPromise has TWO async iteration modes that look almost identical:
-- `for await (const line of child)` -- iterates the ProcessPromise directly, which uses zx's internal `getLines()` splitter to yield complete newline-delimited lines
-- `for await (const chunk of child.stdout)` -- iterates the raw Node.js readable stream, which yields arbitrary chunks
-
-The design doc uses the second form but expects the behavior of the first. This is an easy mistake because the variable is named `line` and the comment says "read stdout line-by-line."
+The hybrid flag + config pattern persists state to disk early (so it survives context compaction) but relies on `transition.md` to reset `auto_advance = false` at milestone completion. New-milestone runs BEFORE a milestone exists, so the transition reset never fires if milestone creation fails. There is a gap in the lifecycle: config is set before the milestone lifecycle that would clean it up.
 
 **How to avoid:**
-Use `for await (const line of child)` to iterate the ProcessPromise directly. zx's built-in line splitter handles buffering partial lines across chunks and yielding only complete lines. Alternatively, if you need raw stream access, wrap `child.stdout` in `readline.createInterface({ input: child.stdout, crlfDelay: Infinity })` to get line-by-line iteration. But the zx built-in approach is simpler and correct.
+1. Do NOT persist `workflow.auto_advance` in new-milestone's argument parsing step. Instead, pass `--auto` as a flag through each downstream invocation (to discuss-phase). Let discuss-phase handle its own persistence as it already does.
+2. If persisting IS needed (for context compaction survival), wrap the config-set in a try/finally pattern: on any error exit from new-milestone, reset `workflow.auto_advance` to false.
+3. Test: invoke `new-milestone --auto` with a missing MILESTONE-CONTEXT.md (should error), then verify config.json does NOT have `auto_advance: true`.
 
 **Warning signs:**
-- Intermittent `SyntaxError: Unexpected end of JSON input` in logs
-- JSON parse errors that appear randomly, not on every line
-- Errors correlate with long NDJSON lines (tool_use events with large content) that exceed a pipe buffer boundary
-- Works fine in quick runs but fails during long-running phases with lots of tool activity
+- Config.json shows `auto_advance: true` when no `--auto` flag was passed
+- Interactive milestone creation skips questions unexpectedly
+- User complaints about "it just did everything without asking"
 
-**Phase to address:** Phase 1 (core `runClaudeStreaming()` function). This is the foundational line-reading mechanism. Getting it wrong means every downstream feature (display, stall timer, output capture) operates on corrupt data.
-
-**Confidence:** HIGH -- verified via zx documentation: ProcessPromise `[Symbol.asyncIterator]` returns a line iterator; `.stdout` returns the raw Node.js Readable stream.
+**Phase to address:**
+Phase 1 (Argument Parsing and Context Resolution) -- guard the config-set with error handling. Phase 4 (Autopilot Integration) -- integration test that config is clean after failure.
 
 ---
 
-### Pitfall 2: `arguments.callee` Is Illegal in ES Modules — Stall Timer Re-Arm Will Crash
+### Pitfall 2: Silent Failure When --auto Without Context
 
 **What goes wrong:**
-The design doc's `resetStallTimer()` function uses `setTimeout(arguments.callee, STALL_TIMEOUT)` to re-arm the stall warning after each interval. ES modules run in strict mode by default. `arguments.callee` throws `TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions` the first time the stall timer fires. Since the stall timer only fires after 5 minutes of silence, this bug will not appear in any unit test or short integration test. It will appear only in production when Claude is genuinely stalled -- exactly when you need it most.
+User invokes `/gsd:new-milestone --auto` without providing inline text, @file, or MILESTONE-CONTEXT.md. The workflow has no goals to work with. If error handling is weak, it either: (a) silently produces an empty/garbage milestone, or (b) crashes without a clear message, leaving state partially modified (PROJECT.md updated, STATE.md reset, but no requirements or roadmap).
 
 **Why it happens:**
-`arguments.callee` was a common pre-ES5 pattern for recursive anonymous functions. The design doc uses it in a setTimeout callback. Since `autopilot.mjs` is an ES module (uses `import`, runs under zx's ESM mode), strict mode is always active and `arguments.callee` is forbidden.
+Interactive mode asks "What do you want to build next?" as a fallback. Auto mode has no fallback -- it must have context upfront. The design doc specifies an error message, but the error must fire BEFORE any state mutations (PROJECT.md updates, STATE.md resets, commit writes).
 
 **How to avoid:**
-Use a named function expression:
-```javascript
-stallTimer = setTimeout(function onStall() {
-  stallWarningCount++;
-  const mins = (STALL_TIMEOUT * stallWarningCount) / 60000;
-  console.error(`Warning: No output for ${mins} minutes`);
-  logMsg(`STALL WARNING: no output for ${mins}m`);
-  stallTimer = setTimeout(onStall, STALL_TIMEOUT);
-}, STALL_TIMEOUT);
-```
+1. Context resolution must be step 1, before ANY file modifications. The current design places it correctly (step 1 in the design doc), but the new-milestone.md workflow currently loads context in step 1 and modifies PROJECT.md in step 4. In auto mode, validate context availability BEFORE step 4.
+2. The error message must be explicit: `"--auto requires milestone goals. Usage: /gsd:new-milestone --auto 'description' or provide MILESTONE-CONTEXT.md"`
+3. Test: invoke `--auto` with no context source and verify zero file modifications occurred.
 
 **Warning signs:**
-- Stall timer never fires during normal testing (Claude usually responds within seconds)
-- No test exercises the 5-minute timeout path
-- TypeError crash shows up only in production autopilot logs during genuinely stalled steps
+- PROJECT.md has a "Current Milestone" section with no features listed
+- STATE.md shows "Defining requirements" but REQUIREMENTS.md is empty
+- Git log shows a commit for "start milestone" but no subsequent commits
 
-**Phase to address:** Phase 1 (stall detection). The fix is trivial (named function) but the bug is invisible until production. Write a unit test that fast-forwards timers to verify the re-arm path.
-
-**Confidence:** HIGH -- `arguments.callee` is unambiguously forbidden in strict mode, and ESM files are always strict.
+**Phase to address:**
+Phase 1 (Argument Parsing and Context Resolution) -- validate context before mutations. Must be the first guard in the auto-mode path.
 
 ---
 
-### Pitfall 3: Stall Timer Prevents Process Exit — Node.js Hangs After Stream Ends
+### Pitfall 3: Brainstorm Routing Regression
 
 **What goes wrong:**
-`setTimeout()` keeps a reference in the Node.js event loop. If `clearTimeout(stallTimer)` is not called on every exit path -- including error paths, SIGINT, and unexpected stream close -- the Node.js process will hang indefinitely waiting for the timer to fire. The design doc calls `clearTimeout(stallTimer)` only after the `for await` loop completes normally. If the child process crashes (non-zero exit, signal kill), the stream may close with an error that causes `for await` to throw, skipping the `clearTimeout`.
+When simplifying brainstorm.md step 10 from "execute steps 1-11 inline" to "invoke `/gsd:new-milestone --auto`", the brainstorm loses control of the flow. Currently brainstorm step 10c executes new-milestone steps inline, which means brainstorm controls error handling, can display results, and knows when it finishes. After the change, brainstorm delegates to a slash command and has no mechanism to get results back or handle errors.
 
 **Why it happens:**
-`for await` can throw if the underlying stream emits an `error` event. When this happens, execution jumps to the catch block (if any) and the code after the loop never runs. The stall timer, still armed with a 5-minute timeout, keeps the event loop alive. The autopilot appears to hang between steps.
+SlashCommand invocations in GSD are fire-and-forget within a context window. When brainstorm invokes `/gsd:new-milestone --auto`, the new-milestone workflow takes over the conversation. If new-milestone then auto-chains to `/gsd:discuss-phase 1 --auto`, the chain continues indefinitely. Brainstorm's step 10 never "returns" -- it just hands off. This is actually the INTENDED behavior, but the pitfall is in error cases: if new-milestone fails, the user sees a new-milestone error in a brainstorm session, which is confusing.
 
 **How to avoid:**
-1. Use `try/finally` around the `for await` loop to guarantee `clearTimeout`:
-```javascript
-try {
-  for await (const line of child) { /* ... */ }
-} finally {
-  clearTimeout(stallTimer);
-}
-```
-2. Additionally, call `stallTimer.unref()` on each setTimeout so the timer does not prevent process exit if it is the only remaining event loop reference. This is a defense-in-depth measure.
-3. In signal handlers (SIGINT/SIGTERM), clear the stall timer before exiting.
+1. Accept that brainstorm-to-milestone is a one-way handoff, not a delegation. Document this explicitly in the brainstorm workflow.
+2. Ensure new-milestone --auto error messages reference their origin: "Milestone creation failed. Brainstorm design saved to .planning/designs/. Re-run with: /gsd:new-milestone --auto"
+3. Verify MILESTONE-CONTEXT.md is written by brainstorm BEFORE invoking new-milestone (it already is -- step 10a), so context resolution will always succeed from the brainstorm path.
+4. Test the brainstorm-to-new-milestone handoff end-to-end, not just new-milestone in isolation.
 
 **Warning signs:**
-- Autopilot hangs for 5 minutes between steps after a claude process crashes
-- Process does not respond to the circuit breaker because it is stuck waiting for a timer, not in a step
-- Log shows STEP DONE but next BANNER never appears
+- Brainstorm session ends abruptly with a new-milestone error
+- MILESTONE-CONTEXT.md not found despite brainstorm having written it
+- Design doc written but milestone never created (silent failure in handoff)
 
-**Phase to address:** Phase 1 (core streaming function). The `try/finally` pattern must be baked into `runClaudeStreaming()` from the start. Adding `unref()` should also happen here.
-
-**Confidence:** HIGH -- standard Node.js event loop behavior: active timers prevent exit.
+**Phase to address:**
+Phase 4 (Autopilot Integration) -- this is where brainstorm.md simplification happens. Must test the brainstorm routing path.
 
 ---
 
-### Pitfall 4: Race Between `for await` Iterator Completion and ProcessPromise Resolution
+### Pitfall 4: Auto-Chain Creates Unstoppable Cascade
 
 **What goes wrong:**
-After the `for await` loop finishes (stream closed), the design calls `const result = await child` to get the exit code. In zx, the ProcessPromise resolves when the child process exits AND all stdio streams close. If the `for await` loop consumes all stdout data, the stream closes, and then `await child` resolves. But there is a timing nuance: if the child process exits before the `for await` loop finishes consuming buffered data, the ProcessPromise may resolve (or reject) before the loop completes. With `.nothrow()`, this should not throw, but the exit code may arrive before the last lines are processed.
-
-More critically: if the `for await` loop is still iterating when the child process exits with a non-zero code, and `.nothrow()` was NOT applied to the specific child process object that the iterator is consuming, zx may reject the ProcessPromise, potentially interfering with the iterator. The design applies `.nothrow()` via the `$` template -- this is correct, but note that `child.stdout` and iterating the ProcessPromise are different objects. If the code is refactored to separate the process creation from the iteration, `.nothrow()` must remain attached.
+`new-milestone --auto` creates the roadmap, then auto-chains to `/gsd:discuss-phase 1 --auto`, which auto-chains to plan-phase --auto, which auto-chains to execute-phase --auto, which auto-chains via transition.md to discuss-phase 2 --auto, and so on through ALL phases. The user invoked one command and now an entire milestone executes without any checkpoints until the verification gate (which is the only human checkpoint in auto mode).
 
 **Why it happens:**
-zx's ProcessPromise is both a Promise AND an async iterable. These are two different consumption modes. The `for await` loop consumes the iterable; `await child` resolves the promise. They operate on the same underlying process but have independent completion semantics. If the process exits with error before stdout is fully drained, the promise rejection can interfere with ongoing iteration.
+This is by design -- autopilot runs milestones end-to-end. But when invoked from new-milestone (not autopilot), the user may not expect this behavior. Autopilot has stall detection, circuit breakers, and debug-retry. A raw `/gsd:new-milestone --auto` invocation has none of these safety mechanisms.
 
 **How to avoid:**
-1. Always apply `.nothrow()` before iterating so that non-zero exit codes do not cause rejections during iteration.
-2. The `await child` after the loop is correct and necessary -- it waits for the process to fully exit and returns the exit code. Keep this pattern.
-3. Do NOT start the `for await` loop and `await child` in parallel (e.g., via `Promise.all`). The iterator must complete first, then await the promise.
-4. Store the ProcessPromise in a variable before iterating, and ensure `.nothrow()` is on that variable:
-```javascript
-const proc = $`...`.nothrow();
-for await (const line of proc) { /* ... */ }
-const result = await proc;
-```
+1. The auto-chain from new-milestone should ONLY go to discuss-phase 1 --auto, NOT deeper. The design doc already specifies this correctly: "auto-chain to `/gsd:discuss-phase 1 --auto`". However, discuss-phase --auto chains to plan-phase, which chains to execute-phase, which chains via transition. Each workflow independently reads `workflow.auto_advance` from config.
+2. This cascading IS the intended behavior when auto_advance is in config. But document that `/gsd:new-milestone --auto` will run the ENTIRE milestone pipeline, not just create the milestone.
+3. Consider: should new-milestone --auto ONLY create the milestone (research, requirements, roadmap) and NOT chain? The design doc says chain. If chaining is desired, document it clearly in the command help.
 
 **Warning signs:**
-- Intermittent unhandled promise rejections when Claude processes fail
-- Exit code occasionally reads as undefined or is missed
-- Race condition manifests only when Claude process exits with error during active tool use (lots of output)
+- User invokes new-milestone --auto expecting just milestone creation, gets hours of autonomous execution
+- Context window exhaustion when the entire chain runs in one session (each phase should get fresh context)
+- No stall detection or circuit breaker when not running under autopilot
 
-**Phase to address:** Phase 1 (core streaming function). The process creation and iteration pattern must be correct from the start.
-
-**Confidence:** MEDIUM -- zx documentation confirms the async iterator and promise are independent; the exact rejection semantics under `.nothrow()` need empirical verification during implementation.
+**Phase to address:**
+Phase 3 (Auto-Chain to Discuss Phase) -- decide whether chaining is correct, document the behavior, ensure the chain works correctly across context windows.
 
 ---
 
-### Pitfall 5: Changing `--output-format` From `json` to `stream-json` Changes What `result.stdout` Contains
+### Pitfall 5: Research Phase Model Resolution Missed in Auto Mode
 
 **What goes wrong:**
-The current autopilot uses `--output-format json`, which makes Claude CLI output a single JSON object on stdout. The code does `process.stdout.write(result.stdout)` and passes it to debug retry for error context extraction. When switching to `stream-json`, stdout becomes NDJSON (many JSON objects, one per line). Code that expects `result.stdout` to be a single parseable JSON object will break. The `runStepCaptured()` error context extraction reads the last 100 lines of output -- this currently gets the JSON response; with streaming it will get the last 100 NDJSON events, which is a completely different format.
+New-milestone step 7 calls `init new-milestone` to resolve models (`researcher_model`, `synthesizer_model`, `roadmapper_model`). Step 8 asks whether to research. In auto mode, step 8 is auto-answered "yes", but the init call in step 7 may not return a model for researchers if the init command doesn't know about auto mode. The auto-mode path needs all models resolved before spawning researchers.
 
 **Why it happens:**
-The output format change is not just a display change -- it fundamentally changes the data contract between Claude CLI and the autopilot. Every consumer of stdout data must be audited: debug retry error extraction, output file format, progress checking, any downstream parsing.
+The init command (`gsd-tools.cjs init new-milestone`) returns model profiles based on current config. In interactive mode, init runs before the research question. In auto mode, init must also run before research. The ordering is the same, but the pitfall is: if the init command output is not parsed correctly (e.g., researcher_model is null because init doesn't know research will happen), the researcher spawn fails.
 
 **How to avoid:**
-1. When accumulating lines in streaming mode, also track the last `result` event separately. The `result` event contains the final response equivalent to what `--output-format json` produces.
-2. For debug retry error context, extract from the accumulated `result` event rather than raw NDJSON lines.
-3. For `--quiet` mode (which restores JSON behavior), maintain the current single-JSON-object contract unchanged.
-4. Document the output file format change: streaming mode output files contain NDJSON, not JSON.
+1. Verify that `gsd-tools.cjs init new-milestone` always returns researcher_model, synthesizer_model, and roadmapper_model regardless of whether research is enabled. Check the init command's logic.
+2. The design doc proposes adding `auto_mode` field to init output. This is the right place to also ensure all model fields are populated.
+3. Test: invoke init new-milestone and verify all model fields are present.
 
 **Warning signs:**
-- Debug retry prompts contain raw NDJSON events instead of human-readable error context
-- JSON.parse on the full stdout fails because it is NDJSON, not JSON
-- Output files that previously contained parseable JSON now contain concatenated NDJSON
+- Researcher agents fail to spawn with "model not specified" errors
+- Init JSON output missing researcher_model field when research_enabled is false in config
 
-**Phase to address:** Phase 1 (core streaming function) must handle the result event extraction. Phase 2 (integration) must audit all consumers of stdout data.
-
-**Confidence:** HIGH -- the format difference between `json` and `stream-json` is documented in the Claude CLI reference.
-
----
-
-### Pitfall 6: The `< /dev/null` stdin Fix Must Survive the Streaming Refactor
-
-**What goes wrong:**
-v2.3 discovered that zx v8's VoidStream stdin caused `claude -p` to hang indefinitely. The fix was appending `< /dev/null` to the shell command. During the streaming refactor, if the `$` template literal is modified or the command is restructured, the `< /dev/null` redirect can be accidentally dropped. Without it, every Claude invocation hangs waiting for stdin, and the stall timer will fire after 5 minutes, but the process will never produce output.
-
-**Why it happens:**
-The `< /dev/null` is a shell-level redirect that is easy to lose when restructuring command strings. It is not obvious why it is there unless you know the VoidStream history. A developer (or an AI agent) cleaning up the code may remove it thinking it is unnecessary.
-
-**How to avoid:**
-1. Add a code comment explaining WHY `< /dev/null` is required (reference the zx VoidStream stdin bug).
-2. Write a test that verifies the command string includes `< /dev/null` or equivalent stdin handling.
-3. Consider extracting the base command construction into a constant or helper to prevent divergence between streaming and quiet modes.
-4. When `runClaudeStreaming()` replaces all 5 invocation sites, verify that the new single invocation site includes `< /dev/null`.
-
-**Warning signs:**
-- Claude process starts but produces no output
-- Stall timer fires immediately on first streaming attempt
-- Works with `--quiet` (if that path was not changed) but hangs in streaming mode
-
-**Phase to address:** Phase 1 (core streaming function). The `< /dev/null` must be in the `runClaudeStreaming()` function that replaces all invocation sites.
-
-**Confidence:** HIGH -- this is a known, previously-encountered bug with a documented fix in the current codebase.
-
----
-
-## Moderate Pitfalls
-
-Issues that cause incorrect behavior or require non-trivial debugging but do not cause hangs or data loss.
-
----
-
-### Pitfall 7: `fs.appendFileSync` Per Line Blocks the Event Loop During High-Throughput Output
-
-**What goes wrong:**
-The design writes `fs.appendFileSync(outputFile, line + '\n')` for every NDJSON line received. During high-throughput phases (large file edits, verbose tool output), Claude can emit hundreds of NDJSON events per second. Each `appendFileSync` call is a synchronous syscall that blocks the event loop. This prevents the async iterator from reading the next chunk, creating artificial backpressure that slows down stream consumption and can cause the child process to block on a full pipe buffer.
-
-**Why it happens:**
-`appendFileSync` is the simplest way to persist lines incrementally, and for the typical case (a few events per second) it is fine. The problem manifests only during burst output, which happens during tool_result events containing large file contents.
-
-**How to avoid:**
-Use `fs.createWriteStream(outputFile, { flags: 'a' })` and call `stream.write(line + '\n')` asynchronously. The write stream handles buffering and flushing internally. Close the stream in the `finally` block.
-
-Alternatively, if simplicity is preferred: use `fs.appendFile` (async version) with `await` -- but this adds an await per line that may not be desirable. The write stream approach is better.
-
-**Warning signs:**
-- Streaming display stutters during large tool operations
-- Event loop lag warning if using diagnostic tools
-- No visible issue in typical runs; only during phases with heavy file operations
-
-**Phase to address:** Phase 1 (core streaming function). Use a write stream from the start rather than retrofitting later.
-
-**Confidence:** MEDIUM -- the performance impact depends on output volume. For typical Claude CLI output rates (a few events per second), `appendFileSync` is fine. For burst tool_result events, it may matter.
-
----
-
-### Pitfall 8: Claude CLI `stream-json` Event Types Are Not Fully Documented
-
-**What goes wrong:**
-The design doc assumes four event types: `assistant`, `tool_use`, `tool_result`, `result`. The actual Claude CLI `stream-json` output includes additional top-level types (`system`, `user`) and a `stream_event` wrapper with subtypes (`message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`, `input_json_delta`). The `displayStreamEvent()` function's switch statement will fall through to the default case for most events, causing either silent drops or unexpected behavior.
-
-The format may also change between Claude CLI versions. There is an open GitHub issue (anthropics/claude-code#24596) noting the lack of a formal event type reference for `--output-format stream-json`.
-
-**Why it happens:**
-The CLI documentation provides only one example (jq filter for `text_delta`), not a comprehensive schema. The design doc was written based on assumed event shapes rather than empirical observation.
-
-**How to avoid:**
-1. Before implementation, run `claude -p "hello" --output-format stream-json 2>/dev/null` and examine the actual NDJSON output to discover the real event types and shapes.
-2. Make the `displayStreamEvent()` function defensive: log unknown event types to the debug log rather than ignoring them.
-3. Handle `stream_event` wrapper types -- the text content is likely inside `stream_event` with `content_block_delta` subtype containing `text_delta`, not a top-level `assistant` type.
-4. Pin behavior to known types and treat everything else as passthrough.
-
-**Warning signs:**
-- No assistant text appears in terminal despite Claude clearly working (events are wrapped differently than expected)
-- The `result` event is never captured because it has a different shape than assumed
-- Output works for simple prompts but breaks for multi-turn tool-using responses
-
-**Phase to address:** Phase 1 (core streaming function) must discover real event types empirically. This should be the FIRST implementation task before writing the display logic.
-
-**Confidence:** MEDIUM -- confirmed via GitHub issue that documentation is incomplete. The actual format must be discovered empirically.
-
----
-
-### Pitfall 9: Stall Timer Resets `stallWarningCount` to 0 on Every Line -- Cumulative Duration Tracking Lost
-
-**What goes wrong:**
-The design's `resetStallTimer()` sets `stallWarningCount = 0` every time a line arrives. This means the escalating warning messages (5min, 10min, 15min) only work during a SINGLE continuous stall. If Claude outputs one line after 4 minutes of silence, the counter resets. If Claude then goes silent for another 4 minutes, no warning fires even though total silence is 8 minutes with only 1 line of real output. This masking behavior means a nearly-stalled process (emitting one event every few minutes) never triggers a warning.
-
-**Why it happens:**
-The design correctly resets the timer on each line (you do not want a warning during active output). But resetting the warning COUNT makes the escalation meaningless in the face of intermittent output.
-
-**How to avoid:**
-Track the last "meaningful progress" timestamp separately from the stall timer. A `tool_result` or `assistant` event with text content is meaningful; a `system` or `message_start` event is not. Reset the stall timer on any event (to avoid false positives), but only reset the "meaningful progress" tracker on events that indicate real work.
-
-Alternatively, keep it simple: just reset the timer on every line and accept that the escalation is per-stall-period, not cumulative. This is probably fine for v2.4 -- Claude either responds or it does not; intermittent-one-event-every-few-minutes is not a realistic failure mode.
-
-**Warning signs:**
-- Stall warning never escalates past "5 minutes" because any trickle of events resets it
-- Long-running steps feel stalled to the user but no warning appears
-
-**Phase to address:** Phase 1 (stall detection). Decide on the simple or nuanced approach during implementation.
-
-**Confidence:** LOW -- this is a design subtlety, not a bug. The simple approach (reset on every line) is likely sufficient.
-
----
-
-### Pitfall 10: `--quiet` Mode Must Produce Identical Output Contract to Current `--output-format json`
-
-**What goes wrong:**
-The design says `--quiet` falls back to `--output-format json`. But if any code in the streaming path (even in quiet mode) wraps, transforms, or re-emits the output differently, the contract breaks. Current consumers of the JSON output (debug retry error extraction, progress checking, output file format) expect a specific format. If `--quiet` mode routes through the same `runClaudeStreaming()` function but with slightly different handling, subtle differences can appear.
-
-**Why it happens:**
-The refactoring consolidates all 5 invocation sites into one function. The quiet path and streaming path share code. Shared code means shared bugs. A change to fix a streaming issue can inadvertently affect quiet mode.
-
-**How to avoid:**
-1. Make the quiet/json path a completely separate early-return branch in `runClaudeStreaming()` that matches the CURRENT behavior exactly (i.e., `await child; return { exitCode, stdout: result.stdout }`).
-2. Write a regression test that runs the same prompt in both `--output-format json` and `--quiet` streaming mode, and asserts the output file content and exit code are identical.
-3. The design already shows this early-return pattern -- ensure it is preserved during implementation.
-
-**Warning signs:**
-- Debug retry starts failing because error context format changed
-- CI/scripted consumers of quiet mode get unexpected output
-- Output file in quiet mode has NDJSON instead of JSON
-
-**Phase to address:** Phase 1 (core streaming function). The quiet-mode early return should be one of the first things implemented and tested.
-
-**Confidence:** HIGH -- this is a standard refactoring regression risk.
+**Phase to address:**
+Phase 1 (Argument Parsing and Context Resolution) -- ensure init returns all models. Phase 2 (Auto-Skip at Decision Points) -- test research auto-skip with model resolution.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| `fs.appendFileSync` per line | Simple, no stream management | Event loop blocking under burst output, adds latency to stream reading | Acceptable for v2.4 MVP if output volume is low; replace with write stream if profiling shows issues |
-| Hardcoding event type names in switch statement | Quick to implement, easy to read | Breaks when Claude CLI updates event format; no schema validation | Acceptable if the default case logs unknowns rather than silently dropping |
-| Accumulating all lines in memory array | Needed for `result.stdout` compatibility | Memory grows linearly with session length; long phases can be very verbose | Acceptable for v2.4; consider extracting only the `result` event and discarding accumulated lines in a future version |
-| Resetting stall timer on ALL event types | Simple, no event classification needed | Masks stalls where non-meaningful events trickle through | Acceptable for v2.4; Claude stalls are either total silence or active output, not intermittent trickle |
+| Persisting auto_advance in new-milestone instead of passing --auto through | Survives context compaction | Config leaks between milestones on failure | Only if paired with cleanup on error |
+| Reusing discuss-phase's auto_context_check verbatim | Consistency | new-milestone's context resolution is different (MILESTONE-CONTEXT.md, not CONTEXT.md) | Never -- new-milestone needs its own context resolution |
+| Skipping research in auto mode to speed things up | Faster milestone creation | Missing domain insights, weaker requirements | Never -- design doc correctly says "always research" |
+| Not testing brainstorm-to-new-milestone handoff | Faster implementation | Brainstorm routing may silently break | Only in first pass; must be tested in Phase 4 |
 
 ## Integration Gotchas
 
-Common mistakes when connecting streaming to existing autopilot subsystems.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Debug retry error context | Passing raw NDJSON lines as error context to debugger prompt | Extract the `result` event or accumulate only `assistant` text blocks for error context |
-| Progress snapshot (circuit breaker) | No change needed, but verifying -- progress snapshot runs AFTER step completes | Confirm `takeProgressSnapshot()` is called after `await child` resolves, not during streaming |
-| Output file format | Assuming output file is parseable as a single JSON object | Document that streaming mode output files are NDJSON; update any downstream tools that read output files |
-| Verification status extraction | No change needed -- verification reads `.planning/` files, not stdout | Confirm no code path parses claude stdout for verification data |
-| Signal handling (SIGINT/SIGTERM) | Not cleaning up stall timer or write stream on signal | Add stall timer cleanup to existing signal handlers; close write stream if using one |
-
-## Performance Traps
-
-Patterns that work at small scale but fail during long-running autopilot sessions.
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Unbounded line accumulation in `lines[]` array | Memory growth during multi-hour sessions | Cap accumulation or only keep last N lines plus the result event | Long phases with heavy tool use (hundreds of MB of NDJSON) |
-| `appendFileSync` per line | Stream stutter during burst output | Use `fs.createWriteStream` with async writes | During phases with large file reads/writes producing burst NDJSON |
-| Creating readline interface before consuming | Missed lines (documented Node.js bug) | Use zx's built-in line iterator instead of readline | When any async work happens between interface creation and iteration start |
+| brainstorm.md step 10 | Invoking `/gsd:new-milestone --auto` before MILESTONE-CONTEXT.md is written and committed | Ensure brainstorm writes AND commits MILESTONE-CONTEXT.md before the slash command invocation |
+| pr-review.md milestone route | Same as brainstorm -- writes MILESTONE-CONTEXT.md then runs new-milestone inline | After --auto support, pr-review could also simplify to `/gsd:new-milestone --auto`, but only if MILESTONE-CONTEXT.md handling is identical |
+| linear.md milestone route | Writes MILESTONE-CONTEXT.md with issue context | Same pattern -- could simplify, but verify MILESTONE-CONTEXT.md format compatibility across all three sources |
+| autopilot.mjs | Currently doesn't create milestones | Design doc says "enables a future flow" -- do not add autopilot milestone creation in v2.5; that is scope creep |
+| gsd-tools.cjs init | Must return auto_mode field | Add to init new-milestone JSON output; do not modify other init commands |
+| config.json | auto_advance set to true by new-milestone, never cleared | transition.md clears at milestone boundary, but new-milestone errors leave it dirty |
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Streaming works:** Tested with a simple prompt, but NOT tested with a multi-tool, multi-turn Claude session that produces `tool_use`, `tool_result`, `stream_event`, and `result` events -- test with a real autopilot phase
-- [ ] **Stall timer fires:** Tested that timer fires once, but NOT tested that re-arm works (the `arguments.callee` bug means it crashes on re-arm) -- test with `setTimeout` mock that fast-forwards twice
-- [ ] **Quiet mode matches current behavior:** Quick test shows output looks right, but NOT verified that output file content is byte-identical to current json mode -- diff the output files
-- [ ] **`< /dev/null` present:** New `runClaudeStreaming()` function exists, but NOT verified that the shell redirect survived the refactor -- grep for `< /dev/null` in the new function
-- [ ] **Error paths clean up:** Happy path clears stall timer, but NOT verified that stream errors, process crashes, and SIGINT all clear the timer -- test each error path
-- [ ] **Exit code preserved:** Streaming works, but NOT verified that non-zero exit codes from Claude are correctly propagated through the streaming path to the retry logic -- test with a forced failure
-- [ ] **Debug retry still works:** Streaming changes stdout format, but NOT verified that `constructDebugPrompt()` error context extraction still produces useful output -- run a real debug retry cycle
+- [ ] **--auto flag parsing:** Often missing the case where `--auto` appears with inline text after it -- verify `--auto 'build feature X'` correctly separates flag from context text
+- [ ] **Config persistence:** Often missing error-path cleanup -- verify config.json after `new-milestone --auto` fails at each step (context resolution, research, requirements, roadmap)
+- [ ] **MILESTONE-CONTEXT.md consumption:** new-milestone deletes MILESTONE-CONTEXT.md after consuming it (step 6). Verify this still happens in auto mode -- if auto mode skips step 6, the file lingers and confuses the next milestone
+- [ ] **Version auto-accept:** Auto-accepting the version suggestion (minor bump) is correct, but verify the version parsing handles edge cases: v2.5 -> v2.6 (not v2.50 or v3.0)
+- [ ] **Research config persistence:** Step 8 persists `workflow.research = true` to config. In auto mode this always happens. Verify this doesn't conflict with a user who previously set `workflow.research = false` for interactive use
+- [ ] **Requirement scoping "select all":** Auto-selecting all features from context may include anti-features or "future" items that research flagged as "don't build yet"
+- [ ] **Roadmap auto-approve:** Auto-approving the roadmap skips human review of phase ordering and requirement mapping. If the roadmapper produces a suboptimal roadmap, it proceeds without correction
+- [ ] **Auto-chain target:** Verify the auto-chain invokes `/gsd:discuss-phase {FIRST_PHASE} --auto` with the correct phase number (the first phase of the NEW milestone, not phase 1)
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Chunk-boundary JSON parse errors (Pitfall 1) | LOW | Switch from `child.stdout` to ProcessPromise iteration; no API change needed |
-| `arguments.callee` crash (Pitfall 2) | LOW | Replace with named function expression; one-line fix |
-| Stall timer prevents exit (Pitfall 3) | LOW | Add `try/finally` and `unref()`; localized change |
-| stdout format mismatch (Pitfall 5) | MEDIUM | Must audit all stdout consumers and update error context extraction |
-| `< /dev/null` dropped (Pitfall 6) | LOW | Add it back; but diagnosing the hang can take time if the cause is not known |
-| Event type mismatch (Pitfall 8) | MEDIUM | Must empirically discover real event types and rewrite display logic |
+| Config auto_advance leaked | LOW | `gsd settings` to toggle auto_advance off, or manually edit .planning/config.json |
+| Empty milestone created (no context) | MEDIUM | Delete the bad commits (`git reset --soft HEAD~N`), fix context, re-run |
+| Brainstorm handoff failed | LOW | MILESTONE-CONTEXT.md and design doc are saved; just re-run `/gsd:new-milestone --auto` manually |
+| Unstoppable cascade running | LOW | Ctrl+C to interrupt, `gsd settings` to set auto_advance false, resume manually |
+| Wrong version auto-accepted | LOW | Edit PROJECT.md and REQUIREMENTS.md, update version references, re-commit |
+| Research auto-selected wrong config | LOW | `gsd settings` to toggle research config back, re-run plan-phase with --skip-research or --research as needed |
+| Roadmap auto-approved with bad structure | MEDIUM | Re-run `/gsd:new-milestone` interactively (without --auto) to review and adjust the roadmap |
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls.
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Chunk-boundary JSON parse (1) | Phase 1: Core streaming | Unit test: feed multi-line NDJSON in single chunk, verify each line parsed separately |
-| `arguments.callee` crash (2) | Phase 1: Stall detection | Unit test: mock setTimeout, verify callback fires and re-arms without error |
-| Timer prevents exit (3) | Phase 1: Core streaming | Test: stream error path clears timer; process exits promptly |
-| Iterator/promise race (4) | Phase 1: Core streaming | Integration test: force non-zero exit during active streaming, verify exit code captured |
-| stdout format change (5) | Phase 1 + Phase 2 | Verify debug retry error context is human-readable in both streaming and quiet modes |
-| `< /dev/null` survival (6) | Phase 1: Core streaming | Assertion or grep test: command string contains `< /dev/null` |
-| `appendFileSync` blocking (7) | Phase 1: Output capture | Monitor during integration testing; optimize if stutter observed |
-| Undocumented event types (8) | Phase 1: First task | Empirical discovery: run stream-json and log all event types before writing display logic |
-| Stall timer escalation (9) | Phase 1: Stall detection | Design decision during implementation; simple reset-on-every-line is acceptable |
-| Quiet mode regression (10) | Phase 1 + Phase 2 | Regression test: quiet mode output matches current json mode output |
+| Config state leaking | Phase 1: Argument Parsing | Test: fail at each step, verify config.json state |
+| Silent failure without context | Phase 1: Argument Parsing | Test: `--auto` with no context produces error, zero mutations |
+| Brainstorm routing regression | Phase 4: Autopilot Integration | Test: brainstorm milestone route produces working milestone |
+| Unstoppable cascade | Phase 3: Auto-Chain | Document behavior; verify first phase number is correct |
+| Research model resolution | Phase 1: Argument Parsing | Test: init new-milestone returns all model fields |
+| MILESTONE-CONTEXT.md not consumed | Phase 2: Auto-Skip | Test: MILESTONE-CONTEXT.md deleted after successful auto run |
+| Version edge cases | Phase 2: Auto-Skip | Test: version bump from various starting versions |
+| Requirement over-scoping | Phase 2: Auto-Skip | Review: "select all" behavior with research-flagged anti-features |
+| Roadmap auto-approve quality | Phase 2: Auto-Skip | Accept risk: roadmapper quality is generally good; manual re-run is cheap |
 
 ## Sources
 
-- [zx ProcessPromise documentation](https://google.github.io/zx/process-promise) -- async iterator vs .stdout semantics, .nothrow() behavior
-- [zx Known Issues](https://google.github.io/zx/known-issues) -- output truncation with process.exit()
-- [Node.js Child Process documentation](https://nodejs.org/api/child_process.html) -- pipe buffer limits (64KB), stream semantics
-- [Node.js Timers documentation](https://nodejs.org/api/timers.html) -- unref() prevents timer from keeping process alive
-- [Node.js Readline issue #33463](https://github.com/nodejs/node/issues/33463) -- lines missed when async work happens between createInterface and iteration
-- [Node.js Readline issue #42454](https://github.com/nodejs/node/issues/42454) -- silent exit when awaiting before consuming readline iterator
-- [Node.js Backpressuring in Streams](https://nodejs.org/en/learn/modules/backpressuring-in-streams) -- highWaterMark, pipe buffer semantics
-- [MDN arguments.callee](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/arguments/callee) -- forbidden in strict mode (ES modules)
-- [Claude CLI reference](https://code.claude.com/docs/en/cli-reference) -- --output-format stream-json flag
-- [Claude Code issue #24596](https://github.com/anthropics/claude-code/issues/24596) -- stream-json event types lack documentation
-- [Khan/format-claude-stream](https://github.com/Khan/format-claude-stream) -- real-world stream-json parser with fallback for unknown events
-- [Node.js setTimeout memory leak article](https://lucumr.pocoo.org/2024/6/5/node-timeout/) -- timer reference leaks
-- [Ben Nadel on appendFileSync vs streams](https://www.bennadel.com/blog/3233-parsing-and-serializing-large-datasets-using-newline-delimited-json-in-node-js.htm) -- performance of per-line sync writes
+- `get-shit-done/workflows/discuss-phase.md` lines 761-849: existing --auto and auto_advance pattern (HIGH confidence)
+- `get-shit-done/workflows/plan-phase.md` lines 480-559: auto-advance check and execute-phase chaining (HIGH confidence)
+- `get-shit-done/workflows/transition.md` line 456: auto_advance reset at milestone boundary (HIGH confidence)
+- `get-shit-done/workflows/new-milestone.md`: current interactive workflow with 5 AskUserQuestion calls (HIGH confidence)
+- `get-shit-done/workflows/brainstorm.md` lines 257-310: milestone routing that will be simplified (HIGH confidence)
+- `CHANGELOG.md` line 132: real bug -- auto-mode surviving context compaction required config persistence (HIGH confidence)
+- `.planning/designs/2026-03-14-new-milestone-auto-mode-design.md`: design doc for this milestone (HIGH confidence)
 
 ---
-*Pitfalls research for: Adding NDJSON streaming to zx-based autopilot (v2.4)*
-*Researched: 2026-03-12*
+*Pitfalls research for: Adding --auto mode to /gsd:new-milestone workflow*
+*Researched: 2026-03-14*
