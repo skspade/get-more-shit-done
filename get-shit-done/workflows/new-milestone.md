@@ -442,7 +442,34 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: create milest
 | Roadmap        | `.planning/ROADMAP.md`      |
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
+```
 
+**If auto mode is active:**
+
+Resolve the first phase number:
+```bash
+FIRST_PHASE=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" phase find-next --raw)
+```
+
+**If FIRST_PHASE is empty/null:** Display error and skip chaining:
+```
+Error: No incomplete phases found in ROADMAP.md. Cannot auto-chain to discuss-phase.
+```
+Fall through to interactive "Next Up" block below.
+
+**If FIRST_PHASE resolved:**
+
+```
+╔══════════════════════════════════════════╗
+║  AUTO-ADVANCING → DISCUSS PHASE {N}      ║
+╚══════════════════════════════════════════╝
+```
+
+Exit skill and invoke SlashCommand("/gsd:discuss-phase {FIRST_PHASE} --auto")
+
+**If interactive mode:**
+
+```
 ## ▶ Next Up
 
 **Phase [N]: [Phase Name]** — [Goal]
