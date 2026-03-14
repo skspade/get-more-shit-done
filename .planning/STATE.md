@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: New-Milestone Auto Mode
-status: unknown
-last_updated: "2026-03-14T18:38:07.853Z"
+status: completed
+last_updated: "2026-03-14T19:30:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,22 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** v2.5 Phase 63 — Close Verification and Metadata Gaps (complete)
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Milestone: v2.5 New-Milestone Auto Mode
-Phase: 63 of 63 (Close Verification and Metadata Gaps)
-Plan: 1 of 1 in current phase
-Status: Phase 63 complete — all v2.5 phases done
-Last activity: 2026-03-14 — Phase 63 plan 01 complete (gap closure)
+Milestone: v2.5 New-Milestone Auto Mode — SHIPPED 2026-03-14
+Phase: All 5 phases complete (59-63)
+Plans: 6/6 complete
+Status: Milestone archived
+Last activity: 2026-03-14 — Milestone v2.5 completed and archived
 
-Progress: [##--------] 25%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 87 (v1.0: 12, v1.1: 3, v1.2: 4, v1.3: 9, v1.4: 5, v1.5: 5, v1.6: 15, v2.0: 2, v2.1: 2, v2.2: 8, v2.3: 16, v2.4: 6)
+- Total plans completed: 93 (v1.0: 12, v1.1: 3, v1.2: 4, v1.3: 9, v1.4: 5, v1.5: 5, v1.6: 15, v2.0: 2, v2.1: 2, v2.2: 8, v2.3: 16, v2.4: 6, v2.5: 6)
 - Average duration: ---
 - Total execution time: ---
 
@@ -53,9 +53,10 @@ Progress: [##--------] 25%
 | 40-46 (v2.2) | 8 | --- | --- |
 | 47-53 (v2.3) | 16 | --- | --- |
 | 54-58 (v2.4) | 6 | ~14min | ~2.3min |
+| 59-63 (v2.5) | 6 | --- | --- |
 
 **Recent Trend:**
-- Trend: v2.4 shipped — 5 phases, 6 plans, 45 commits
+- Trend: v2.5 shipped — 5 phases, 6 plans, 30 commits
 
 *Updated after each plan completion*
 
@@ -89,5 +90,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Phase 59 complete, ready to plan Phase 60
+Stopped at: v2.5 milestone completed and archived
 Resume file: None

@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.5 New-Milestone Auto Mode (Shipped: 2026-03-14)
+
+**Phases completed:** 5 phases, 6 plans
+**Timeline:** 1 day (2026-03-14)
+**Git range:** a5423c4 → c039cb9 (30 commits)
+**Files modified:** 33 (3,180 insertions, 86 deletions)
+
+**Key accomplishments:**
+- Added `--auto` flag parsing with hybrid flag+config pattern and context resolution (MILESTONE-CONTEXT.md > @file > inline > error) in `new-milestone.md` and `init.cjs`
+- Bypassed all 6 interactive decision points (build-next question, version, research, features, gaps, roadmap approval) with sensible defaults in auto mode
+- Auto-chain from milestone creation into `/gsd:discuss-phase {N} --auto` with dynamic first phase resolution via `phase find-next`
+- Simplified brainstorm.md milestone route from ~70 inline lines to SlashCommand delegation to `/gsd:new-milestone --auto`
+- Closed all verification and metadata gaps: created VERIFICATION.md for phases 59/61, SUMMARY.md for phase 59, fixed traceability
+- Milestone audit: 19/19 requirements satisfied, 19/19 integrations wired, 2/2 E2E flows verified (tech_debt status — 3 minor items)
+
+---
+
 ## v2.4 Autopilot Streaming (Shipped: 2026-03-13)
 
 **Phases completed:** 5 phases, 6 plans, 9 tasks

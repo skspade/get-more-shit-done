@@ -504,6 +504,50 @@
 
 ---
 
+## Milestone: v2.5 — New-Milestone Auto Mode
+
+**Shipped:** 2026-03-14
+**Phases:** 5 | **Plans:** 6 | **Commits:** 30
+
+### What Was Built
+- `--auto` flag parsing with hybrid flag+config pattern and MILESTONE-CONTEXT.md > @file > inline > error context resolution
+- Auto-skip branches at all 6 interactive decision points in new-milestone workflow (build-next, version, research, features, gaps, roadmap)
+- Auto-chain from milestone creation into `/gsd:discuss-phase {N} --auto` with dynamic first phase resolution
+- Brainstorm.md milestone route simplified from ~70 inline lines to SlashCommand delegation
+- Gap closure: VERIFICATION.md for phases 59/61, SUMMARY.md for phase 59, fixed traceability metadata
+
+### What Worked
+- Pattern reuse from discuss-phase/plan-phase `--auto` behavior: same flag+config+persist pattern, same init integration
+- Each phase had atomic, well-scoped deliverables: flag parsing → skip points → chain → brainstorm → gap closure
+- SlashCommand delegation pattern for brainstorm→milestone handoff eliminated significant code duplication
+- Gap closure (Phase 63) resolved all audit findings in one pass — 19/19 requirements satisfied after closure
+- Milestone audit second pass promoted status from `gaps_found` → `tech_debt` (acceptable)
+- Entire milestone completed in 1 day (30 commits)
+
+### What Was Inefficient
+- Phase 59 and 61 did not create VERIFICATION.md or SUMMARY.md during execution — required Phase 63 gap closure (11th milestone with this pattern)
+- Phase 62 SUMMARY.md frontmatter was missing `requirements-completed` — caught by audit, fixed in Phase 63
+- Two audit passes needed: first found 9 unsatisfied requirements + 4 partial; gap closure resolved all critical gaps
+
+### Patterns Established
+- Auto-mode detection pattern: flag parsing → config fallback → persist on first use (consistent with discuss/plan)
+- Context resolution priority: MILESTONE-CONTEXT.md > @file > inline > error (deterministic, no ambiguity)
+- Auto-chain pattern: resolve next phase dynamically via `phase find-next`, null-check, banner, SlashCommand
+- SlashCommand delegation: workflow delegates to another workflow via `Exit skill and invoke SlashCommand(...)` pattern
+
+### Key Lessons
+1. VERIFICATION.md gap persists (11th of 13 milestones) — the only milestones without it are v2.1 (2 phases, TDD) and v2.4 (had it too actually); this is truly baked into the system
+2. SlashCommand delegation is a powerful pattern for workflow composition — eliminates duplication and maintains single source of truth
+3. The auto-mode flag+config+persist pattern is now battle-tested across 3 workflows (discuss, plan, new-milestone)
+4. Context resolution priority ordering removes ambiguity from multi-source scenarios — worth establishing early for any multi-input workflow
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents)
+- Sessions: 6 plan executions across 5 phases
+- Notable: workflow-only milestone (no new CJS code) — all changes were in .md workflow files and test files
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -522,12 +566,13 @@
 | v2.2 | 48 | 7 | PR review integration — pattern reuse from v1.4, file-proximity dedup, dual-path routing |
 | v2.3 | 49 | 7 | Autopilot CJS consolidation — zx rewrite with direct CJS imports, legacy bash preserved |
 | v2.4 | 45 | 5 | Autopilot streaming — NDJSON real-time output, stall detection, consolidated invocations |
+| v2.5 | 30 | 5 | New-milestone auto mode — flag+config+persist pattern, 6 skip points, auto-chain, SlashCommand delegation |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 11 of 12 milestones (v2.1 is only clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 10 of 12 milestones; only v2.1 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 10 of 12 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 12 of 13 milestones (v2.1 is only clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 11 of 13 milestones; only v2.1 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 11 of 13 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -537,3 +582,5 @@
 10. Pattern reuse across milestones (v1.4 → v2.2) dramatically accelerates development — similar features share scoring, routing, and delegation patterns
 11. Integration testing (`--dry-run`) should happen immediately after implementation, not deferred to a later phase (v2.3 — real bugs caught only at audit time)
 12. Consolidating scattered invocations into a single function simplifies subsequent integration phases — each new consumer just calls the one function (v2.4)
+13. SlashCommand delegation eliminates workflow duplication — proven in v2.5 where brainstorm→milestone handoff dropped ~70 lines to 3 lines
+14. Auto-mode flag+config+persist pattern is now battle-tested across 3 workflows (discuss, plan, new-milestone) — consistent UX for autonomous execution
