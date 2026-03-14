@@ -282,29 +282,24 @@ Write to `.planning/MILESTONE-CONTEXT.md`:
 {Approved section content}
 ```
 
-**10b. Initialize milestone models:**
+**10b. Commit and hand off to new-milestone:**
+
+Commit MILESTONE-CONTEXT.md so it persists for the new-milestone workflow:
 
 ```bash
-MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: write MILESTONE-CONTEXT.md from brainstorm" --files ".planning/MILESTONE-CONTEXT.md"
 ```
 
-Parse JSON for model parameters.
+Display:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► ROUTING TO NEW-MILESTONE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**10c. Execute new-milestone workflow steps 1-11 inline:**
+Milestone context committed. Handing off to new-milestone...
+```
 
-Follow the new-milestone workflow (`new-milestone.md`) from Step 1 through Step 11:
-
-1. Load context (PROJECT.md, MILESTONES.md, STATE.md)
-2. Gather milestone goals — MILESTONE-CONTEXT.md exists, use it
-3. Determine milestone version
-4. Update PROJECT.md
-5. Update STATE.md
-6. Cleanup and commit (delete MILESTONE-CONTEXT.md after consuming)
-7. Resolve models from MINIT
-8. Research decision (ask user)
-9. Define requirements
-10. Create roadmap (spawn gsd-roadmapper)
-11. Done — display completion
+Exit skill and invoke SlashCommand("/gsd:new-milestone --auto")
 
 ### New-Project Route (no PROJECT.md)
 
