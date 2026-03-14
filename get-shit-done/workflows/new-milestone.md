@@ -60,7 +60,7 @@ The context should describe what you want to build in this milestone.
 
 Exit workflow. No file mutations occur.
 
-**Effect:** Resolved context is used in step 2 (Gather Milestone Goals) instead of interactive questioning. Steps 3-11 proceed normally — decision points are NOT skipped in this phase (see Phase 60).
+**Effect:** Resolved context is used in step 2 (Gather Milestone Goals) instead of interactive questioning. In auto mode, steps 3, 8, 9, and 10 also bypass interactive decision points with sensible defaults.
 
 </context_resolution>
 
@@ -90,6 +90,12 @@ Exit workflow. No file mutations occur.
 - Use AskUserQuestion to explore features, priorities, constraints, scope
 
 ## 3. Determine Milestone Version
+
+**If auto mode is active:**
+- Parse last version from MILESTONES.md
+- Compute suggested next version (minor bump)
+- Display: `Auto: accepting version v[X.Y] (minor bump)`
+- Continue to step 4
 
 - Parse last version from MILESTONES.md
 - Suggest next version (v1.0 → v1.1, or v2.0 for major)
@@ -142,6 +148,14 @@ INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
 Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
 
 ## 8. Research Decision
+
+**If auto mode is active:**
+- Display: `Auto: selecting "Research first"`
+- Persist choice to config:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.research true
+```
+- Continue to research spawning (below)
 
 AskUserQuestion: "Research the domain ecosystem for new features before defining requirements?"
 - "Research first (Recommended)" — Discover patterns, features, architecture for NEW capabilities
@@ -253,6 +267,16 @@ Display key findings from SUMMARY.md:
 ```
 
 Read PROJECT.md: core value, current milestone goals, validated requirements (what exists).
+
+**If auto mode is active:**
+- If research exists: read FEATURES.md, include ALL features (all table stakes + all differentiators)
+- If no research: include all features from resolved context
+- Skip per-category AskUserQuestion scoping
+- Skip "Identify gaps" AskUserQuestion (proceed as "No, research covered it")
+- Skip requirements confirmation ("Does this capture what you're building?") — auto-approve
+- Display: `Auto: including all features from research`
+- Generate REQUIREMENTS.md with all features included
+- Commit requirements and continue to step 10
 
 **If research exists:** Read FEATURES.md, extract feature categories.
 
@@ -378,6 +402,15 @@ Success criteria:
 1. [criterion]
 2. [criterion]
 ```
+
+**If auto mode is active AND `## ROADMAP CREATED`:**
+- Display: `Auto: approving roadmap`
+- Skip approval AskUserQuestion
+- Continue to commit roadmap
+
+**If auto mode is active AND `## ROADMAP BLOCKED`:**
+- Display error: `Auto mode cannot resolve roadmap blocker. Review the output above.`
+- Exit workflow with error
 
 **Ask for approval** via AskUserQuestion:
 - "Approve" — Commit and continue
