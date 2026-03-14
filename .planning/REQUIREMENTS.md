@@ -2,17 +2,17 @@
 
 ## Argument Parsing
 
-- [ ] **PARSE-01**: `--auto` flag is parsed from $ARGUMENTS in new-milestone workflow
-- [ ] **PARSE-02**: `workflow.auto_advance` config is read and used as fallback when flag not present
-- [ ] **PARSE-03**: `--auto` flag persists `workflow.auto_advance: true` to config when not already set
+- [x] **PARSE-01**: `--auto` flag is parsed from $ARGUMENTS in new-milestone workflow
+- [x] **PARSE-02**: `workflow.auto_advance` config is read and used as fallback when flag not present
+- [x] **PARSE-03**: `--auto` flag persists `workflow.auto_advance: true` to config when not already set
 
 ## Context Resolution
 
-- [ ] **CTX-01**: Auto mode resolves context from MILESTONE-CONTEXT.md when present
-- [ ] **CTX-02**: Auto mode resolves context from @file reference in arguments
-- [ ] **CTX-03**: Auto mode resolves context from inline text in arguments
-- [ ] **CTX-04**: Auto mode errors with usage message when no context provided
-- [ ] **CTX-05**: Context validation occurs before any PROJECT.md or STATE.md mutations
+- [x] **CTX-01**: Auto mode resolves context from MILESTONE-CONTEXT.md when present
+- [x] **CTX-02**: Auto mode resolves context from @file reference in arguments
+- [x] **CTX-03**: Auto mode resolves context from inline text in arguments
+- [x] **CTX-04**: Auto mode errors with usage message when no context provided
+- [x] **CTX-05**: Context validation occurs before any PROJECT.md or STATE.md mutations
 
 ## Auto-Skip Decision Points
 
@@ -25,14 +25,14 @@
 
 ## Auto-Chain
 
-- [ ] **CHAIN-01**: After roadmap creation in auto mode, invoke `/gsd:discuss-phase {first_phase} --auto`
-- [ ] **CHAIN-02**: First phase number is read from ROADMAP.md, not hardcoded
+- [x] **CHAIN-01**: After roadmap creation in auto mode, invoke `/gsd:discuss-phase {first_phase} --auto`
+- [x] **CHAIN-02**: First phase number is read from ROADMAP.md, not hardcoded
 
 ## Autopilot Integration
 
-- [ ] **INT-01**: brainstorm.md step 10 milestone route simplified to invoke `/gsd:new-milestone --auto` instead of inline steps 1-11
-- [ ] **INT-02**: MILESTONE-CONTEXT.md is written and committed before brainstorm handoff
-- [ ] **INT-03**: `gsd-tools.cjs init new-milestone` includes `auto_mode` field in JSON output
+- [x] **INT-01**: brainstorm.md step 10 milestone route simplified to invoke `/gsd:new-milestone --auto` instead of inline steps 1-11
+- [x] **INT-02**: MILESTONE-CONTEXT.md is written and committed before brainstorm handoff
+- [x] **INT-03**: `gsd-tools.cjs init new-milestone` includes `auto_mode` field in JSON output
 
 ## Out of Scope
 

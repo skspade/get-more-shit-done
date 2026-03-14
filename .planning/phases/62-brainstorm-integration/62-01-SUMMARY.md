@@ -3,6 +3,7 @@ phase: 62-brainstorm-integration
 plan: 01
 status: complete
 started: 2026-03-14
+requirements-completed: [INT-01, INT-02]
 completed: 2026-03-14
 ---
 
