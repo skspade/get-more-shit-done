@@ -10,6 +10,60 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 </required_reading>
 
+<auto_mode>
+## Auto Mode Detection
+
+Check if `--auto` flag is present in $ARGUMENTS.
+
+**If `--auto` flag present:**
+
+1. Read `workflow.auto_advance` from config:
+```bash
+AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
+```
+
+2. If `AUTO_CFG` is not true, persist auto-advance to config:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.auto_advance true
+```
+
+3. Strip `--auto` from arguments. Remaining args are the context source (inline text or @file reference).
+
+**Auto mode is active when:** `--auto` flag is present OR `workflow.auto_advance` config is true.
+
+</auto_mode>
+
+<context_resolution>
+## Context Resolution (auto mode)
+
+**Skip if:** Auto mode is NOT active. Continue to `<process>` step 1.
+
+**If auto mode is active:** Resolve context BEFORE any mutations (before step 4).
+
+Resolution priority order:
+
+1. **MILESTONE-CONTEXT.md** — If `.planning/MILESTONE-CONTEXT.md` exists, use it as context.
+2. **@file reference** — If remaining args (after stripping `--auto`) start with `@`, read the referenced file as milestone goals.
+3. **Inline text** — If remaining args contain text (after stripping `--auto`), use as milestone goals.
+4. **Error** — If no context source found:
+
+```
+Error: --auto requires milestone goals.
+
+Usage:
+  /gsd:new-milestone --auto "description of what to build"
+  /gsd:new-milestone --auto @path/to/context.md
+  Or provide .planning/MILESTONE-CONTEXT.md
+
+The context should describe what you want to build in this milestone.
+```
+
+Exit workflow. No file mutations occur.
+
+**Effect:** Resolved context is used in step 2 (Gather Milestone Goals) instead of interactive questioning. Steps 3-11 proceed normally — decision points are NOT skipped in this phase (see Phase 60).
+
+</context_resolution>
+
 <process>
 
 ## 1. Load Context
@@ -20,6 +74,11 @@ Read all files referenced by the invoking prompt's execution_context before star
 - Check for MILESTONE-CONTEXT.md (from /gsd:discuss-milestone)
 
 ## 2. Gather Milestone Goals
+
+**If auto mode with resolved context:**
+- Use resolved context from `<context_resolution>` as milestone goals
+- Skip interactive questioning
+- Continue to step 3
 
 **If MILESTONE-CONTEXT.md exists:**
 - Use features and scope from discuss-milestone
