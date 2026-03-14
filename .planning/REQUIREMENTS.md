@@ -16,12 +16,12 @@
 
 ## Auto-Skip Decision Points
 
-- [ ] **SKIP-01**: "What do you want to build next?" question is skipped, using resolved context
-- [ ] **SKIP-02**: Version suggestion is auto-accepted (minor bump) without confirmation
-- [ ] **SKIP-03**: Research decision auto-selects "Research first" and persists config
-- [ ] **SKIP-04**: Requirement scoping auto-includes all features from context/research
-- [ ] **SKIP-05**: "Identify gaps" question is auto-skipped with "No"
-- [ ] **SKIP-06**: Roadmap approval is auto-approved
+- [x] **SKIP-01**: "What do you want to build next?" question is skipped, using resolved context
+- [x] **SKIP-02**: Version suggestion is auto-accepted (minor bump) without confirmation
+- [x] **SKIP-03**: Research decision auto-selects "Research first" and persists config
+- [x] **SKIP-04**: Requirement scoping auto-includes all features from context/research
+- [x] **SKIP-05**: "Identify gaps" question is auto-skipped with "No"
+- [x] **SKIP-06**: Roadmap approval is auto-approved
 
 ## Auto-Chain
 
@@ -56,14 +56,14 @@
 | CTX-03 | Phase 59 | Done |
 | CTX-04 | Phase 59 | Done |
 | CTX-05 | Phase 59 | Done |
-| SKIP-01 | Phase 60 | Pending |
-| SKIP-02 | Phase 60 | Pending |
-| SKIP-03 | Phase 60 | Pending |
-| SKIP-04 | Phase 60 | Pending |
-| SKIP-05 | Phase 60 | Pending |
-| SKIP-06 | Phase 60 | Pending |
+| SKIP-01 | Phase 60 | Done |
+| SKIP-02 | Phase 60 | Done |
+| SKIP-03 | Phase 60 | Done |
+| SKIP-04 | Phase 60 | Done |
+| SKIP-05 | Phase 60 | Done |
+| SKIP-06 | Phase 60 | Done |
 | CHAIN-01 | Phase 61 | Done |
 | CHAIN-02 | Phase 61 | Done |
-| INT-01 | Phase 62 | Pending |
-| INT-02 | Phase 62 | Pending |
+| INT-01 | Phase 62 | Done |
+| INT-02 | Phase 62 | Done |
 | INT-03 | Phase 59 | Done |

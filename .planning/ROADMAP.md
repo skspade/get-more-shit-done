@@ -14,7 +14,7 @@
 - ✅ **v2.2 PR Review Integration** — Phases 40-46 (shipped 2026-03-09)
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
 - ✅ **v2.4 Autopilot Streaming** — Phases 54-58 (shipped 2026-03-13)
-- [ ] **v2.5 New-Milestone Auto Mode** — Phases 59-62 (in progress)
+- [ ] **v2.5 New-Milestone Auto Mode** — Phases 59-63 (in progress)
 
 ## Phases
 
@@ -156,6 +156,7 @@
 - [x] **Phase 60: Auto-Skip Decision Points** - Bypass all 6 interactive questions with sensible defaults (completed 2026-03-14)
 - [x] **Phase 61: Auto-Chain to Discuss Phase** - Chain milestone creation into autonomous phase execution (completed 2026-03-14)
 - [x] **Phase 62: Brainstorm Integration** - Simplify brainstorm routing to use --auto flag (completed 2026-03-14)
+- [ ] **Phase 63: Close Verification and Metadata Gaps** - Add missing verification artifacts and fix stale metadata (Gap Closure)
 
 ## Phase Details
 
@@ -184,10 +185,10 @@ Plans:
   2. Auto mode accepts the suggested version (minor bump) without confirmation
   3. Auto mode selects "Research first" and includes all features from context/research without prompting
   4. Auto mode skips the "Identify gaps?" question and auto-approves the roadmap
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 60-01: TBD
+- [x] 60-01: Auto-skip all 6 decision points in new-milestone workflow
 
 ### Phase 61: Auto-Chain to Discuss Phase
 **Goal**: After auto-mode milestone creation completes, the workflow automatically chains into discuss-phase for the first phase, connecting milestone creation to the autonomous execution pipeline
@@ -196,10 +197,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. After roadmap creation in auto mode, `/gsd:discuss-phase {N} --auto` is invoked automatically
   2. The first phase number is read from ROADMAP.md (not hardcoded to 1)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 61-01: TBD
+- [x] 61-01: Auto-chain to discuss-phase after milestone creation
 
 ### Phase 62: Brainstorm Integration
 **Goal**: Brainstorm workflow delegates milestone creation to `/gsd:new-milestone --auto` instead of inlining milestone creation steps, reducing code duplication and enabling the full brainstorm-to-execution pipeline
@@ -209,10 +210,28 @@ Plans:
   1. Brainstorm step 10 milestone route invokes `/gsd:new-milestone --auto` via SlashCommand instead of inline steps
   2. MILESTONE-CONTEXT.md is written and committed before the brainstorm-to-milestone handoff
   3. The previous inline milestone creation code (~70 lines) is removed from brainstorm.md
+**Plans**: 1
+
+Plans:
+- [x] 62-01: Replace inline milestone creation with SlashCommand delegation
+
+### Phase 63: Close Verification and Metadata Gaps
+**Goal**: Add missing verification/summary artifacts for Phases 59 and 61, fix Phase 62 SUMMARY frontmatter, and update all stale metadata in REQUIREMENTS.md and ROADMAP.md
+**Depends on**: Phase 62
+**Requirements**: PARSE-01, PARSE-02, PARSE-03, CTX-01, CTX-02, CTX-03, CTX-04, CTX-05, INT-03, CHAIN-01, CHAIN-02, INT-01, INT-02
+**Gap Closure:** Closes gaps from v2.5 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 59 has VERIFICATION.md confirming all 9 requirements pass
+  2. Phase 59 has SUMMARY.md with execution summary
+  3. Phase 61 has VERIFICATION.md confirming CHAIN-01, CHAIN-02 pass
+  4. Phase 62 SUMMARY frontmatter lists INT-01, INT-02 in requirements-completed
+  5. REQUIREMENTS.md checkboxes checked for all satisfied requirements
+  6. REQUIREMENTS.md traceability table shows correct statuses (Done for all completed)
+  7. ROADMAP.md progress table and plan details reflect actual state
 **Plans**: TBD
 
 Plans:
-- [ ] 62-01: TBD
+- [ ] 63-01: TBD
 
 ## Progress
 
@@ -233,7 +252,8 @@ Phases execute in numeric order: 59 → 60 → 61 → 62
 | 40-46 | v2.2 | 8/8 | Complete | 2026-03-09 |
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
-| 59. Flag Parsing and Context Resolution | v2.5 | 0/0 | Not started | - |
-| 60. Auto-Skip Decision Points | 1/1 | Complete    | 2026-03-14 | - |
-| 61. Auto-Chain to Discuss Phase | 1/1 | Complete    | 2026-03-14 | - |
-| 62. Brainstorm Integration | 1/1 | Complete    | 2026-03-14 | - |
+| 59. Flag Parsing and Context Resolution | v2.5 | 2/2 | Complete | 2026-03-14 |
+| 60. Auto-Skip Decision Points | v2.5 | 1/1 | Complete | 2026-03-14 |
+| 61. Auto-Chain to Discuss Phase | v2.5 | 1/1 | Complete | 2026-03-14 |
+| 62. Brainstorm Integration | v2.5 | 1/1 | Complete | 2026-03-14 |
+| 63. Close Verification and Metadata Gaps | v2.5 | 0/0 | Not started | - |
