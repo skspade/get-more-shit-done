@@ -89,7 +89,12 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — next milestone not yet planned)
+- `--auto` flag for `/gsd:new-milestone` — skip all confirmation questions when creating milestones — v2.5
+- Hybrid flag + config pattern (mirrors discuss-phase/plan-phase `--auto` behavior) — v2.5
+- Auto-resolve milestone context from MILESTONE-CONTEXT.md, @file, or inline text — v2.5
+- Auto-accept version, always research, auto-approve requirements and roadmap — v2.5
+- Auto-chain to `/gsd:discuss-phase 1 --auto` after roadmap creation — v2.5
+- Simplify brainstorm.md milestone routing to use `/gsd:new-milestone --auto` — v2.5
 
 ### Out of Scope
 
@@ -171,7 +176,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v2.4 with real-time streaming output. 12 milestones shipped (v1.0-v2.4) across 58 phases, 87 plans. 746 tests (budget at 93.3%).
+Shipped v2.4 with real-time streaming output. 12 milestones shipped (v1.0-v2.4) across 58 phases, 87 plans. 746 tests (budget at 93.3%). Starting v2.5: --auto flag for new-milestone command.
 
 **Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP
@@ -179,4 +184,4 @@ Shipped v2.4 with real-time streaming output. 12 milestones shipped (v1.0-v2.4) 
 **Known tech debt:** Test budget at 93.3% (746/800) — 4 redundancy findings with 1 consolidation proposal; `docs/CLI.md` line 14 contains upstream package name (pre-existing)
 
 ---
-*Last updated: 2026-03-13 after v2.4 milestone*
+*Last updated: 2026-03-14 after v2.5 milestone creation*

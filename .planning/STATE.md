@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.4
-milestone_name: Autopilot Streaming
-status: unknown
-last_updated: "2026-03-13T06:07:26.422Z"
+milestone: v2.5
+milestone_name: New-Milestone Auto Mode
+status: active
+last_updated: "2026-03-14"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-13)
+See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** v2.5 New-Milestone Auto Mode
 
 ## Current Position
 
-Milestone: v2.4 Autopilot Streaming — SHIPPED 2026-03-13
-Phase: All complete
-Status: Milestone complete
-Last activity: 2026-03-13 — v2.4 milestone archived
+Milestone: v2.5 New-Milestone Auto Mode
+Phase: Awaiting roadmap
+Status: Creating milestone
+Last activity: 2026-03-14 — milestone created from brainstorm design
 
-Progress: [##########] 100%
+Progress: [----------] 0%
 
 ## Performance Metrics
 
