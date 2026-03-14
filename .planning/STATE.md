@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 Milestone: v2.5 New-Milestone Auto Mode
 Phase: 60 of 62 (Auto-Skip Decision Points)
-Plan: 0 of 0 in current phase
-Status: Ready to plan
-Last activity: 2026-03-14 — Phase 59 completed (2 plans)
+Plan: 1 of 1 in current phase
+Status: Plan 60-01 complete
+Last activity: 2026-03-14 — Phase 60 plan 01 complete (auto-skip branches)
 
 Progress: [##--------] 25%
 

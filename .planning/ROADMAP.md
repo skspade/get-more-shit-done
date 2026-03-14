@@ -153,7 +153,7 @@
 **Milestone Goal:** Users can invoke `/gsd:new-milestone --auto` to create milestones without interactive confirmation, completing the autonomous pipeline from brainstorm through execution.
 
 - [x] **Phase 59: Flag Parsing and Context Resolution** - Parse --auto flag, resolve context from multiple sources, wire init.cjs
-- [ ] **Phase 60: Auto-Skip Decision Points** - Bypass all 6 interactive questions with sensible defaults
+- [x] **Phase 60: Auto-Skip Decision Points** - Bypass all 6 interactive questions with sensible defaults (completed 2026-03-14)
 - [ ] **Phase 61: Auto-Chain to Discuss Phase** - Chain milestone creation into autonomous phase execution
 - [ ] **Phase 62: Brainstorm Integration** - Simplify brainstorm routing to use --auto flag
 
@@ -234,6 +234,6 @@ Phases execute in numeric order: 59 → 60 → 61 → 62
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
 | 59. Flag Parsing and Context Resolution | v2.5 | 0/0 | Not started | - |
-| 60. Auto-Skip Decision Points | v2.5 | 0/0 | Not started | - |
+| 60. Auto-Skip Decision Points | 1/1 | Complete   | 2026-03-14 | - |
 | 61. Auto-Chain to Discuss Phase | v2.5 | 0/0 | Not started | - |
 | 62. Brainstorm Integration | v2.5 | 0/0 | Not started | - |
