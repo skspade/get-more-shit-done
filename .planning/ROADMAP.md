@@ -15,6 +15,7 @@
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
 - ✅ **v2.4 Autopilot Streaming** — Phases 54-58 (shipped 2026-03-13)
 - ✅ **v2.5 New-Milestone Auto Mode** — Phases 59-63 (shipped 2026-03-14)
+- 🚧 **v2.6 Unified Validation Module** — Phases 64-68 (in progress)
 
 ## Phases
 
@@ -159,7 +160,80 @@
 
 </details>
 
+### 🚧 v2.6 Unified Validation Module (In Progress)
+
+**Milestone Goal:** Eliminate the disparity between `gsd health` (regex-based) and autopilot (artifact-based) validation by creating a single `validation.cjs` module that both consumers delegate to.
+
+- [ ] **Phase 64: Module Foundation and Check Registry** - validation.cjs skeleton with API contracts, check registry pattern, result type, severity model, and category filtering
+- [ ] **Phase 65: Structure and State Checks** - Core check implementations for file existence, config validation, phase directory naming, orphaned plans, and STATE/ROADMAP consistency
+- [ ] **Phase 66: Phase Navigation and Autopilot Readiness** - Artifact-based phase status via computePhaseStatus(), autopilot readiness checks with deterministic step detection
+- [ ] **Phase 67: Auto-Repair and Consumer Migration** - Separated repair logic, CLI delegation, autopilot pre-flight, gsd-tools dispatch, dead code removal, backward compatibility
+- [ ] **Phase 68: Testing and Consolidation** - Test suite for all check categories, auto-repair tests, integration tests, net-zero test count migration
+
+## Phase Details
+
+### Phase 64: Module Foundation and Check Registry
+**Goal**: Validation module exists with locked API contracts that all subsequent phases build on
+**Depends on**: Nothing (first phase of v2.6)
+**Requirements**: VAL-01, VAL-02, VAL-03, VAL-04, VAL-05
+**Success Criteria** (what must be TRUE):
+  1. `require('./validation.cjs')` returns a module with `validateProjectHealth` as a callable function
+  2. A check can be defined as `{ id, category, severity, check, repair? }` and registered in the check array
+  3. `validateProjectHealth()` returns a result object with `healthy`, `checks`, `errors`, `warnings`, `repairs`, `nextPhase`, `phaseStep` fields
+  4. Checks can be filtered by category via `runChecks({ categories: ['readiness'] })` and only matching checks execute
+  5. Result `healthy` status reflects three-tier severity — false when any error exists, true when only warnings/info
+**Plans**: TBD
+
+### Phase 65: Structure and State Checks
+**Goal**: All existing health checks from cli.cjs and verify.cjs are implemented in validation.cjs as the single source of truth
+**Depends on**: Phase 64
+**Requirements**: STRUCT-01, STRUCT-02, STRUCT-03, STRUCT-04, STATE-01, STATE-02, STATE-03, STATE-04
+**Success Criteria** (what must be TRUE):
+  1. Missing `.planning/` files (PROJECT.md, ROADMAP.md, STATE.md, config.json, phases/) are detected and reported with appropriate error codes
+  2. Invalid config.json (parse errors, unknown keys, bad enum values) produces warnings with specific diagnostic messages
+  3. STATE.md milestone name mismatch with ROADMAP.md is detected as an error
+  4. STATE.md phase counts (completed and total) that disagree with ROADMAP.md are detected as warnings
+  5. Phase directories not matching `NN-name` format and PLAN.md without SUMMARY.md are flagged
+**Plans**: TBD
+
+### Phase 66: Phase Navigation and Autopilot Readiness
+**Goal**: Phase lifecycle truth comes from artifact inspection, and autopilot can determine whether it is safe to proceed
+**Depends on**: Phase 65
+**Requirements**: NAV-01, NAV-02, NAV-03, NAV-04, READY-01, READY-02, READY-03, READY-04
+**Success Criteria** (what must be TRUE):
+  1. Phase status is determined by `computePhaseStatus()` artifact inspection, not regex parsing of STATE.md
+  2. When milestone is active, `findFirstIncompletePhase()` returns a valid phase and each incomplete phase reports a deterministic lifecycle step (discuss/plan/execute/verify)
+  3. Orphan phase directories (on disk but not in ROADMAP) and missing directories (in ROADMAP but not on disk) are detected
+  4. Autopilot readiness check confirms: incomplete phases exist, next phase has deterministic step, no truncated artifacts, config has valid autopilot settings
+**Plans**: TBD
+
+### Phase 67: Auto-Repair and Consumer Migration
+**Goal**: Trivially fixable state drift is auto-repaired, and all three consumers (CLI, autopilot, gsd-tools) delegate to validation.cjs
+**Depends on**: Phase 66
+**Requirements**: REPAIR-01, REPAIR-02, REPAIR-03, REPAIR-04, INT-01, INT-02, INT-03, INT-04, INT-05, INT-06
+**Success Criteria** (what must be TRUE):
+  1. `validateProjectHealth({ autoRepair: true })` fixes stale STATE.md counts, missing phase directories, and reports repairs in a `repairs` array — each repair attempted independently
+  2. `gsd health` output is backward-compatible (same error codes, same field structure) while delegating to `validateProjectHealth()` internally
+  3. `gsd health --fix` triggers auto-repair and reports what was changed
+  4. Autopilot pre-flight calls `validateProjectHealth({ autoRepair: true })` before entering the phase loop
+  5. `gsd-tools.cjs validate` dispatch routes to validation.cjs, and old `gatherHealthData()`/`cmdValidateHealth()` code is removed
+**Plans**: TBD
+
+### Phase 68: Testing and Consolidation
+**Goal**: Every check category has test coverage and the test count is net-zero or net-negative versus pre-milestone
+**Depends on**: Phase 67
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
+**Success Criteria** (what must be TRUE):
+  1. Tests exist for each check category (STRUCT, STATE, NAV, READY) using mock filesystem fixtures
+  2. Auto-repair tests verify that repairs fix issues and re-validation passes
+  3. Autopilot pre-flight integration tests confirm correct behavior for healthy, unhealthy, and repairable project states
+  4. Total test count is at or below the pre-milestone count (750) — existing health tests migrated, not duplicated
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 64 → 65 → 66 → 67 → 68
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -176,3 +250,8 @@
 | 47-53 | v2.3 | 16/16 | Complete | 2026-03-10 |
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
 | 59-63 | v2.5 | 6/6 | Complete | 2026-03-14 |
+| 64. Module Foundation | v2.6 | 0/0 | Not started | - |
+| 65. Structure and State Checks | v2.6 | 0/0 | Not started | - |
+| 66. Navigation and Readiness | v2.6 | 0/0 | Not started | - |
+| 67. Auto-Repair and Migration | v2.6 | 0/0 | Not started | - |
+| 68. Testing and Consolidation | v2.6 | 0/0 | Not started | - |

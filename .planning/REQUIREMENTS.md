@@ -90,47 +90,47 @@ Requirements for Unified Validation Module milestone. Each maps to roadmap phase
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
-| VAL-03 | — | Pending |
-| VAL-04 | — | Pending |
-| VAL-05 | — | Pending |
-| STRUCT-01 | — | Pending |
-| STRUCT-02 | — | Pending |
-| STRUCT-03 | — | Pending |
-| STRUCT-04 | — | Pending |
-| STATE-01 | — | Pending |
-| STATE-02 | — | Pending |
-| STATE-03 | — | Pending |
-| STATE-04 | — | Pending |
-| NAV-01 | — | Pending |
-| NAV-02 | — | Pending |
-| NAV-03 | — | Pending |
-| NAV-04 | — | Pending |
-| READY-01 | — | Pending |
-| READY-02 | — | Pending |
-| READY-03 | — | Pending |
-| READY-04 | — | Pending |
-| REPAIR-01 | — | Pending |
-| REPAIR-02 | — | Pending |
-| REPAIR-03 | — | Pending |
-| REPAIR-04 | — | Pending |
-| INT-01 | — | Pending |
-| INT-02 | — | Pending |
-| INT-03 | — | Pending |
-| INT-04 | — | Pending |
-| INT-05 | — | Pending |
-| INT-06 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
+| VAL-01 | Phase 64 | Pending |
+| VAL-02 | Phase 64 | Pending |
+| VAL-03 | Phase 64 | Pending |
+| VAL-04 | Phase 64 | Pending |
+| VAL-05 | Phase 64 | Pending |
+| STRUCT-01 | Phase 65 | Pending |
+| STRUCT-02 | Phase 65 | Pending |
+| STRUCT-03 | Phase 65 | Pending |
+| STRUCT-04 | Phase 65 | Pending |
+| STATE-01 | Phase 65 | Pending |
+| STATE-02 | Phase 65 | Pending |
+| STATE-03 | Phase 65 | Pending |
+| STATE-04 | Phase 65 | Pending |
+| NAV-01 | Phase 66 | Pending |
+| NAV-02 | Phase 66 | Pending |
+| NAV-03 | Phase 66 | Pending |
+| NAV-04 | Phase 66 | Pending |
+| READY-01 | Phase 66 | Pending |
+| READY-02 | Phase 66 | Pending |
+| READY-03 | Phase 66 | Pending |
+| READY-04 | Phase 66 | Pending |
+| REPAIR-01 | Phase 67 | Pending |
+| REPAIR-02 | Phase 67 | Pending |
+| REPAIR-03 | Phase 67 | Pending |
+| REPAIR-04 | Phase 67 | Pending |
+| INT-01 | Phase 67 | Pending |
+| INT-02 | Phase 67 | Pending |
+| INT-03 | Phase 67 | Pending |
+| INT-04 | Phase 67 | Pending |
+| INT-05 | Phase 67 | Pending |
+| INT-06 | Phase 67 | Pending |
+| TEST-01 | Phase 68 | Pending |
+| TEST-02 | Phase 68 | Pending |
+| TEST-03 | Phase 68 | Pending |
+| TEST-04 | Phase 68 | Pending |
 
 **Coverage:**
-- v2.6 requirements: 34 total
-- Mapped to phases: 0
-- Unmapped: 34 ⚠️
+- v2.6 requirements: 35 total
+- Mapped to phases: 35
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-15 after initial definition*
+*Last updated: 2026-03-15 after roadmap creation*
