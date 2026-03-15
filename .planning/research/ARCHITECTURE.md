@@ -1,308 +1,411 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** --auto flag integration into new-milestone workflow
-**Researched:** 2026-03-14
+**Domain:** Unified validation module integration into existing CJS module ecosystem
+**Researched:** 2026-03-15
+**Confidence:** HIGH
 
-## Recommended Architecture
-
-The --auto flag follows the established hybrid flag + config pattern already proven in discuss-phase and plan-phase. Four integration points require modifications; no new components are needed.
-
-### Integration Point Map
+## System Overview -- Current Architecture
 
 ```
-new-milestone.md (workflow)
-  |
-  +-- [MODIFY] Argument parsing: extract --auto flag
-  |     Pattern source: discuss-phase.md auto_context_check step
-  |
-  +-- [MODIFY] 6 AskUserQuestion calls: wrap each with auto-mode conditional
-  |     Step 2: milestone goals  -> use resolved context
-  |     Step 3: version confirm  -> auto-accept suggestion
-  |     Step 8: research decision -> always research
-  |     Step 9: requirement scope -> select all features
-  |     Step 9: identify gaps    -> auto-skip ("No")
-  |     Step 10: roadmap approval -> auto-approve
-  |
-  +-- [MODIFY] Step 11 (Done): add auto-chain to discuss-phase
-  |     Pattern source: discuss-phase.md auto_advance step
-  |
-  +-- [MODIFY] gsd-tools.cjs init new-milestone: add auto_mode field
-        Pattern source: existing init JSON output structure
-
-brainstorm.md (workflow)
-  |
-  +-- [MODIFY] Step 10: replace inline steps 1-11 with SlashCommand
-        /gsd:new-milestone --auto (MILESTONE-CONTEXT.md already created)
-
-gsd-tools.cjs / init.cjs
-  |
-  +-- [MODIFY] cmdInitNewMilestone: add auto_mode to output JSON
-
-config.cjs (NO CHANGES)
-cli.cjs (NO CHANGES)
-  |
-  +-- workflow.auto_advance already registered in:
-        CONFIG_DEFAULTS (implicit false via error fallback)
-        KNOWN_SETTINGS_KEYS (line 738)
-        validateSetting booleanKeys (line 683)
+                          CONSUMERS
+  ┌────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+  │   gsd-cli.cjs      │  │   autopilot.mjs      │  │   gsd-tools.cjs      │
+  │  (CLI binary)      │  │  (ESM/zx outer loop) │  │  (workflow dispatch)  │
+  │                    │  │  createRequire()      │  │                      │
+  └────────┬───────────┘  └───────┬──────────────┘  └──────────┬───────────┘
+           │                      │                             │
+           │ routeCommand()       │ direct CJS import           │ switch/case
+           ▼                      ▼                             ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                         bin/lib/ CJS MODULES                            │
+  ├─────────┬──────────┬──────────┬──────────┬──────────┬──────────────────┤
+  │ cli.cjs │phase.cjs │verify.cjs│ core.cjs │config.cjs│ state.cjs  ...  │
+  └─────────┴──────────┴──────────┴──────────┴──────────┴──────────────────┘
 ```
 
-### Component Boundaries
+### Current Health/Validation Split (the problem)
 
-| Component | Responsibility | Change Type |
-|-----------|---------------|-------------|
-| `get-shit-done/workflows/new-milestone.md` | Workflow orchestration, AskUserQuestion gates, SlashCommand chaining | MODIFY: add --auto parsing, 6 conditional bypasses, auto-chain |
-| `get-shit-done/workflows/brainstorm.md` | Design session, milestone routing | MODIFY: simplify step 10 to single SlashCommand |
-| `commands/gsd/new-milestone.md` | Command spec (tool allowlist, argument hint) | NO CHANGE: $ARGUMENTS already passes through |
-| `get-shit-done/bin/lib/init.cjs` | Init JSON for new-milestone workflow | MODIFY: add `auto_mode` field |
-| `get-shit-done/bin/lib/config.cjs` | Config read/write, defaults | NO CHANGE: `workflow.auto_advance` already handled |
-| `get-shit-done/bin/lib/cli.cjs` | Settings validation | NO CHANGE: `workflow.auto_advance` already registered |
-| `get-shit-done/scripts/autopilot.mjs` | Autonomous phase loop | NO CHANGE for v2.5 (doesn't create milestones) |
+Today, validation logic lives in three disconnected places:
 
-### Data Flow
+1. **cli.cjs `gatherHealthData()`** (lines 409-595) -- Uses regex on STATE.md to find phase references, checks file existence, validates config JSON syntax. Returns `{ status, checks, errors, warnings, info }`.
+
+2. **verify.cjs `cmdValidateHealth()`** (lines 535-871) -- More thorough: `.completed` marker checks, ROADMAP checkbox/disk phase sync, stale STATE.md detection, autopilot phase detection via `findFirstIncompletePhase()`. Supports `--repair`. Returns `{ status, errors, warnings, info, repairable_count }`.
+
+3. **autopilot.mjs** (line 74, 450, 1053-1065) -- Does its own ad-hoc pre-flight: checks `.planning/` exists, then uses `findPhaseInternal()` + `computePhaseStatus()` to determine lifecycle step. No unified readiness check.
+
+**Result:** Three consumers each do partial validation with different approaches. `gsd health` (via cli.cjs) misses things that `validate health` (via verify.cjs) catches, and autopilot has no pre-flight validation at all.
+
+## Recommended Architecture -- validation.cjs Integration
 
 ```
-User invokes: /gsd:new-milestone --auto "Add streaming support"
-                    |
-                    v
-        commands/gsd/new-milestone.md
-        (passes $ARGUMENTS = "--auto Add streaming support")
-                    |
-                    v
-        workflows/new-milestone.md
-                    |
-    +---------------+---------------+
-    |                               |
-    v                               v
-Parse --auto flag            Resolve context
-from $ARGUMENTS              (priority order):
-                              1. MILESTONE-CONTEXT.md
-                              2. @file in args
-                              3. Inline text in args
-                              4. Error if none + auto
-                    |
-                    v
-        Read config: workflow.auto_advance
-        If --auto and config not true -> persist true
-                    |
-                    v
-        Steps 2-11 with conditional bypasses
-        (each AskUserQuestion wrapped in auto check)
-                    |
-                    v
-        Step 11: auto-chain
-        SlashCommand("/gsd:discuss-phase 1 --auto")
-                    |
-                    v
-        discuss-phase auto_advance step
-        (existing: spawns plan-phase --auto)
-                    |
-                    v
-        plan-phase auto_advance step
-        (existing: spawns execute-phase --auto)
+                          CONSUMERS
+  ┌────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+  │   gsd-cli.cjs      │  │   autopilot.mjs      │  │   gsd-tools.cjs      │
+  │  handleHealth()    │  │  preFlight()         │  │  validate dispatch   │
+  │  delegates to      │  │  calls validation    │  │  routes to           │
+  │  validation.cjs    │  │  + auto-repair       │  │  validation.cjs      │
+  └────────┬───────────┘  └───────┬──────────────┘  └──────────┬───────────┘
+           │                      │                             │
+           ▼                      ▼                             ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                    validation.cjs (NEW)                                  │
+  │                                                                         │
+  │  runChecks(cwd, options)        -> { status, checks, errors, warnings } │
+  │  checkStateConsistency(cwd)     -> { errors, warnings }                 │
+  │  checkAutopilotReadiness(cwd)   -> { ready, step, phase, errors }       │
+  │  autoRepair(cwd, issues)        -> { repairs[] }                        │
+  │                                                                         │
+  │  IMPORTS FROM (reads only):                                             │
+  │    phase.cjs  -- findFirstIncompletePhase, computePhaseStatus            │
+  │    core.cjs   -- findPhaseInternal, getMilestoneInfo                     │
+  │    verify.cjs -- getVerificationStatus (optional, for enrichment)        │
+  │    config.cjs -- CONFIG_DEFAULTS                                         │
+  │    state.cjs  -- writeStateMd (repair only)                              │
+  │    frontmatter.cjs -- extractFrontmatter                                 │
+  └──────────────────────────────────────────────────────────────────────────┘
+           │
+           ▼ (uses but does NOT modify)
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │    phase.cjs    core.cjs    verify.cjs    config.cjs    state.cjs       │
+  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Patterns to Follow
+### Component Responsibilities
 
-### Pattern 1: Hybrid Flag + Config Check
-**What:** Check both CLI flag and persisted config, persist flag to config on first use.
-**When:** Every auto-mode decision point.
-**Why:** Enables both direct `--auto` invocation and config-driven auto from upstream callers.
-**Example (from discuss-phase.md, reuse exactly):**
-```
-1. Parse --auto flag from $ARGUMENTS
-2. Read workflow.auto_advance from config:
-   AUTO_CFG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-get workflow.auto_advance 2>/dev/null || echo "false")
+| Component | Responsibility | Changes for v2.6 |
+|-----------|----------------|-------------------|
+| **validation.cjs** (NEW) | All structural/consistency checks, autopilot readiness, auto-repair | New module |
+| **cli.cjs** | CLI formatting, command routing, `handleHealth()` presentation | `gatherHealthData()` replaced by `validation.runChecks()` delegation |
+| **verify.cjs** | Plan/summary/artifact verification, VERIFICATION.md parsing | `cmdValidateHealth()` replaced by `validation.runChecks()` delegation |
+| **autopilot.mjs** | Outer loop orchestration | Adds pre-flight call to `validation.checkAutopilotReadiness()` |
+| **gsd-tools.cjs** | CLI dispatch for workflows | Adds `validate` entries routing to `validation.cjs` |
+| **phase.cjs** | Phase CRUD and lifecycle status | No changes (consumed by validation.cjs) |
+| **core.cjs** | Shared utilities | No changes (consumed by validation.cjs) |
+| **config.cjs** | Config CRUD and defaults | No changes (consumed by validation.cjs) |
 
-If --auto flag present AND AUTO_CFG is not true:
-   node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" config-set workflow.auto_advance true
+## Module Boundary and Export Surface
 
-If --auto flag present OR AUTO_CFG is true:
-   {auto behavior}
-Otherwise:
-   {interactive behavior}
-```
-
-### Pattern 2: Context Resolution Priority Chain
-**What:** Resolve milestone goals from multiple sources with clear priority.
-**When:** Step 2 (gathering milestone goals) in auto mode.
-**Why:** Supports all entry points: brainstorm (MILESTONE-CONTEXT.md), CLI (@file), direct invocation (inline text).
-**Example:**
-```
-1. If MILESTONE-CONTEXT.md exists -> use it (brainstorm route)
-2. If @file reference in args -> read file as goals
-3. If inline text after stripping --auto -> use as goals
-4. If none and auto -> error with usage message
-5. If none and interactive -> ask user (existing)
-```
-
-### Pattern 3: Auto-Chain via SlashCommand
-**What:** After completing workflow, invoke next command with --auto flag.
-**When:** Step 11 (Done) when auto mode is active.
-**Why:** Continues autonomous pipeline without user intervention.
-**Example (from discuss-phase.md auto_advance step):**
-```
-If --auto flag present OR AUTO_CFG is true:
-   Display: "Auto-advancing to first phase..."
-   SlashCommand("/gsd:discuss-phase 1 --auto")
-
-Otherwise:
-   Display existing completion message with manual next steps
-```
-
-### Pattern 4: Init JSON Auto-Mode Field
-**What:** Include `auto_mode` boolean in init command output.
-**When:** `gsd-tools.cjs init new-milestone` invocation.
-**Why:** Centralizes config-state detection so the workflow has a signal from init.
-
-The init command does not receive $ARGUMENTS from the workflow. The auto_mode field reflects config state only. The workflow must parse --auto from $ARGUMENTS separately. The init field is informational (tells the workflow what config says).
+### validation.cjs -- Proposed Exports
 
 ```javascript
-// In cmdInitNewMilestone, add to result object:
-auto_mode: config.workflow?.auto_advance === true,
+module.exports = {
+  // Primary entry point -- runs all checks, returns unified result
+  runChecks,           // (cwd, { repair?: boolean }) => ValidationResult
+
+  // Granular check functions (composable building blocks)
+  checkStructure,      // (cwd) => { checks[], errors[], warnings[] }
+  checkStateConsistency, // (cwd) => { errors[], warnings[] }
+  checkConfig,         // (cwd) => { errors[], warnings[] }
+  checkPhaseSync,      // (cwd) => { errors[], warnings[] }
+  checkAutopilotReadiness, // (cwd) => AutopilotReadiness
+
+  // Repair
+  autoRepair,          // (cwd, issues[]) => { repairs[] }
+};
 ```
 
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Separate Auto Workflow File
-**What:** Creating a `new-milestone-auto.md` alongside `new-milestone.md`.
-**Why bad:** Duplicates all shared logic, creates maintenance burden, diverges over time.
-**Instead:** Inline conditionals within the existing workflow (established pattern).
-
-### Anti-Pattern 2: Skipping Research in Auto Mode
-**What:** Defaulting to "skip research" to save time in auto mode.
-**Why bad:** Research catches feature gaps and architecture issues before requirements lock in. The design doc explicitly says "always research."
-**Instead:** Auto-select "Research first" option (the default recommendation).
-
-### Anti-Pattern 3: Partial Feature Selection in Auto Mode
-**What:** Using heuristics to select a subset of features from MILESTONE-CONTEXT.md.
-**Why bad:** The context was curated (by brainstorm or user) -- filtering it defeats the purpose.
-**Instead:** Select all features from context. The roadmapper handles phasing.
-
-### Anti-Pattern 4: Config Persistence Without Flag Check
-**What:** Always persisting `workflow.auto_advance = true` when --auto flag is present, even if config is already true.
-**Why bad:** Unnecessary write operations, noisy git diffs on config.json.
-**Instead:** Only persist when `--auto` present AND config is NOT already true (conditional persist pattern from discuss-phase).
-
-### Anti-Pattern 5: Chaining via Task Instead of SlashCommand
-**What:** Using Task() to spawn discuss-phase after milestone creation.
-**Why bad:** Task spawns a subagent that cannot itself spawn subagents. The discuss-phase auto flow needs to chain plan-phase, which chains execute-phase. Task nesting would hit the subagent-cannot-spawn-subagent constraint.
-**Instead:** Use SlashCommand which continues in the same agent context, allowing the full auto chain to work.
-
-## Build Order and Dependencies
-
-The changes have clear dependencies that dictate build order:
-
-```
-Phase 1: gsd-tools init modification
-  init.cjs: add auto_mode field to cmdInitNewMilestone
-  No dependencies. Can be tested independently.
-  Estimated scope: ~3 lines changed
-
-Phase 2: new-milestone.md workflow modifications
-  Depends on: Phase 1 (uses auto_mode from init)
-  Add: argument parsing, context resolution, 6 AskUserQuestion bypasses, auto-chain
-  This is the bulk of the work.
-  Estimated scope: ~80 lines of new conditional blocks inserted
-
-Phase 3: brainstorm.md simplification
-  Depends on: Phase 2 (new-milestone --auto must work first)
-  Replace: step 10 inline execution with SlashCommand("/gsd:new-milestone --auto")
-  Estimated scope: ~70 lines removed, ~5 lines added
-```
-
-### Why This Order
-
-1. **init.cjs first** because the workflow reads init output early (step 7). Having auto_mode available from init gives the workflow a config-state signal before it parses $ARGUMENTS.
-
-2. **new-milestone.md second** because it is the core deliverable. The 6 AskUserQuestion bypasses and auto-chain are the primary feature.
-
-3. **brainstorm.md last** because it is a simplification that depends on `--auto` working. If brainstorm step 10 is changed before new-milestone supports `--auto`, the milestone route breaks.
-
-## Modification Details per File
-
-### init.cjs (1 function, ~3 lines)
+### Return Type Contracts
 
 ```javascript
-// cmdInitNewMilestone: add one field to result object
-auto_mode: config.workflow?.auto_advance === true,
+// ValidationResult -- returned by runChecks()
+{
+  status: 'healthy' | 'degraded' | 'broken',
+  checks: [{ name, path, passed, detail }],
+  errors: [{ code, message, fix, repairable }],
+  warnings: [{ code, message, fix, repairable }],
+  info: [{ code, message, fix }],
+  repairable_count: number,
+  repairs_performed: [{ action, success, path?, error? }] | undefined,
+}
+
+// AutopilotReadiness -- returned by checkAutopilotReadiness()
+{
+  ready: boolean,
+  phase: string | null,       // first incomplete phase number
+  step: string | null,        // 'discuss' | 'plan' | 'execute' | 'verify'
+  errors: string[],           // blocking issues
+  warnings: string[],         // non-blocking issues
+  repaired: string[],         // auto-repairs performed
+}
 ```
 
-Requires reading config with `loadConfig(cwd)` which already happens on line 222. The `config` object is already available; this accesses `config.workflow?.auto_advance`.
-
-### new-milestone.md (6 insertion points across steps 2-11)
-
-| Location | Current Behavior | Auto Behavior | Insertion Type |
-|----------|-----------------|---------------|----------------|
-| New step before Step 1 | N/A | Parse --auto from $ARGUMENTS, read config, conditional persist | New block |
-| Step 2 (goals) | AskUserQuestion for goals | Use resolved context (MILESTONE-CONTEXT.md / @file / inline) | Conditional wrapper |
-| Step 3 (version) | AskUserQuestion for version confirmation | Auto-accept suggested version | Conditional wrapper |
-| Step 8 (research) | AskUserQuestion for research choice | Always select "Research first" | Conditional wrapper |
-| Step 9 (scope) | AskUserQuestion multiSelect per category | Select all features | Conditional wrapper |
-| Step 9 (gaps) | AskUserQuestion for additions | Select "No, research covered it" | Conditional wrapper |
-| Step 10 (roadmap) | AskUserQuestion for roadmap approval | Auto-approve | Conditional wrapper |
-| Step 11 (done) | Display next steps | SlashCommand("/gsd:discuss-phase N --auto") | New conditional block |
-
-Each conditional wrapper uses the same guard:
+## Dependency Direction (Critical)
 
 ```
-If --auto flag present OR AUTO_CFG is true:
-   {auto behavior}
-Otherwise:
-   {existing interactive behavior unchanged}
+validation.cjs IMPORTS FROM:
+  ├── phase.cjs        (findFirstIncompletePhase, computePhaseStatus, extractPhaseNumbers)
+  ├── core.cjs         (findPhaseInternal, getMilestoneInfo, safeReadFile)
+  ├── verify.cjs       (getVerificationStatus -- for enrichment only)
+  ├── config.cjs       (CONFIG_DEFAULTS)
+  ├── state.cjs        (writeStateMd -- repair path only)
+  └── frontmatter.cjs  (extractFrontmatter)
+
+validation.cjs IS IMPORTED BY:
+  ├── cli.cjs          (gatherHealthData delegation)
+  ├── autopilot.mjs    (pre-flight readiness check)
+  ├── gsd-tools.cjs    (validate dispatch)
+  └── verify.cjs       (cmdValidateHealth delegation) -- SEE BELOW
 ```
 
-### brainstorm.md (step 10, ~70 lines replaced)
+**Circular dependency risk:** `validation.cjs` imports from `verify.cjs` AND `verify.cjs` would import from `validation.cjs`. This is a real concern.
 
-Current step 10 milestone route (lines ~263-307) duplicates new-milestone workflow steps 1-11 inline. Replace with:
+**Resolution:** Move `cmdValidateHealth()` out of `verify.cjs` entirely. The `validate health` dispatch in `gsd-tools.cjs` routes directly to `validation.cjs` instead. `verify.cjs` keeps its verification-specific functions (`getVerificationStatus`, `getGapsSummary`, etc.) and does NOT import from `validation.cjs`. The dependency is one-way: `validation.cjs` -> `verify.cjs`, never reverse.
 
 ```
-1. Write MILESTONE-CONTEXT.md (keep existing -- this is the context source)
-2. Commit MILESTONE-CONTEXT.md
-3. Display: "Routing to new-milestone with design context..."
-4. SlashCommand("/gsd:new-milestone --auto")
+AFTER REFACTOR:
+
+verify.cjs exports: cmdVerifySummary, cmdVerifyPlanStructure, cmdVerifyPhaseCompleteness,
+                     cmdVerifyReferences, cmdVerifyCommits, cmdVerifyArtifacts, cmdVerifyKeyLinks,
+                     cmdValidateConsistency, getVerificationStatus, getGapsSummary
+                     (cmdValidateHealth REMOVED)
+
+validation.cjs exports: runChecks, checkStructure, checkStateConsistency, checkConfig,
+                         checkPhaseSync, checkAutopilotReadiness, autoRepair
+
+gsd-tools.cjs validate dispatch:
+  'health' -> validation.runChecks()     (was verify.cmdValidateHealth)
+  'readiness' -> validation.checkAutopilotReadiness()   (new)
+  'consistency' -> verify.cmdValidateConsistency()      (unchanged)
 ```
 
-The MILESTONE-CONTEXT.md creation (step 10a) stays because new-milestone reads it as its context source. Only 10b (init) and 10c (inline execution of steps 1-11) are replaced.
+## Data Flow
 
-## Existing Infrastructure Already Supporting --auto
+### Health Command Flow (gsd health)
 
-These components are already wired for `workflow.auto_advance` and require zero changes:
+```
+User runs: gsd health [--fix]
+    │
+    ▼
+gsd-cli.cjs -> cli.cjs handleHealth()
+    │
+    ▼ (delegation replaces inline logic)
+validation.runChecks(projectRoot, { repair: hasFix })
+    │
+    ├── checkStructure()    -> file existence checks
+    ├── checkConfig()       -> JSON validity, known keys
+    ├── checkStateConsistency() -> STATE.md <-> ROADMAP.md sync
+    ├── checkPhaseSync()    -> disk <-> roadmap phase agreement
+    │
+    ├── if repair: autoRepair(cwd, repairableIssues)
+    │
+    ▼
+ValidationResult -> cli.cjs formats with ANSI -> stdout
+```
 
-| Component | What It Already Does | File Location |
-|-----------|---------------------|--------------|
-| `KNOWN_SETTINGS_KEYS` | Lists `workflow.auto_advance` as valid key | `cli.cjs:738` |
-| `validateSetting()` | Validates `workflow.auto_advance` as boolean | `cli.cjs:683` |
-| `gsd settings` CLI | Can display/modify `workflow.auto_advance` | `cli.cjs` |
-| `config-set` command | Persists dot-notation keys like `workflow.auto_advance` | `config.cjs:102` |
-| `config-get` command | Reads dot-notation keys with fallback to CONFIG_DEFAULTS | `config.cjs:147` |
-| discuss-phase `--auto` | Full reference implementation of auto pattern | `discuss-phase.md:132-210, 761-849` |
-| plan-phase `--auto` | Auto-chain to execute-phase | `plan-phase.md:482-558` |
+### Autopilot Pre-Flight Flow
 
-This means the config layer is a zero-touch integration. The only infrastructure change is the init.cjs field addition.
+```
+autopilot.mjs startup
+    │
+    ▼ (new, after existing .planning/ check)
+validation.checkAutopilotReadiness(PROJECT_DIR)
+    │
+    ├── checkStructure()    -> .planning/, ROADMAP.md, STATE.md exist
+    ├── checkConfig()       -> config.json valid
+    ├── findFirstIncompletePhase() -> phase exists to work on
+    ├── computePhaseStatus() -> deterministic lifecycle step
+    │
+    ├── if trivial issues: autoRepair() silently
+    │
+    ▼
+{ ready: true, phase: '64', step: 'discuss' }
+    │
+    ▼
+autopilot proceeds with CURRENT_PHASE = result.phase
+```
 
-## Scalability Considerations
+### Workflow Dispatch Flow (gsd-tools validate)
 
-| Concern | Current (v2.5) | Future |
-|---------|----------------|--------|
-| Auto-chain depth | 3 hops: new-milestone -> discuss -> plan -> execute | Stable; each hop uses SlashCommand for fresh context |
-| Config persistence race | Single-threaded workflow, no race possible | Safe; GSD workflows are sequential |
-| Context resolution sources | 3 sources (MILESTONE-CONTEXT.md, @file, inline) | Extensible; add new sources to priority chain |
-| AskUserQuestion bypass count | 6 in new-milestone | Pattern scales to any count; each is independent |
-| Subagent depth | SlashCommand (not Task) avoids subagent nesting limits | Correct architectural choice for auto-chain |
+```
+Workflow runs: node gsd-tools.cjs validate health --repair
+    │
+    ▼
+gsd-tools.cjs switch('validate')
+    │
+    ├── 'health' -> validation.runChecks(cwd, { repair })
+    ├── 'readiness' -> validation.checkAutopilotReadiness(cwd)
+    └── 'consistency' -> verify.cmdValidateConsistency(cwd)  (unchanged)
+```
+
+## Architectural Patterns
+
+### Pattern 1: Check Composition
+
+**What:** Individual check functions return `{ errors[], warnings[] }`. `runChecks()` composes them into a unified result.
+**When to use:** Always -- each check is independently testable and reusable.
+**Trade-offs:** Slight overhead from multiple function calls, but gains independent testability and selective use (autopilot only needs readiness, not all checks).
+
+```javascript
+function runChecks(cwd, options = {}) {
+  const structure = checkStructure(cwd);
+  if (structure.errors.some(e => e.code === 'E001')) {
+    // .planning/ missing -- short-circuit
+    return { status: 'broken', ...structure, repairable_count: 0 };
+  }
+
+  const configResult = checkConfig(cwd);
+  const stateResult = checkStateConsistency(cwd);
+  const phaseSyncResult = checkPhaseSync(cwd);
+
+  const errors = [...structure.errors, ...configResult.errors,
+                  ...stateResult.errors, ...phaseSyncResult.errors];
+  const warnings = [...structure.warnings, ...configResult.warnings,
+                    ...stateResult.warnings, ...phaseSyncResult.warnings];
+
+  if (options.repair) {
+    const repairable = [...errors, ...warnings].filter(i => i.repairable);
+    if (repairable.length > 0) {
+      autoRepair(cwd, repairable);
+    }
+  }
+
+  return {
+    status: errors.length > 0 ? 'broken' : warnings.length > 0 ? 'degraded' : 'healthy',
+    checks: structure.checks,
+    errors, warnings,
+  };
+}
+```
+
+### Pattern 2: Consumer Delegation (not duplication)
+
+**What:** `cli.cjs handleHealth()` and `gsd-tools.cjs validate health` delegate to `validation.cjs` instead of reimplementing checks.
+**When to use:** When multiple consumers need the same logic.
+**Trade-offs:** Creates a dependency, but eliminates the current divergence where `gsd health` and `gsd-tools validate health` produce different results.
+
+```javascript
+// cli.cjs -- AFTER refactor
+function gatherHealthData(projectRoot) {
+  const validation = require('./validation.cjs');
+  return validation.runChecks(projectRoot);
+}
+
+// handleHealth stays the same -- it formats the result for CLI display
+```
+
+### Pattern 3: Lazy Require for Circular Avoidance
+
+**What:** If a module is only needed in one code path, require it inside the function, not at module top.
+**When to use:** When imports would create circular dependencies.
+**Trade-offs:** Slightly less discoverable, but Node.js CJS handles this well.
+
+```javascript
+// validation.cjs -- state.cjs only needed for repair
+function autoRepair(cwd, issues) {
+  const { writeStateMd } = require('./state.cjs');  // lazy require
+  // ...
+}
+```
+
+## Integration Points
+
+### Changes to Existing Files
+
+| File | Change Type | What Changes |
+|------|-------------|--------------|
+| **bin/lib/validation.cjs** | NEW | All validation/check/repair logic |
+| **bin/lib/cli.cjs** | MODIFY | `gatherHealthData()` delegates to `validation.runChecks()`. Add `--fix` flag parsing to `handleHealth()`. Formatting logic stays. |
+| **bin/lib/verify.cjs** | MODIFY | Remove `cmdValidateHealth()`. Keep `cmdValidateConsistency()`, `getVerificationStatus()`, `getGapsSummary()`. |
+| **bin/gsd-tools.cjs** | MODIFY | `validate health` routes to `validation.runChecks()` instead of `verify.cmdValidateHealth()`. Add `validate readiness` entry. Import validation.cjs. |
+| **scripts/autopilot.mjs** | MODIFY | Add `createRequire` import of `validation.cjs`. Call `checkAutopilotReadiness()` after existing `.planning/` check (line 74-78). Use returned phase/step. |
+| **bin/gsd-cli.cjs** | NO CHANGE | Already routes through `cli.cjs` |
+| **bin/lib/phase.cjs** | NO CHANGE | Consumed by validation.cjs |
+| **bin/lib/core.cjs** | NO CHANGE | Consumed by validation.cjs |
+| **bin/lib/config.cjs** | NO CHANGE | Consumed by validation.cjs |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| validation.cjs -> phase.cjs | Direct CJS require, function calls | Read-only: `findFirstIncompletePhase`, `computePhaseStatus`, `extractPhaseNumbers` |
+| validation.cjs -> core.cjs | Direct CJS require, function calls | Read-only: `findPhaseInternal`, `getMilestoneInfo`, `safeReadFile` |
+| validation.cjs -> verify.cjs | Direct CJS require, function calls | Read-only: `getVerificationStatus` for enrichment. One-way dependency. |
+| validation.cjs -> state.cjs | Lazy require in autoRepair only | Write: `writeStateMd` for STATE.md regeneration |
+| cli.cjs -> validation.cjs | Direct CJS require, function calls | `gatherHealthData` delegates to `runChecks` |
+| autopilot.mjs -> validation.cjs | createRequire CJS import | `checkAutopilotReadiness` called at startup |
+| gsd-tools.cjs -> validation.cjs | Direct CJS require, dispatch routing | `validate health`, `validate readiness` |
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Bidirectional Dependencies Between validation.cjs and verify.cjs
+
+**What people do:** Have verify.cjs import from validation.cjs AND validation.cjs import from verify.cjs.
+**Why it's wrong:** CJS circular requires cause subtle bugs (empty objects at import time). Even if Node resolves it, it creates a maintenance trap.
+**Do this instead:** Move `cmdValidateHealth` out of verify.cjs. validation.cjs imports from verify.cjs (one-way). gsd-tools.cjs routes `validate health` to validation.cjs directly.
+
+### Anti-Pattern 2: Duplicating Check Logic Across Consumers
+
+**What people do:** Copy the same STATE.md parsing regex into validation.cjs, cli.cjs, and autopilot.mjs.
+**Why it's wrong:** This is the exact problem v2.6 is solving. Three implementations drift apart.
+**Do this instead:** Single implementation in validation.cjs. All consumers call it.
+
+### Anti-Pattern 3: Validation Module Doing Formatting
+
+**What people do:** Have validation.cjs produce ANSI-colored strings.
+**Why it's wrong:** Breaks `--json` mode, breaks workflow consumption via gsd-tools. Mixes concerns.
+**Do this instead:** validation.cjs returns structured data only. cli.cjs handles ANSI formatting. gsd-tools.cjs returns JSON.
+
+### Anti-Pattern 4: Putting Auto-Repair in Check Functions
+
+**What people do:** Each `check*()` function both detects AND repairs issues.
+**Why it's wrong:** Makes checks non-idempotent, impossible to do a dry-run, and couples detection to mutation.
+**Do this instead:** Check functions are pure (read-only, return issues). `autoRepair()` is separate, takes issues as input.
+
+## Suggested Build Order
+
+Based on dependency analysis, build in this order:
+
+1. **Create `validation.cjs`** with `checkStructure()`, `checkConfig()`, `checkStateConsistency()`, `checkPhaseSync()`, `runChecks()`, and `autoRepair()`. This is pure new code with no breaking changes. Test in isolation.
+
+2. **Add `checkAutopilotReadiness()`** to validation.cjs. Uses `findFirstIncompletePhase`, `computePhaseStatus`. Test independently.
+
+3. **Refactor `gsd-tools.cjs` dispatch** to route `validate health` to `validation.runChecks()` and add `validate readiness`. Remove verify.cjs dependency for health validation.
+
+4. **Refactor `cli.cjs gatherHealthData()`** to delegate to `validation.runChecks()`. Add `--fix` flag to `handleHealth()`. Keep all ANSI formatting in cli.cjs.
+
+5. **Remove `cmdValidateHealth()` from `verify.cjs`** now that no consumer references it.
+
+6. **Add pre-flight to `autopilot.mjs`** by importing `checkAutopilotReadiness()` via createRequire and calling it after existing prerequisites check.
+
+**Rationale:** Steps 1-2 are additive (no existing code changes). Steps 3-5 are the refactor (swap consumers to new module, then remove old code). Step 6 is the autopilot integration. Each step can be verified independently.
+
+## Check Consolidation Matrix
+
+Mapping existing checks to validation.cjs functions:
+
+| Check | Currently In | Moves To | Function |
+|-------|-------------|----------|----------|
+| .planning/ exists | cli.cjs, verify.cjs, autopilot.mjs | validation.cjs | `checkStructure()` |
+| PROJECT.md exists + sections | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
+| ROADMAP.md exists | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
+| STATE.md exists | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
+| config.json valid JSON | cli.cjs, verify.cjs | validation.cjs | `checkConfig()` |
+| config.json known keys | cli.cjs | validation.cjs | `checkConfig()` |
+| STATE.md phase refs valid | cli.cjs, verify.cjs | validation.cjs | `checkStateConsistency()` |
+| STATE.md current vs ROADMAP completed | cli.cjs | validation.cjs | `checkStateConsistency()` |
+| STATE.md milestone name matches ROADMAP | nowhere (new) | validation.cjs | `checkStateConsistency()` |
+| STATE.md phase count matches disk | nowhere (new) | validation.cjs | `checkStateConsistency()` |
+| Disk phases vs ROADMAP phases | verify.cjs | validation.cjs | `checkPhaseSync()` |
+| Phase directory naming | verify.cjs | validation.cjs | `checkPhaseSync()` |
+| .completed vs ROADMAP checkbox | verify.cjs | validation.cjs | `checkPhaseSync()` |
+| Autopilot phase detection | verify.cjs | validation.cjs | `checkAutopilotReadiness()` |
+| Incomplete phases exist | autopilot.mjs (ad-hoc) | validation.cjs | `checkAutopilotReadiness()` |
+| Deterministic lifecycle step | autopilot.mjs (ad-hoc) | validation.cjs | `checkAutopilotReadiness()` |
+| Missing phase directories (auto-repair) | nowhere (new) | validation.cjs | `autoRepair()` |
+| Stale STATE.md counts (auto-repair) | nowhere (new) | validation.cjs | `autoRepair()` |
 
 ## Sources
 
-- `get-shit-done/workflows/new-milestone.md` -- current workflow (11 steps, 6 AskUserQuestion calls) (HIGH confidence, direct reading)
-- `get-shit-done/workflows/discuss-phase.md` -- reference implementation of --auto pattern (auto_context_check + auto_advance steps) (HIGH confidence, direct reading)
-- `get-shit-done/workflows/plan-phase.md` -- reference implementation of --auto chain (step 14) (HIGH confidence, direct reading)
-- `get-shit-done/workflows/brainstorm.md` -- step 10 milestone route (inline execution to be simplified) (HIGH confidence, direct reading)
-- `get-shit-done/bin/lib/init.cjs` -- cmdInitNewMilestone function (lines 221-251) (HIGH confidence, direct reading)
-- `get-shit-done/bin/lib/config.cjs` -- CONFIG_DEFAULTS, cmdConfigSet, cmdConfigGet (HIGH confidence, direct reading)
-- `get-shit-done/bin/lib/cli.cjs` -- KNOWN_SETTINGS_KEYS, validateSetting (workflow.auto_advance already registered) (HIGH confidence, direct reading)
-- `commands/gsd/new-milestone.md` -- command spec (HIGH confidence, direct reading)
-- `.planning/designs/2026-03-14-new-milestone-auto-mode-design.md` -- approved design document (HIGH confidence, direct reading)
+- Direct analysis of existing codebase (HIGH confidence):
+  - `bin/lib/cli.cjs` -- `gatherHealthData()` lines 409-595, `handleHealth()` lines 597-655
+  - `bin/lib/verify.cjs` -- `cmdValidateHealth()` lines 535-871, `getVerificationStatus()` lines 878-899
+  - `bin/lib/phase.cjs` -- `computePhaseStatus()` lines 895-979, `findFirstIncompletePhase()` lines 1034-1055
+  - `bin/gsd-tools.cjs` -- validate dispatch lines 508-519
+  - `scripts/autopilot.mjs` -- CJS imports lines 27-30, pre-flight lines 60-83
+  - `bin/gsd-cli.cjs` -- routing through cli.cjs
+  - `bin/lib/core.cjs` -- `findPhaseInternal`, `getMilestoneInfo`
+  - `.planning/PROJECT.md` -- v2.6 active requirements
 
 ---
-*Architecture research for: new-milestone --auto mode integration*
-*Researched: 2026-03-14*
+*Architecture research for: GSD Autopilot v2.6 unified validation module*
+*Researched: 2026-03-15*

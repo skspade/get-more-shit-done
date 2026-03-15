@@ -1,143 +1,178 @@
 # Project Research Summary
 
-**Project:** GSD Autopilot v2.5 -- New-Milestone Auto Mode
-**Domain:** Autonomous workflow orchestration (CLI-based coding agent pipeline)
-**Researched:** 2026-03-14
+**Project:** GSD Autopilot v2.6 — Unified Validation Module
+**Domain:** CJS CLI tooling refactor — validation module unification
+**Researched:** 2026-03-15
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone adds `--auto` flag support to the `/gsd:new-milestone` workflow, completing the autonomous pipeline from brainstorm through execution. The work is pure pattern replication -- every behavior needed (flag parsing, config persistence, context resolution, question skipping, auto-chaining) already exists in discuss-phase, plan-phase, execute-phase, or new-project workflows. No new dependencies, libraries, or architectural components are required. The entire implementation consists of modifying three markdown workflow files and adding one field to an existing CJS module.
+This milestone is a focused refactoring project, not a greenfield build. Three separate implementations of health/validation logic exist across `cli.cjs` (`gatherHealthData`), `verify.cjs` (`cmdValidateHealth`), and `autopilot.mjs` (ad-hoc pre-flight checks). They use different approaches — regex-based STATE.md parsing vs. artifact inspection via `computePhaseStatus()` — and produce subtly different results for the same project state. The research unanimously confirms that the right approach is to create a single `validation.cjs` module that all three consumers delegate to, with `computePhaseStatus()` from `phase.cjs` as the authoritative source of phase lifecycle truth.
 
-The recommended approach is a four-phase build that follows the natural dependency chain: first wire up argument parsing and context resolution (the foundation), then add conditional bypasses at each of the 6 AskUserQuestion points (the core feature), then add auto-chaining to discuss-phase (the pipeline connector), and finally simplify brainstorm routing (the cleanup). This order ensures each phase is independently testable and avoids the primary risk of breaking existing interactive behavior.
+The recommended implementation requires zero new dependencies: Node.js built-ins, the existing CJS module ecosystem, and the `node:test` suite. The module exposes composable check functions (`checkStructure`, `checkConfig`, `checkStateConsistency`, `checkPhaseSync`, `checkAutopilotReadiness`) and a top-level `runChecks()` orchestrator. Auto-repair is strictly separated from detection: check functions are pure/read-only, `autoRepair()` is a separate function that takes detected issues as input. This avoids the most dangerous pitfall — silent state mutation during autopilot pre-flight.
 
-The key risks are config state leaking between milestones on failure (auto_advance persists to disk but only gets cleaned up at milestone completion), silent failure when --auto is invoked without context, and the brainstorm routing regression when simplifying step 10. All three are preventable with straightforward error handling and testing. The strongest recommendation from research: do NOT persist `workflow.auto_advance` in new-milestone itself -- pass `--auto` through to discuss-phase and let the existing persistence mechanism handle it. This eliminates the config leak risk entirely.
+The primary risk is regression: changing the output format of `gsd health --json` would silently break any workflow that parses health output. The mitigation is explicit: add new artifact-based checks additively (as new warning codes W006+) rather than replacing existing regex checks, write a snapshot test for the current JSON output shape before touching any logic, and preserve backward-compatible exports in `verify.cjs` for any consumers that import it directly. The build order matters — create `validation.cjs` as pure additive code first, then migrate consumers, then delete dead code.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new technologies. The entire implementation reuses existing infrastructure.
+The entire milestone requires zero new dependencies. `validation.cjs` is a CJS module (`module.exports = { ... }`) that uses synchronous `node:fs`, `node:path`, and imports from five existing internal modules: `core.cjs`, `phase.cjs`, `frontmatter.cjs`, `state.cjs`, and `config.cjs`. The project's existing test infrastructure (`node:test`, `node:assert`, `helpers.cjs`) handles all testing. Coverage via `c8` picks up the new file automatically.
 
-**Core components (all existing, zero changes needed to infrastructure):**
-- `gsd-tools.cjs config-get/config-set` -- reads and persists `workflow.auto_advance` boolean (already registered in KNOWN_SETTINGS_KEYS and booleanKeys)
-- `gsd-tools.cjs init new-milestone` -- resolves models for researcher/synthesizer/roadmapper agents (needs one new `auto_mode` field)
-- `SlashCommand` invocation pattern -- chains workflows across context windows without subagent nesting limits (proven in discuss-phase auto-chain)
+See `.planning/research/STACK.md` for full stack details.
+
+**Core technologies:**
+- Node.js CJS (`require`/`module.exports`): module format — matches all existing `lib/*.cjs` modules; no ESM conversion needed
+- `node:fs` (sync): file I/O — validation runs sequentially at startup; async provides no benefit and adds complexity
+- `node:path`: path resolution — standard across all modules; no alternatives
+- `node:test` + `node:assert`: test runner — already used for all 750 tests; no new framework
+- `c8`: coverage — already in devDependencies; picks up `validation.cjs` automatically
 
 ### Expected Features
 
+The unified module is a consolidation, not a feature expansion. The table stakes are all checks that currently exist across the three implementations, now in one place. The differentiators are the improvements that make the refactor worth doing — specifically, replacing regex phase parsing with `computePhaseStatus()` and adding autopilot readiness as a proper check category.
+
+See `.planning/research/FEATURES.md` for full feature analysis with the MVP priority ordering.
+
 **Must have (table stakes):**
-- `--auto` flag parsing from $ARGUMENTS (identical pattern to discuss-phase)
-- `workflow.auto_advance` config read and conditional persistence
-- Context resolution priority chain: MILESTONE-CONTEXT.md > @file > inline text > error
-- Skip all 6 AskUserQuestion calls with sensible defaults (use context, accept version, always research, select all features, skip gap question, approve roadmap)
-- Error with clear usage message when --auto has no context source
+- Structured check result objects with stable error codes (E001-E005, W001-W005, I001) — existing consumers parse these
+- File/directory existence checks (`checkStructure`) — the foundation; early-exit if `.planning/` missing
+- Config JSON validation (`checkConfig`) — parse, known keys, valid enum values
+- STATE.md phase reference validation (`checkStateConsistency`) — stale references, cross-checks with ROADMAP.md
+- Phase directory naming and disk-vs-roadmap sync (`checkPhaseSync`) — consolidates verify.cjs checks 6-8
+- `gsd health` backward-compatible output — cli.cjs stays as the formatting layer
+- `gsd-tools.cjs validate` dispatch entry — `validate health`, `validate readiness`, `validate consistency`
+- Three-tier severity model (error/warning/info) — aggregate status derived from highest severity
 
 **Should have (differentiators):**
-- Auto-chain to `/gsd:discuss-phase 1 --auto` after milestone creation (completes the brainstorm-to-execution pipeline)
-- Brainstorm.md step 10 simplification (replace ~70 lines of inline milestone creation with single SlashCommand)
-- `auto_mode` field in gsd-tools init JSON output (centralizes flag + config resolution)
+- Phase status via `computePhaseStatus()` instead of regex — the core reason this module exists
+- Autopilot readiness checks — new category: incomplete phase exists, deterministic next step, valid config
+- Auto-repair for trivially fixable issues — create missing config.json, regenerate STATE.md, mkdir missing phase dirs
+- Category-filtered check execution — autopilot calls only `readiness` category, not all 15+ checks
+- Unified check registry — array of `{ id, category, severity, check: fn, repair?: fn }` objects
 
-**Defer (explicitly NOT building):**
-- Partial feature selection (`--auto --only "auth,api"`) -- scope control belongs at the input level
-- Interactive fallback on context failure -- violates principle of least surprise
-- Skip-research option (`--auto --no-research`) -- always research in auto mode
-- Dry-run mode -- review inputs before running instead
-- Auto-approve verification checkpoint -- human judgment stays at verification by design
+**Defer (after v2.6):**
+- Deterministic step detection in `gsd health` output ("Phase 64: ready for execute") — nice-to-have UX
+- Plugin/extensible check system — zero demand signal; hard-coding is correct here
+- Watch mode or dashboard reports — over-engineering
 
 ### Architecture Approach
 
-The architecture is inline conditional modification of the existing `new-milestone.md` workflow, not a separate auto workflow file. Six AskUserQuestion calls get wrapped in `if auto: {default} else: {interactive}` guards. The auto-chain at step 11 uses SlashCommand (not Task) to avoid subagent nesting limits. The init.cjs module gets one new field. Brainstorm.md step 10 shrinks from ~70 lines of inline execution to a 5-line SlashCommand delegation.
+The dependency direction is strict and non-negotiable: `validation.cjs` imports from `phase.cjs`, `core.cjs`, `frontmatter.cjs`, `state.cjs`, and `config.cjs`. The consumers (`cli.cjs`, `autopilot.mjs`, `gsd-tools.cjs`) import from `validation.cjs`. `verify.cjs` keeps its verification-specific functions and does NOT import from `validation.cjs` — and `validation.cjs` may optionally import `getVerificationStatus` from `verify.cjs` for enrichment (one-way only). The circular dependency risk between `validation.cjs` and `verify.cjs` is resolved by removing `cmdValidateHealth` from `verify.cjs` entirely and re-exporting it from `validation.cjs` for backward compatibility.
 
-**Major components (by modification scope):**
-1. `workflows/new-milestone.md` -- add --auto parsing, 6 conditional bypasses, auto-chain (~80 lines of new conditional blocks)
-2. `workflows/brainstorm.md` -- replace step 10 inline execution with SlashCommand (~70 lines removed, ~5 added)
-3. `bin/lib/init.cjs` -- add `auto_mode` field to cmdInitNewMilestone output (~3 lines)
+See `.planning/research/ARCHITECTURE.md` for the full dependency graph, data flow diagrams, and the check consolidation matrix.
+
+**Major components:**
+1. `validation.cjs` (NEW) — all structural/consistency checks, autopilot readiness, auto-repair; pure data returns, no formatting
+2. `cli.cjs handleHealth()` (MODIFIED) — delegates to `validation.runChecks()`, keeps all ANSI formatting, adds `--fix` flag parsing
+3. `autopilot.mjs` (MODIFIED) — adds `checkAutopilotReadiness()` call after existing `.planning/` check via `createRequire`
+4. `gsd-tools.cjs` (MODIFIED) — routes `validate health` and new `validate readiness` to `validation.cjs`
+5. `verify.cjs` (MODIFIED) — removes `cmdValidateHealth`, keeps verification-specific functions, re-exports health for compat
 
 ### Critical Pitfalls
 
-1. **Config state leaking between milestones** -- `workflow.auto_advance` persists to disk but only clears at milestone completion via transition.md. If new-milestone fails mid-workflow, config stays dirty. Prevention: do NOT persist auto_advance in new-milestone; pass `--auto` through to discuss-phase and let it handle its own persistence.
-2. **Silent failure without context** -- `--auto` with no MILESTONE-CONTEXT.md, @file, or inline text must error BEFORE any file mutations (PROJECT.md, STATE.md). Prevention: validate context availability as the very first step in auto-mode path, before any writes.
-3. **Brainstorm routing regression** -- replacing brainstorm step 10 inline execution with SlashCommand is a one-way handoff, not a delegation. Prevention: ensure MILESTONE-CONTEXT.md is written and committed before the handoff; include origin context in error messages.
-4. **Unstoppable cascade** -- `/gsd:new-milestone --auto` chains to discuss-phase, which chains through the full pipeline. Prevention: document this behavior clearly in command help.
-5. **Research model resolution** -- init must return all model fields (researcher, synthesizer, roadmapper) regardless of config state. Prevention: verify init output includes all models before auto-spawning researchers.
+1. **Auto-repair side effects during autopilot pre-flight** — Never auto-repair in autopilot; `validate()` and `repair()` must be separate functions. If state is inconsistent at pre-flight, fail fast and tell the user to run `gsd health --fix`.
+
+2. **Circular dependencies between validation.cjs and verify.cjs** — `validation.cjs` -> `verify.cjs` only, never reverse. Document the dependency direction as a hard constraint in Phase 1. Any `require('./validation.cjs')` in `phase.cjs`, `core.cjs`, or `verify.cjs` is a bug.
+
+3. **Divergent health output format breaking CLI consumers** — Add a snapshot test for `gsd health --json` output shape before changing any logic. The `checks` array, error codes, and field names must match pre-refactoring exactly. `validation.cjs` returns its own internal type; `cli.cjs` maps it to the existing public shape.
+
+4. **Regex vs. artifact inspection parity gap** — New artifact-based checks must be additive (W006+), not replacements. Projects that were "healthy" must stay "healthy" after the upgrade. Add new checks alongside existing ones for the first release.
+
+5. **Test budget exhaustion** — Budget is 750/800 (93.75%). The refactoring should be test-count neutral or negative. `verify-health.test.cjs` tests migrate to `validation.test.cjs`; `cli.test.cjs` health tests reduce to thin integration tests. Run test steward before planning to identify redundancy.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+The build order from ARCHITECTURE.md is clear and dependency-driven. Additive work first, then consumer migrations, then dead code removal, then integration.
 
-### Phase 1: Argument Parsing and Context Resolution
-**Rationale:** Foundation for all auto-mode behavior. Nothing else works without flag detection and context.
-**Delivers:** --auto flag parsing, config read/persist, context resolution chain (MILESTONE-CONTEXT.md > @file > inline > error), init.cjs auto_mode field
-**Addresses:** Flag parsing, config persistence, context resolution, error handling (table stakes)
-**Avoids:** Config state leaking (Pitfall 1), silent failure without context (Pitfall 2), model resolution issues (Pitfall 5)
+### Phase 1: API Design and Module Skeleton
+**Rationale:** All subsequent phases depend on the module interface being locked. The two most critical decisions — validation/repair separation and dependency direction — must be documented before any implementation. This is where Pitfall 1 (auto-repair side effects) and Pitfall 2 (circular dependencies) are prevented.
+**Delivers:** `validation.cjs` skeleton with exported function signatures, JSDoc contracts, dependency graph documented in comments, test file scaffolded with budget accounting.
+**Addresses:** Check registry structure, return type contracts, category metadata on checks.
+**Avoids:** Circular dependency, auto-repair coupling, and starting implementation without a clear interface.
 
-### Phase 2: Auto-Skip at Decision Points
-**Rationale:** Depends on Phase 1 (needs parsed auto flag and resolved context). This is the core value delivery -- skipping interactive questions.
-**Delivers:** Conditional bypasses at all 6 AskUserQuestion calls with correct defaults
-**Addresses:** Version auto-accept, always-research, select-all-features, roadmap auto-approve (table stakes)
-**Avoids:** MILESTONE-CONTEXT.md not consumed (must still delete after use), requirement over-scoping (select-all includes research anti-features)
+### Phase 2: Core Check Functions Implementation
+**Rationale:** Pure additive code — no existing files change. `checkStructure`, `checkConfig`, `checkStateConsistency`, `checkPhaseSync` with all existing checks migrated from cli.cjs and verify.cjs. This is the deduplication step.
+**Delivers:** All existing health checks implemented in `validation.cjs`, tested in `validation.test.cjs`. `runChecks()` orchestrator with early-exit pattern.
+**Uses:** `node:fs` (sync), `node:path`, `frontmatter.cjs`, `core.cjs`, `config.cjs`, `phase.cjs`
+**Implements:** Check composition pattern, unified result type, backward-compatible error codes.
+**Avoids:** Pitfall 3 (output format breakage) via snapshot test written before migration. Pitfall 4 (parity gap) by implementing new checks additively as W006+ codes.
 
-### Phase 3: Auto-Chain to Discuss Phase
-**Rationale:** Depends on Phase 2 (milestone must be fully created before chaining). This is the differentiating capability that connects milestone creation to execution.
-**Delivers:** SlashCommand invocation of `/gsd:discuss-phase {FIRST_PHASE} --auto` at step 11
-**Addresses:** Auto-chain (differentiator), full pipeline from brainstorm to human checkpoint
-**Avoids:** Unstoppable cascade (Pitfall 4) -- must document the chaining behavior
+### Phase 3: Autopilot Readiness and Auto-Repair
+**Rationale:** Depends on Phase 2 check functions existing. `checkAutopilotReadiness` uses `findFirstIncompletePhase` and `computePhaseStatus` — this is the core improvement over regex. `autoRepair` is built separately from checks (separation enforced from Phase 1 API design).
+**Delivers:** `checkAutopilotReadiness()` returning `{ ready, phase, step, errors, warnings }`. `autoRepair()` handling config.json creation, STATE.md regeneration, missing phase mkdir.
+**Uses:** `phase.cjs: computePhaseStatus, findFirstIncompletePhase`, `state.cjs: writeStateMd` (lazy require in autoRepair only)
+**Implements:** Category-filtered execution, repair report in results.
 
-### Phase 4: Brainstorm Integration
-**Rationale:** Depends on Phases 1-3 (new-milestone --auto must work end-to-end before brainstorm delegates to it). Simplification and integration testing.
-**Delivers:** Brainstorm.md step 10 simplification, end-to-end brainstorm-to-milestone testing
-**Addresses:** Brainstorm simplification (differentiator), code duplication removal (~70 lines removed)
-**Avoids:** Brainstorm routing regression (Pitfall 3)
+### Phase 4: Consumer Migration
+**Rationale:** Now that `validation.cjs` is complete and tested in isolation, consumers can be refactored to delegate to it. This is the highest-regression-risk phase — do consumers last, after the module is proven.
+**Delivers:** `cli.cjs gatherHealthData()` delegating to `validation.runChecks()`. `gsd-tools.cjs` routing `validate health` and new `validate readiness` to `validation.cjs`. `cmdValidateHealth` removed from `verify.cjs` (re-exported for compat). Autopilot `checkAutopilotReadiness()` call added after existing prerequisite check.
+**Uses:** `createRequire(import.meta.url)` for autopilot CJS import (established v2.3 pattern).
+**Avoids:** Pitfall 6 (gsd-tools dispatch breakage) via integration tests through child_process. Pitfall 3 (output format) verified by snapshot tests from Phase 2 still passing.
+
+### Phase 5: Dead Code Removal and Test Consolidation
+**Rationale:** Dead code left from Phase 4 must be explicitly removed. `gatherHealthData()` inline logic in cli.cjs, `cmdValidateHealth` body in verify.cjs. Test files consolidated: `verify-health.test.cjs` tests that duplicated `validation.test.cjs` are deleted.
+**Delivers:** Clean codebase with single validation implementation. Test count at or below pre-milestone count. All consumers using `validation.cjs`.
+**Avoids:** Pitfall 5 (test budget exhaustion) via net-zero or net-negative test count.
 
 ### Phase Ordering Rationale
 
-- **Dependency-driven:** Each phase depends on the previous one. Flag parsing before question skipping before chaining before integration.
-- **Risk-front-loaded:** The two critical pitfalls (config leaking, silent failure) are addressed in Phase 1 where they can be caught early.
-- **Incremental value:** Phases 1-2 alone deliver a useful "skip confirmations" mode even without chaining. Phase 3 adds autonomous pipeline. Phase 4 is cleanup.
-- **Safe brainstorm modification last:** Changing brainstorm.md last ensures the existing inline milestone creation works until --auto is proven.
+- API design before implementation prevents the hardest-to-fix architectural mistakes (circular deps, auto-repair coupling)
+- Pure additive work (Phases 1-3) before any existing-file changes (Phase 4) means each phase is independently verifiable and reversible
+- Consumer migrations grouped together in Phase 4 because they share the same regression risk — run the full test suite after each consumer is migrated, not after all four at once
+- Dead code removal last (Phase 5) because it's easy to skip when everything seems to work — but without it, the milestone has not actually eliminated the divergence
 
 ### Research Flags
 
-Phases with standard patterns (skip research-phase):
-- **All phases:** Every behavior is pattern replication from existing --auto implementations. discuss-phase.md is the reference implementation. No novel patterns, no external APIs, no unfamiliar domains.
+Phases likely needing deeper research during planning:
+- **Phase 4 (Consumer Migration):** The `verify.cjs` re-export strategy and exact backward-compatibility shape needs careful line-by-line analysis of what consumers of `verify.cjs` actually call. Worth a focused pre-phase review.
+- **Phase 3 (Autopilot Readiness):** The `computePhaseStatus()` return shape and what fields map to which lifecycle steps needs confirming against the actual phase.cjs implementation before coding.
 
-Phases that need careful testing but not research:
-- **Phase 1:** Config leaking edge cases need integration testing, not more research
-- **Phase 4:** Brainstorm handoff needs end-to-end testing, not more research
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (API Design):** Pattern is well-established from existing lib/*.cjs modules — named exports, plain object results, `(cwd, options)` signatures.
+- **Phase 2 (Core Checks):** Direct migration of existing code; patterns fully documented in STACK.md and ARCHITECTURE.md.
+- **Phase 5 (Cleanup):** Mechanical deletion and test consolidation; no new patterns needed.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | No new dependencies; all existing infrastructure verified by direct codebase reading |
-| Features | HIGH | Every feature is pattern replication from existing workflows; design doc reviewed |
-| Architecture | HIGH | Modification points precisely identified with line numbers; no ambiguity |
-| Pitfalls | HIGH | Grounded in real bug history (CHANGELOG), existing --auto edge cases, and design doc analysis |
+| Stack | HIGH | Based on direct codebase inspection; zero new dependencies; all patterns exist in current lib/*.cjs files |
+| Features | HIGH | Both existing implementations analyzed line-by-line; feature boundaries clear from actual code, not speculation |
+| Architecture | HIGH | Dependency graph derived from actual imports; circular dependency risk identified and resolution documented |
+| Pitfalls | HIGH | All pitfalls derived from direct analysis of the existing divergent implementations and known Node.js CJS behaviors |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Config cleanup on error:** The exact mechanism needs a decision during Phase 1 planning. Recommendation: do not persist auto_advance in new-milestone; let discuss-phase handle it. This eliminates the problem.
-- **First phase number for auto-chain:** The auto-chain must invoke discuss-phase with the correct first phase number of the newly created milestone. Verify this is deterministic (always phase 1 of the new milestone) or needs parsing from ROADMAP.md.
-- **pr-review.md and linear.md milestone routes:** These also create milestones inline and could benefit from the same simplification as brainstorm.md. Out of scope for v2.5 but worth noting for future work.
+- **`verify.cjs` exact export surface for backward compat:** Research documents that `cmdValidateHealth` must be re-exported from `validation.cjs`, but the complete list of `verify.cjs` exports consumed by external callers needs a grep before Phase 4 planning to avoid missing any.
+- **`computePhaseStatus()` return fields:** ARCHITECTURE.md references `has_context`, `has_plan`, `has_summary`, `has_verification` fields — these need verification against the actual phase.cjs implementation (lines 895-979) before coding Phase 3.
+- **Test count delta:** The research identifies that `verify-health.test.cjs` (793 lines) is a candidate for migration, but the actual redundancy between it, `cli.test.cjs` health tests, and the planned `validation.test.cjs` needs a test steward run to quantify. Target is net-zero or net-negative test count.
 
 ## Sources
 
-### Primary (HIGH confidence)
-- `get-shit-done/workflows/new-milestone.md` -- current interactive workflow (11 steps, 6 AskUserQuestion calls)
-- `get-shit-done/workflows/discuss-phase.md` -- reference --auto implementation (flag parsing, config, auto-chain)
-- `get-shit-done/workflows/plan-phase.md` -- reference --auto chain (auto-advance to execute-phase)
-- `get-shit-done/workflows/execute-phase.md` -- reference --auto chain (auto-advance to transition)
-- `get-shit-done/workflows/new-project.md` -- reference --auto context resolution (@file, inline, error)
-- `get-shit-done/workflows/brainstorm.md` -- step 10 milestone routing (simplification target)
-- `get-shit-done/workflows/transition.md` -- auto_advance reset at milestone boundary
-- `get-shit-done/bin/lib/init.cjs` -- cmdInitNewMilestone function
-- `get-shit-done/bin/lib/config.cjs` -- CONFIG_DEFAULTS, config-get, config-set
-- `get-shit-done/bin/lib/cli.cjs` -- KNOWN_SETTINGS_KEYS, validateSetting (workflow.auto_advance registered)
-- `.planning/designs/2026-03-14-new-milestone-auto-mode-design.md` -- approved design document
+### Primary (HIGH confidence — direct codebase inspection)
+
+- `bin/lib/cli.cjs` lines 409-655 — `gatherHealthData()`, `handleHealth()`, regex-based health checks
+- `bin/lib/verify.cjs` lines 535-871 — `cmdValidateHealth()`, `cmdValidateConsistency()`, artifact-based validation
+- `bin/lib/phase.cjs` lines 895-979, 1034-1055 — `computePhaseStatus()`, `findFirstIncompletePhase()`
+- `bin/lib/core.cjs` — `findPhaseInternal`, `getMilestoneInfo`, `safeReadFile`, `output`, `error`
+- `bin/lib/state.cjs` — `writeStateMd`
+- `bin/lib/config.cjs` — `CONFIG_DEFAULTS`
+- `bin/gsd-tools.cjs` lines 508-519 — `validate` dispatch routing
+- `scripts/autopilot.mjs` lines 27-30, 60-83 — CJS imports, pre-flight prerequisite checks
+- `tests/helpers.cjs` — `runGsdTools`, `createTempProject`, `cleanup` patterns
+- `tests/verify-health.test.cjs` — existing health test patterns
+- `package.json` — engine (`>=16.7.0`), devDependencies (`c8 ^11.0.0`), dependencies (`zx` only)
+- `.planning/PROJECT.md` — v2.6 active requirements
+
+### Secondary (MEDIUM confidence — external reference implementations)
+
+- [Replicated Troubleshoot Preflight Framework](https://troubleshoot.sh/docs/preflight/cli-usage/) — pass/warn/fail severity model, category-based check organization
+- [Google Distributed Cloud Preflight Checks](https://cloud.google.com/kubernetes-engine/distributed-cloud/vmware/docs/how-to/preflight-checks) — granular skip flags, iterative validation, early-run best practice
+- [Microservices Health Check API Pattern](https://microservices.io/patterns/observability/health-check-api.html) — structured health endpoint returning component-level status
 
 ---
-*Research completed: 2026-03-14*
+*Research completed: 2026-03-15*
 *Ready for roadmap: yes*
