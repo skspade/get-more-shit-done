@@ -7,6 +7,7 @@ const path = require('path');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { getMilestoneInfo, findPhaseInternal } = require('./core.cjs');
 const { computePhaseStatus, findFirstIncompletePhase, extractPhaseNumbers } = require('./phase.cjs');
+const { CONFIG_DEFAULTS } = require('./config.cjs');
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -449,6 +450,154 @@ const checks = [
       }
     },
   },
+  // READY-01: At least one incomplete phase exists
+  {
+    id: 'READY-01',
+    category: 'readiness',
+    severity: 'info',
+    check: (cwd) => {
+      try {
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Readiness check skipped — ROADMAP.md not found' };
+        }
+        const result = findFirstIncompletePhase(cwd);
+        if (result !== null) {
+          return { passed: true, message: `Incomplete phase found: ${result}`, nextPhase: result };
+        }
+        return { passed: false, message: 'No incomplete phases found' };
+      } catch {
+        return { passed: true, message: 'Readiness check skipped — error' };
+      }
+    },
+  },
+  // READY-02: Next incomplete phase has deterministic step
+  {
+    id: 'READY-02',
+    category: 'readiness',
+    severity: 'error',
+    check: (cwd) => {
+      try {
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Readiness step check skipped — ROADMAP.md not found' };
+        }
+        const incompletePhase = findFirstIncompletePhase(cwd);
+        if (incompletePhase === null) {
+          return { passed: true, message: 'No incomplete phase to validate' };
+        }
+        const phaseInfo = findPhaseInternal(cwd, incompletePhase);
+        if (!phaseInfo) {
+          return { passed: true, message: `Phase ${incompletePhase} directory not found — step is discuss`, phaseStep: 'discuss', nextPhase: incompletePhase };
+        }
+        const status = computePhaseStatus(cwd, phaseInfo);
+        if (!status) {
+          return { passed: false, message: `Phase ${incompletePhase}: computePhaseStatus returned null` };
+        }
+        const validSteps = ['discuss', 'plan', 'execute', 'verify'];
+        if (validSteps.includes(status.step)) {
+          return { passed: true, message: `Phase ${incompletePhase} step: ${status.step}`, phaseStep: status.step, nextPhase: incompletePhase };
+        }
+        return { passed: false, message: `Phase ${incompletePhase} has non-deterministic step: ${status.step}` };
+      } catch {
+        return { passed: true, message: 'Readiness step check skipped — error' };
+      }
+    },
+  },
+  // READY-03: No truncated/empty artifacts in next phase
+  {
+    id: 'READY-03',
+    category: 'readiness',
+    severity: 'error',
+    check: (cwd) => {
+      try {
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Artifact check skipped — ROADMAP.md not found' };
+        }
+        const incompletePhase = findFirstIncompletePhase(cwd);
+        if (incompletePhase === null) {
+          return { passed: true, message: 'No incomplete phase to check artifacts' };
+        }
+        const phaseInfo = findPhaseInternal(cwd, incompletePhase);
+        if (!phaseInfo) {
+          return { passed: true, message: 'Phase directory not found — no artifacts to check' };
+        }
+        const phaseDir = path.join(cwd, phaseInfo.directory);
+        let files;
+        try {
+          files = fs.readdirSync(phaseDir);
+        } catch {
+          return { passed: true, message: 'Cannot read phase directory — skipped' };
+        }
+        const issues = [];
+        for (const f of files) {
+          if (f.endsWith('-CONTEXT.md') || f === 'CONTEXT.md') {
+            const stat = fs.statSync(path.join(phaseDir, f));
+            if (stat.size <= 50) {
+              issues.push(`Truncated CONTEXT.md: ${f} (${stat.size} bytes)`);
+            }
+          }
+          if (f.endsWith('-PLAN.md') || f === 'PLAN.md') {
+            const content = fs.readFileSync(path.join(phaseDir, f), 'utf-8');
+            const hasTaskTag = /<task[\s>]/i.test(content);
+            const hasTaskHeading = /##\s*Task\s*\d+/i.test(content);
+            if (!hasTaskTag && !hasTaskHeading) {
+              issues.push(`Truncated PLAN.md: ${f} (no task definitions)`);
+            }
+          }
+        }
+        if (issues.length === 0) {
+          return { passed: true, message: 'No truncated artifacts in next phase' };
+        }
+        return { passed: false, message: issues.join('; ') };
+      } catch {
+        return { passed: true, message: 'Artifact check skipped — error' };
+      }
+    },
+  },
+  // READY-04: Config autopilot settings valid
+  {
+    id: 'READY-04',
+    category: 'readiness',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const configPath = path.join(cwd, '.planning', 'config.json');
+        if (!fs.existsSync(configPath)) {
+          return { passed: true, message: 'Autopilot config check skipped — config.json not found' };
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        } catch {
+          return { passed: true, message: 'Autopilot config check skipped — parse error handled by STRUCT-02' };
+        }
+        if (!parsed.autopilot || typeof parsed.autopilot !== 'object') {
+          return { passed: true, message: 'No autopilot section in config — using defaults' };
+        }
+        const knownSubkeys = Object.keys(CONFIG_DEFAULTS)
+          .filter(k => k.startsWith('autopilot.'))
+          .map(k => k.slice('autopilot.'.length));
+        const issues = [];
+        const numericKeys = ['circuit_breaker_threshold', 'max_debug_retries', 'max_audit_fix_iterations', 'stall_timeout_ms'];
+        for (const key of Object.keys(parsed.autopilot)) {
+          if (!knownSubkeys.includes(key)) {
+            issues.push(`unknown autopilot key: ${key}`);
+          }
+          if (numericKeys.includes(key) && typeof parsed.autopilot[key] === 'number' && parsed.autopilot[key] <= 0) {
+            issues.push(`${key} must be positive (got ${parsed.autopilot[key]})`);
+          }
+        }
+        if (issues.length === 0) {
+          return { passed: true, message: 'Autopilot config settings valid' };
+        }
+        return { passed: false, message: `Autopilot config: ${issues.join('; ')}` };
+      } catch {
+        return { passed: true, message: 'Autopilot config check skipped — error' };
+      }
+    },
+  },
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -473,6 +622,9 @@ function runChecks(cwd, options = {}) {
   const results = [];
   for (const entry of toRun) {
     const result = entry.check(cwd);
+    const extra = {};
+    if (result.nextPhase !== undefined) extra.nextPhase = result.nextPhase;
+    if (result.phaseStep !== undefined) extra.phaseStep = result.phaseStep;
     results.push({
       id: entry.id,
       category: entry.category,
@@ -481,6 +633,7 @@ function runChecks(cwd, options = {}) {
       message: result.message,
       repairable: typeof entry.repair === 'function',
       repairAction: null,
+      ...extra,
     });
   }
   return results;
@@ -496,14 +649,21 @@ function validateProjectHealth(cwd, options = {}) {
   const warnings = results.filter(r => !r.passed && r.severity === 'warning');
   const healthy = errors.length === 0;
 
+  let nextPhase = null;
+  let phaseStep = null;
+  for (const r of results) {
+    if (r.nextPhase !== undefined && nextPhase === null) nextPhase = r.nextPhase;
+    if (r.phaseStep !== undefined && phaseStep === null) phaseStep = r.phaseStep;
+  }
+
   return {
     healthy,
     checks: results,
     errors,
     warnings,
     repairs: [],
-    nextPhase: null,
-    phaseStep: null,
+    nextPhase,
+    phaseStep,
   };
 }
 
