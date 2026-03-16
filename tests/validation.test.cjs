@@ -509,3 +509,238 @@ describe('three-tier severity model', () => {
     }
   });
 });
+
+// ─── STATE-01: Milestone Name Match ─────────────────────────────────────────
+
+describe('STATE-01: milestone name match', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when milestone names match', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test Milestone\nstatus: active\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test Milestone\n\n## Phases\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-01');
+    assert.ok(check, 'STATE-01 should exist');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with error when milestone names differ', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Wrong Name\nstatus: active\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test Milestone\n\n## Phases\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'error');
+  });
+
+  test('passes (skipped) when STATE.md missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\n---\n# State');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── STATE-02: Completed Phases Count ───────────────────────────────────────
+
+describe('STATE-02: completed phases count', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when completed count matches', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: active\nprogress:\n  completed_phases: 2\n  total_phases: 3\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [x] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-02');
+    assert.ok(check, 'STATE-02 should exist');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with warning when counts differ', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: active\nprogress:\n  completed_phases: 3\n  total_phases: 3\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [x] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+  });
+
+  test('passes (skipped) when STATE.md missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── STATE-03: Total Phases Count ───────────────────────────────────────────
+
+describe('STATE-03: total phases count', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when total count matches', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: active\nprogress:\n  completed_phases: 1\n  total_phases: 3\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [ ] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-03');
+    assert.ok(check, 'STATE-03 should exist');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with warning when counts differ', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: active\nprogress:\n  completed_phases: 1\n  total_phases: 5\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [ ] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nprogress:\n  total_phases: 3\n---\n# State');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── STATE-04: Status Consistency ───────────────────────────────────────────
+
+describe('STATE-04: status consistency', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when status completed and all phases checked', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: completed\nprogress:\n  completed_phases: 2\n  total_phases: 2\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [x] **Phase 2: Build**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-04');
+    assert.ok(check, 'STATE-04 should exist');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with warning when status completed but unchecked phases exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: completed\nprogress:\n  completed_phases: 2\n  total_phases: 3\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [x] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+  });
+
+  test('passes when status active and unchecked phases exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
+      '---\nmilestone_name: Test\nstatus: active\nprogress:\n  completed_phases: 1\n  total_phases: 3\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '## Milestone v1.0: Test\n\n## Phases\n\n- [x] **Phase 1: Setup**\n- [ ] **Phase 2: Build**\n- [ ] **Phase 3: Test**');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when STATE.md missing', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    const check = results.find(c => c.id === 'STATE-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── State Category Filtering ───────────────────────────────────────────────
+
+describe('state category filtering', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('runChecks with state category returns only state checks', () => {
+    const results = runChecks(tmpDir, { categories: ['state'] });
+    assert.ok(results.length > 0, 'should have state checks');
+    for (const r of results) {
+      assert.strictEqual(r.category, 'state');
+    }
+  });
+
+  test('validateProjectHealth runs both structure and state checks', () => {
+    const result = validateProjectHealth(tmpDir);
+    const categories = [...new Set(result.checks.map(c => c.category))];
+    assert.ok(categories.includes('structure'));
+    assert.ok(categories.includes('state'));
+  });
+});
