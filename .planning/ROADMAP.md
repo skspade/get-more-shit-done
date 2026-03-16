@@ -15,7 +15,7 @@
 - ✅ **v2.3 Autopilot CJS Consolidation** — Phases 47-53 (shipped 2026-03-10)
 - ✅ **v2.4 Autopilot Streaming** — Phases 54-58 (shipped 2026-03-13)
 - ✅ **v2.5 New-Milestone Auto Mode** — Phases 59-63 (shipped 2026-03-14)
-- ✅ **v2.6 Unified Validation Module** — Phases 64-68 (shipped 2026-03-16)
+- 🚧 **v2.6 Unified Validation Module** — Phases 64-70 (in progress)
 
 ## Phases
 
@@ -169,6 +169,8 @@
 - [x] **Phase 66: Phase Navigation and Autopilot Readiness** - Artifact-based phase status via computePhaseStatus(), autopilot readiness checks with deterministic step detection (completed 2026-03-16)
 - [x] **Phase 67: Auto-Repair and Consumer Migration** - Separated repair logic, CLI delegation, autopilot pre-flight, gsd-tools dispatch, dead code removal, backward compatibility (completed 2026-03-16)
 - [x] **Phase 68: Testing and Consolidation** - Test suite for all check categories, auto-repair tests, integration tests, net-zero test count migration (completed 2026-03-16)
+- [ ] **Phase 69: Close Verification and Metadata Gaps** - Create VERIFICATION.md for Phases 67-68, fix Phase 67 summary frontmatter (Gap Closure)
+- [ ] **Phase 70: Test Consolidation and Legacy Code Fix** - Parameterize redundant tests to meet budget, fix INT-06 legacy code mapping (Gap Closure)
 
 ## Phase Details
 
@@ -230,6 +232,30 @@
   4. Total test count is at or below the pre-milestone count (750) — existing health tests migrated, not duplicated
 **Plans**: TBD
 
+### Phase 69: Close Verification and Metadata Gaps
+**Goal**: All Phase 67 and Phase 68 requirements have formal verification artifacts
+**Depends on**: Phase 68
+**Requirements**: REPAIR-01, REPAIR-02, REPAIR-03, REPAIR-04, INT-01, INT-02, INT-03, INT-04, INT-05, INT-06, TEST-01, TEST-02, TEST-03, TEST-04
+**Gap Closure**: Closes gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. 67-VERIFICATION.md exists and confirms REPAIR-01–04 and INT-01–06 are satisfied
+  2. Phase 67 summary files have `requirements-completed` in frontmatter
+  3. 68-VERIFICATION.md exists and confirms TEST-01–04 are satisfied
+**Plans**: TBD
+
+### Phase 70: Test Consolidation and Legacy Code Fix
+**Goal**: Test count is within 800 budget and INT-06 legacy code mapping is complete
+**Depends on**: Phase 69
+**Requirements**: TEST-04, INT-06
+**Gap Closure**: Closes gaps from audit
+**Success Criteria** (what must be TRUE):
+  1. validation.test.cjs skip-guard tests parameterized (est. -16 tests)
+  2. cmdInitLinear/cmdInitPrReview shared tests parameterized (est. -5 tests)
+  3. frontmatter-cli.test.cjs missing-file tests parameterized (est. -3 tests)
+  4. STRUCT-01f has entry in CHECK_ID_TO_LEGACY mapping
+  5. Total test count ≤ 800
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -255,3 +281,5 @@ Phases execute in numeric order: 64 → 65 → 66 → 67 → 68
 | 66. Navigation and Readiness | v2.6 | Complete    | 2026-03-16 | - |
 | 67. Auto-Repair and Migration | 2/3 | Complete    | 2026-03-16 | - |
 | 68. Testing and Consolidation | v2.6 | 2/2 | Complete | 2026-03-16 |
+| 69. Close Verification Gaps | v2.6 | 0/0 | Not Started | - |
+| 70. Test Consolidation | v2.6 | 0/0 | Not Started | - |

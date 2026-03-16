@@ -111,20 +111,20 @@ Requirements for Unified Validation Module milestone. Each maps to roadmap phase
 | READY-02 | Phase 66 | Pending |
 | READY-03 | Phase 66 | Pending |
 | READY-04 | Phase 66 | Pending |
-| REPAIR-01 | Phase 67 | Pending |
-| REPAIR-02 | Phase 67 | Pending |
-| REPAIR-03 | Phase 67 | Pending |
-| REPAIR-04 | Phase 67 | Pending |
-| INT-01 | Phase 67 | Pending |
-| INT-02 | Phase 67 | Pending |
-| INT-03 | Phase 67 | Pending |
-| INT-04 | Phase 67 | Pending |
-| INT-05 | Phase 67 | Pending |
-| INT-06 | Phase 67 | Pending |
-| TEST-01 | Phase 68 | Pending |
-| TEST-02 | Phase 68 | Pending |
-| TEST-03 | Phase 68 | Pending |
-| TEST-04 | Phase 68 | Pending |
+| REPAIR-01 | Phase 69 | Pending |
+| REPAIR-02 | Phase 69 | Pending |
+| REPAIR-03 | Phase 69 | Pending |
+| REPAIR-04 | Phase 69 | Pending |
+| INT-01 | Phase 69 | Pending |
+| INT-02 | Phase 69 | Pending |
+| INT-03 | Phase 69 | Pending |
+| INT-04 | Phase 69 | Pending |
+| INT-05 | Phase 69 | Pending |
+| INT-06 | Phase 69, 70 | Pending |
+| TEST-01 | Phase 69 | Pending |
+| TEST-02 | Phase 69 | Pending |
+| TEST-03 | Phase 69 | Pending |
+| TEST-04 | Phase 69, 70 | Pending |
 
 **Coverage:**
 - v2.6 requirements: 35 total
