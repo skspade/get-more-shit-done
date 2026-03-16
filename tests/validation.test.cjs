@@ -967,3 +967,334 @@ describe('navigation category filtering', () => {
     }
   });
 });
+
+// ─── READY-01: Incomplete Phases Exist ──────────────────────────────────────
+
+describe('READY-01: incomplete phases exist', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when incomplete phases exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-01');
+    assert.ok(check, 'READY-01 should exist');
+    assert.strictEqual(check.category, 'readiness');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with info when no incomplete phases exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [x] **Phase 1: Setup** (completed 2026-03-15)');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '.completed'), '{}');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context with enough content');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'), '---\nplan: 01\n---\n<task type="auto">\ntest\n</task>');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-SUMMARY.md'), '# Summary');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'info');
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── READY-02: Deterministic Step for Next Phase ────────────────────────────
+
+describe('READY-02: deterministic step for next phase', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when next phase has deterministic step (discuss)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-02');
+    assert.ok(check, 'READY-02 should exist');
+    assert.strictEqual(check.category, 'readiness');
+    assert.strictEqual(check.severity, 'error');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes when next phase has plan step', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context\n\nSome meaningful content here.');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes when no incomplete phase exists', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [x] **Phase 1: Setup** (completed 2026-03-15)');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '.completed'), '{}');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context with enough content');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'), '---\nplan: 01\n---\n<task type="auto">\ntest\n</task>');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-SUMMARY.md'), '# Summary');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── READY-03: No Truncated Artifacts ───────────────────────────────────────
+
+describe('READY-03: no truncated artifacts', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when CONTEXT.md has sufficient content (> 50 bytes)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'),
+      '# Context\n\nThis is meaningful content that exceeds fifty bytes easily.');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check, 'READY-03 should exist');
+    assert.strictEqual(check.category, 'readiness');
+    assert.strictEqual(check.severity, 'error');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails when CONTEXT.md is truncated (<= 50 bytes)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# C');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'error');
+    assert.ok(check.message.toLowerCase().includes('truncat'));
+  });
+
+  test('passes when PLAN.md has valid task tags', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'),
+      '---\nplan: 01\n---\n<task type="auto">\nDo something\n</task>');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails when PLAN.md has no task tags or headings', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'),
+      '---\nphase: test\n---\nSome content without tasks');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'error');
+    assert.ok(check.message.toLowerCase().includes('truncat'));
+  });
+
+  test('passes when no artifacts exist in next phase', () => {
+    // Empty phase dir — no artifacts to check
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes when no incomplete phase exists', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [x] **Phase 1: Setup** (completed)');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '.completed'), '{}');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context with enough content');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'), '---\nplan: 01\n---\n<task type="auto">\ntest\n</task>');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-SUMMARY.md'), '# Summary');
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── READY-04: Config Autopilot Settings ────────────────────────────────────
+
+describe('READY-04: config autopilot settings', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when config has valid autopilot settings', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ autopilot: { circuit_breaker_threshold: 3 } }));
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-04');
+    assert.ok(check, 'READY-04 should exist');
+    assert.strictEqual(check.category, 'readiness');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes when config has no autopilot section', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({}));
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails with warning when autopilot has unknown keys', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ autopilot: { unknown_key: true } }));
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+    assert.ok(check.message.includes('unknown'));
+  });
+
+  test('fails with warning when numeric setting is non-positive', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ autopilot: { stall_timeout_ms: -1 } }));
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+  });
+
+  test('passes (skipped) when config.json missing', () => {
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const check = results.find(c => c.id === 'READY-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── nextPhase and phaseStep Population ──────────────────────────────────────
+
+describe('nextPhase and phaseStep population', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('validateProjectHealth populates nextPhase and phaseStep when incomplete phases exist', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), '# Project');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '---\nmilestone_name: Test\nstatus: active\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}');
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+    const result = validateProjectHealth(tmpDir);
+    assert.strictEqual(result.nextPhase, '1');
+    assert.strictEqual(result.phaseStep, 'discuss');
+  });
+
+  test('nextPhase and phaseStep are null when all phases complete', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [x] **Phase 1: Setup** (completed 2026-03-15)');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '.completed'), '{}');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context with enough content');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-PLAN.md'), '---\nplan: 01\n---\n<task type="auto">\ntest\n</task>');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'), '# Project');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '---\nmilestone_name: Test\nstatus: completed\n---\n# State');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{}');
+    const result = validateProjectHealth(tmpDir);
+    assert.strictEqual(result.nextPhase, null);
+    assert.strictEqual(result.phaseStep, null);
+  });
+});
+
+// ─── Readiness Category Filtering ───────────────────────────────────────────
+
+describe('readiness category filtering', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('runChecks with readiness category returns only readiness checks', () => {
+    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    assert.ok(results.length > 0, 'should have readiness checks');
+    for (const r of results) {
+      assert.strictEqual(r.category, 'readiness');
+    }
+  });
+});
+
+// ─── All Categories Present ─────────────────────────────────────────────────
+
+describe('all categories present', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('validateProjectHealth runs all four categories', () => {
+    const result = validateProjectHealth(tmpDir);
+    const categories = [...new Set(result.checks.map(c => c.category))];
+    assert.ok(categories.includes('structure'));
+    assert.ok(categories.includes('state'));
+    assert.ok(categories.includes('navigation'));
+    assert.ok(categories.includes('readiness'));
+  });
+});
