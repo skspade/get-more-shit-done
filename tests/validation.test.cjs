@@ -438,7 +438,7 @@ describe('category filtering', () => {
   });
 
   test('runChecks with non-matching category returns empty', () => {
-    const results = runChecks(tmpDir, { categories: ['readiness'] });
+    const results = runChecks(tmpDir, { categories: ['nonexistent'] });
     assert.ok(Array.isArray(results));
     assert.strictEqual(results.length, 0);
   });
@@ -450,7 +450,7 @@ describe('category filtering', () => {
   });
 
   test('validateProjectHealth with categories filters checks', () => {
-    const result = validateProjectHealth(tmpDir, { categories: ['readiness'] });
+    const result = validateProjectHealth(tmpDir, { categories: ['nonexistent'] });
     assert.strictEqual(result.checks.length, 0);
     assert.strictEqual(result.healthy, true);
   });
@@ -737,10 +737,234 @@ describe('state category filtering', () => {
     }
   });
 
-  test('validateProjectHealth runs both structure and state checks', () => {
+  test('validateProjectHealth runs structure, state, navigation, and readiness checks', () => {
     const result = validateProjectHealth(tmpDir);
     const categories = [...new Set(result.checks.map(c => c.category))];
     assert.ok(categories.includes('structure'));
     assert.ok(categories.includes('state'));
+    assert.ok(categories.includes('navigation'));
+    assert.ok(categories.includes('readiness'));
+  });
+});
+
+// ─── NAV-01: computePhaseStatus Validation ──────────────────────────────────
+
+describe('NAV-01: computePhaseStatus validation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when phase directory has artifacts and computePhaseStatus returns valid data', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '01-CONTEXT.md'), '# Context\n\nSome content here that is meaningful.');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-01');
+    assert.ok(check, 'NAV-01 should exist');
+    assert.strictEqual(check.category, 'navigation');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when phases/ directory missing', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-01');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── NAV-02: findFirstIncompletePhase Validation ────────────────────────────
+
+describe('NAV-02: findFirstIncompletePhase validation', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when incomplete phase exists and milestone is active', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-02');
+    assert.ok(check, 'NAV-02 should exist');
+    assert.strictEqual(check.category, 'navigation');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes when milestone is complete (all phases checked)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [x] **Phase 1: Setup** (completed 2026-03-15)');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'phases', '01-setup', '.completed'), '{}');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-02');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── NAV-03: Deterministic Lifecycle Step ────────────────────────────────────
+
+describe('NAV-03: deterministic lifecycle step', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when all incomplete phases have deterministic step', () => {
+    // Empty dir = discuss step (deterministic)
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-03');
+    assert.ok(check, 'NAV-03 should exist');
+    assert.strictEqual(check.category, 'navigation');
+    assert.strictEqual(check.severity, 'error');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when phases/ missing', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-03');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── NAV-04: Disk vs ROADMAP Phase Sync ──────────────────────────────────────
+
+describe('NAV-04: disk vs ROADMAP phase sync', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('passes when disk directories match ROADMAP phases', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-build'));
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n### Phase 2: Build\n\n- [ ] **Phase 1: Setup**\n- [ ] **Phase 2: Build**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check, 'NAV-04 should exist');
+    assert.strictEqual(check.category, 'navigation');
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('fails when orphan directory exists on disk but not in ROADMAP', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '03-orphan'));
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+    assert.ok(check.message.includes('orphan') || check.message.includes('Orphan'));
+  });
+
+  test('fails when ROADMAP phase has no disk directory', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-setup'));
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '### Phase 1: Setup\n### Phase 2: Build\n\n- [ ] **Phase 1: Setup**\n- [ ] **Phase 2: Build**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, false);
+    assert.strictEqual(check.severity, 'warning');
+    assert.ok(check.message.includes('missing') || check.message.includes('Missing'));
+  });
+
+  test('ignores phases inside <details> blocks (shipped milestones)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '02-current'));
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '<details>\n<summary>v1.0</summary>\n\n- [x] **Phase 1: Old**\n\n</details>\n\n### Phase 2: Current\n\n- [ ] **Phase 2: Current**');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check);
+    // Phase 1 is in <details> so should be ignored; only Phase 2 is active and has a directory
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when phases/ missing', () => {
+    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+
+  test('passes (skipped) when ROADMAP.md missing', () => {
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    const check = results.find(c => c.id === 'NAV-04');
+    assert.ok(check);
+    assert.strictEqual(check.passed, true);
+  });
+});
+
+// ─── Navigation Category Filtering ──────────────────────────────────────────
+
+describe('navigation category filtering', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('runChecks with navigation category returns only navigation checks', () => {
+    const results = runChecks(tmpDir, { categories: ['navigation'] });
+    assert.ok(results.length > 0, 'should have navigation checks');
+    for (const r of results) {
+      assert.strictEqual(r.category, 'navigation');
+    }
   });
 });
