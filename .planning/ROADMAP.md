@@ -167,7 +167,7 @@
 - [x] **Phase 64: Module Foundation and Check Registry** - validation.cjs skeleton with API contracts, check registry pattern, result type, severity model, and category filtering (completed 2026-03-15)
 - [x] **Phase 65: Structure and State Checks** - Core check implementations for file existence, config validation, phase directory naming, orphaned plans, and STATE/ROADMAP consistency (completed 2026-03-16)
 - [x] **Phase 66: Phase Navigation and Autopilot Readiness** - Artifact-based phase status via computePhaseStatus(), autopilot readiness checks with deterministic step detection (completed 2026-03-16)
-- [ ] **Phase 67: Auto-Repair and Consumer Migration** - Separated repair logic, CLI delegation, autopilot pre-flight, gsd-tools dispatch, dead code removal, backward compatibility
+- [x] **Phase 67: Auto-Repair and Consumer Migration** - Separated repair logic, CLI delegation, autopilot pre-flight, gsd-tools dispatch, dead code removal, backward compatibility (completed 2026-03-16)
 - [ ] **Phase 68: Testing and Consolidation** - Test suite for all check categories, auto-repair tests, integration tests, net-zero test count migration
 
 ## Phase Details
@@ -253,5 +253,5 @@ Phases execute in numeric order: 64 → 65 → 66 → 67 → 68
 | 64. Module Foundation | 1/1 | Complete    | 2026-03-15 | - |
 | 65. Structure and State Checks | v2.6 | Complete    | 2026-03-16 | - |
 | 66. Navigation and Readiness | v2.6 | Complete    | 2026-03-16 | - |
-| 67. Auto-Repair and Migration | v2.6 | 0/0 | Not started | - |
+| 67. Auto-Repair and Migration | 2/3 | Complete    | 2026-03-16 | - |
 | 68. Testing and Consolidation | v2.6 | 0/0 | Not started | - |
