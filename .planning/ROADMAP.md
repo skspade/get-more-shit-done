@@ -170,7 +170,7 @@
 - [x] **Phase 67: Auto-Repair and Consumer Migration** - Separated repair logic, CLI delegation, autopilot pre-flight, gsd-tools dispatch, dead code removal, backward compatibility (completed 2026-03-16)
 - [x] **Phase 68: Testing and Consolidation** - Test suite for all check categories, auto-repair tests, integration tests, net-zero test count migration (completed 2026-03-16)
 - [x] **Phase 69: Close Verification and Metadata Gaps** - Create VERIFICATION.md for Phases 67-68, fix Phase 67 summary frontmatter (Gap Closure) (completed 2026-03-16)
-- [ ] **Phase 70: Test Consolidation and Legacy Code Fix** - Parameterize redundant tests to meet budget, fix INT-06 legacy code mapping (Gap Closure)
+- [x] **Phase 70: Test Consolidation and Legacy Code Fix** - Parameterize redundant tests to meet budget, fix INT-06 legacy code mapping (Gap Closure) (completed 2026-03-16)
 
 ## Phase Details
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 64 → 65 → 66 → 67 → 68
 | 67. Auto-Repair and Migration | 2/3 | Complete    | 2026-03-16 | - |
 | 68. Testing and Consolidation | v2.6 | 2/2 | Complete | 2026-03-16 |
 | 69. Close Verification Gaps | 1/1 | Complete   | 2026-03-16 | - |
-| 70. Test Consolidation | v2.6 | 0/0 | Not Started | - |
+| 70. Test Consolidation | 1/1 | Complete   | 2026-03-16 | - |
