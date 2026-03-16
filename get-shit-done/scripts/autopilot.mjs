@@ -28,6 +28,7 @@ const { findFirstIncompletePhase, nextIncompletePhase, computePhaseStatus } = re
 const { CONFIG_DEFAULTS } = require('../bin/lib/config.cjs');
 const { findPhaseInternal } = require('../bin/lib/core.cjs');
 const { getVerificationStatus, getGapsSummary } = require('../bin/lib/verify.cjs');
+const { validateProjectHealth } = require('../bin/lib/validation.cjs');
 
 // ─── Argument Parsing ─────────────────────────────────────────────────────────
 
@@ -71,9 +72,25 @@ try {
   process.exit(1);
 }
 
-if (!fs.existsSync(path.join(PROJECT_DIR, '.planning'))) {
-  console.error(`Error: .planning/ directory not found in ${PROJECT_DIR}`);
-  console.error('Run /gsd:new-project first to initialize.');
+// Pre-flight project health validation with auto-repair
+const healthResult = validateProjectHealth(PROJECT_DIR, { autoRepair: true });
+
+if (healthResult.repairs.length > 0) {
+  console.log('Auto-repairs performed:');
+  for (const repair of healthResult.repairs) {
+    const icon = repair.success ? '\u2713' : '\u2717';
+    console.log(`  ${icon} ${repair.checkId}: ${repair.action} \u2014 ${repair.detail}`);
+  }
+  console.log('');
+}
+
+if (!healthResult.healthy) {
+  console.error('Error: Project health validation failed.');
+  for (const err of healthResult.errors) {
+    console.error(`  ${err.id}: ${err.message}`);
+  }
+  console.error('');
+  console.error('Fix issues and retry, or run: gsd health --fix');
   process.exit(1);
 }
 

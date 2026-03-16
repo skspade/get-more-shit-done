@@ -45,6 +45,14 @@ describe('autopilot.mjs --dry-run', () => {
       path.join(tmpDir, '.planning', 'STATE.md'),
       '# Project State\n\n## Current Position\n\nPhase: 1\n'
     );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'PROJECT.md'),
+      '# Project\n\n## What This Is\nTest\n\n## Core Value\nTest\n\n## Requirements\nTest\n'
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'balanced' })
+    );
   });
 
   afterEach(() => {
