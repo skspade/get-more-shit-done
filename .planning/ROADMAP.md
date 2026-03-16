@@ -241,7 +241,8 @@
   1. 67-VERIFICATION.md exists and confirms REPAIR-01–04 and INT-01–06 are satisfied
   2. Phase 67 summary files have `requirements-completed` in frontmatter
   3. 68-VERIFICATION.md exists and confirms TEST-01–04 are satisfied
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 69-01-PLAN.md — Create verification artifacts and add Phase 67 summary frontmatter
 
 ### Phase 70: Test Consolidation and Legacy Code Fix
 **Goal**: Test count is within 800 budget and INT-06 legacy code mapping is complete
