@@ -4,6 +4,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { extractFrontmatter } = require('./frontmatter.cjs');
+const { getMilestoneInfo } = require('./core.cjs');
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -196,7 +198,132 @@ const checks = [
       }
     },
   },
+  // STATE-01: Milestone name match
+  {
+    id: 'STATE-01',
+    category: 'state',
+    severity: 'error',
+    check: (cwd) => {
+      try {
+        const statePath = path.join(cwd, '.planning', 'STATE.md');
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(statePath) || !fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Milestone name check skipped — STATE.md or ROADMAP.md not found' };
+        }
+        const stateContent = fs.readFileSync(statePath, 'utf-8');
+        const fm = extractFrontmatter(stateContent);
+        const stateMilestone = fm.milestone_name;
+        if (!stateMilestone) {
+          return { passed: true, message: 'Milestone name check skipped — no milestone_name in STATE.md' };
+        }
+        const milestoneInfo = getMilestoneInfo(cwd);
+        const roadmapName = milestoneInfo.name;
+        if (stateMilestone === roadmapName || stateMilestone.includes(roadmapName) || roadmapName.includes(stateMilestone)) {
+          return { passed: true, message: `Milestone name matches: "${stateMilestone}"` };
+        }
+        return { passed: false, message: `STATE.md milestone "${stateMilestone}" does not match ROADMAP.md milestone "${roadmapName}"` };
+      } catch {
+        return { passed: true, message: 'Milestone name check skipped — error reading files' };
+      }
+    },
+  },
+  // STATE-02: Completed phases count
+  {
+    id: 'STATE-02',
+    category: 'state',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const statePath = path.join(cwd, '.planning', 'STATE.md');
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(statePath) || !fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Completed phases check skipped — STATE.md or ROADMAP.md not found' };
+        }
+        const stateContent = fs.readFileSync(statePath, 'utf-8');
+        const fm = extractFrontmatter(stateContent);
+        const stateCompleted = Number(fm.progress?.completed_phases);
+        if (isNaN(stateCompleted)) {
+          return { passed: true, message: 'Completed phases check skipped — no completed_phases in STATE.md' };
+        }
+        const counts = countRoadmapPhases(cwd);
+        if (stateCompleted === counts.checked) {
+          return { passed: true, message: `Completed phases count matches: ${stateCompleted}` };
+        }
+        return { passed: false, message: `STATE.md completed_phases (${stateCompleted}) does not match ROADMAP.md checked count (${counts.checked})` };
+      } catch {
+        return { passed: true, message: 'Completed phases check skipped — error reading files' };
+      }
+    },
+  },
+  // STATE-03: Total phases count
+  {
+    id: 'STATE-03',
+    category: 'state',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const statePath = path.join(cwd, '.planning', 'STATE.md');
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(statePath) || !fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Total phases check skipped — STATE.md or ROADMAP.md not found' };
+        }
+        const stateContent = fs.readFileSync(statePath, 'utf-8');
+        const fm = extractFrontmatter(stateContent);
+        const stateTotal = Number(fm.progress?.total_phases);
+        if (isNaN(stateTotal)) {
+          return { passed: true, message: 'Total phases check skipped — no total_phases in STATE.md' };
+        }
+        const counts = countRoadmapPhases(cwd);
+        if (stateTotal === counts.total) {
+          return { passed: true, message: `Total phases count matches: ${stateTotal}` };
+        }
+        return { passed: false, message: `STATE.md total_phases (${stateTotal}) does not match ROADMAP.md phase count (${counts.total})` };
+      } catch {
+        return { passed: true, message: 'Total phases check skipped — error reading files' };
+      }
+    },
+  },
+  // STATE-04: Status consistency
+  {
+    id: 'STATE-04',
+    category: 'state',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const statePath = path.join(cwd, '.planning', 'STATE.md');
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(statePath) || !fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Status consistency check skipped — STATE.md or ROADMAP.md not found' };
+        }
+        const stateContent = fs.readFileSync(statePath, 'utf-8');
+        const fm = extractFrontmatter(stateContent);
+        const status = fm.status;
+        if (!status) {
+          return { passed: true, message: 'Status consistency check skipped — no status in STATE.md' };
+        }
+        const counts = countRoadmapPhases(cwd);
+        const unchecked = counts.total - counts.checked;
+        if (status === 'completed' && unchecked > 0) {
+          return { passed: false, message: `STATE.md status is "completed" but ${unchecked} unchecked phase(s) remain in ROADMAP.md` };
+        }
+        return { passed: true, message: `Status "${status}" is consistent with ROADMAP.md` };
+      } catch {
+        return { passed: true, message: 'Status consistency check skipped — error reading files' };
+      }
+    },
+  },
 ];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function countRoadmapPhases(cwd) {
+  const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+  const content = fs.readFileSync(roadmapPath, 'utf-8');
+  const cleaned = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  const checked = (cleaned.match(/- \[x\]\s+\*?\*?Phase\s+\d+/gi) || []).length;
+  const unchecked = (cleaned.match(/- \[ \]\s+\*?\*?Phase\s+\d+/gi) || []).length;
+  return { checked, total: checked + unchecked };
+}
 
 // ─── Check Execution ─────────────────────────────────────────────────────────
 
