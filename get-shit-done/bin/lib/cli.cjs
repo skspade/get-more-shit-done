@@ -409,6 +409,7 @@ const CHECK_ID_TO_LEGACY = {
   'STRUCT-01c': { code: 'E003', fix: 'Run /gsd:new-milestone to create roadmap' },
   'STRUCT-01d': { code: 'E004', fix: 'Run /gsd:health --fix to regenerate' },
   'STRUCT-01e': { code: 'W003', fix: 'Run /gsd:health --fix to create with defaults' },
+  'STRUCT-01f': { code: 'W006', fix: 'Create phases/ directory' },
   'STRUCT-03': { code: 'W005', fix: 'Rename to match pattern (e.g., 01-setup)' },
   'STRUCT-04': { code: 'I001', fix: 'May be in progress' },
 };

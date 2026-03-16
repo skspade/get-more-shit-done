@@ -861,178 +861,93 @@ describe('cmdInitNewMilestone', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// cmdInitLinear (INIT-01, CMD-01)
+// cmdInitLinear / cmdInitPrReview shared tests (INIT-01, CMD-01, QCK-01, QCK-02)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('cmdInitLinear', () => {
-  let tmpDir;
+for (const cmd of ['linear', 'pr-review']) {
+  describe(`cmdInit ${cmd}`, () => {
+    let tmpDir;
 
-  beforeEach(() => {
-    tmpDir = createTempProject();
+    beforeEach(() => {
+      tmpDir = createTempProject();
+    });
+
+    afterEach(() => {
+      cleanup(tmpDir);
+    });
+
+    test('returns valid JSON with model fields', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.ok('planner_model' in output, 'Should have planner_model');
+      assert.ok('executor_model' in output, 'Should have executor_model');
+      assert.ok('checker_model' in output, 'Should have checker_model');
+      assert.ok('verifier_model' in output, 'Should have verifier_model');
+    });
+
+    test('returns commit_docs config field', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.ok('commit_docs' in output, 'Should have commit_docs');
+    });
+
+    test('returns next_num starting at 1 when no quick tasks exist', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.next_num, 1);
+    });
+
+    test('returns correct next_num when existing quick tasks are present', () => {
+      const quickDir = path.join(tmpDir, '.planning', 'quick');
+      fs.mkdirSync(path.join(quickDir, '1-old-task'), { recursive: true });
+      fs.mkdirSync(path.join(quickDir, '3-another-task'), { recursive: true });
+
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.next_num, 4);
+    });
+
+    test('returns date and timestamp fields', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.ok('date' in output, 'Should have date');
+      assert.ok('timestamp' in output, 'Should have timestamp');
+      assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(output.date), 'date should be YYYY-MM-DD format');
+      assert.ok(output.timestamp.includes('T'), 'timestamp should be ISO format');
+    });
+
+    test('returns path fields', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.quick_dir, '.planning/quick');
+      assert.strictEqual(output.state_path, '.planning/STATE.md');
+      assert.strictEqual(output.roadmap_path, '.planning/ROADMAP.md');
+      assert.strictEqual(output.project_path, '.planning/PROJECT.md');
+      assert.strictEqual(output.config_path, '.planning/config.json');
+    });
+
+    test('returns planning_exists and roadmap_exists booleans', () => {
+      const result = runGsdTools(`init ${cmd}`, tmpDir);
+      assert.ok(result.success, `Command failed: ${result.error}`);
+
+      const output = JSON.parse(result.output);
+      assert.strictEqual(output.planning_exists, true);
+      assert.strictEqual(typeof output.roadmap_exists, 'boolean');
+    });
   });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
-
-  test('returns valid JSON with model fields', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('planner_model' in output, 'Should have planner_model');
-    assert.ok('executor_model' in output, 'Should have executor_model');
-    assert.ok('checker_model' in output, 'Should have checker_model');
-    assert.ok('verifier_model' in output, 'Should have verifier_model');
-  });
-
-  test('returns commit_docs config field', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('commit_docs' in output, 'Should have commit_docs');
-  });
-
-  test('returns next_num starting at 1 when no quick tasks exist', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.next_num, 1);
-  });
-
-  test('returns correct next_num when existing quick tasks are present', () => {
-    const quickDir = path.join(tmpDir, '.planning', 'quick');
-    fs.mkdirSync(path.join(quickDir, '1-old-task'), { recursive: true });
-    fs.mkdirSync(path.join(quickDir, '3-another-task'), { recursive: true });
-
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.next_num, 4);
-  });
-
-  test('returns date and timestamp fields', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('date' in output, 'Should have date');
-    assert.ok('timestamp' in output, 'Should have timestamp');
-    assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(output.date), 'date should be YYYY-MM-DD format');
-    assert.ok(output.timestamp.includes('T'), 'timestamp should be ISO format');
-  });
-
-  test('returns path fields', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.quick_dir, '.planning/quick');
-    assert.strictEqual(output.state_path, '.planning/STATE.md');
-    assert.strictEqual(output.roadmap_path, '.planning/ROADMAP.md');
-    assert.strictEqual(output.project_path, '.planning/PROJECT.md');
-    assert.strictEqual(output.config_path, '.planning/config.json');
-  });
-
-  test('returns planning_exists and roadmap_exists booleans', () => {
-    const result = runGsdTools('init linear', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.planning_exists, true);
-    assert.strictEqual(typeof output.roadmap_exists, 'boolean');
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// cmdInitPrReview (QCK-01, QCK-02)
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('cmdInitPrReview', () => {
-  let tmpDir;
-
-  beforeEach(() => {
-    tmpDir = createTempProject();
-  });
-
-  afterEach(() => {
-    cleanup(tmpDir);
-  });
-
-  test('returns valid JSON with model fields', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('planner_model' in output, 'Should have planner_model');
-    assert.ok('executor_model' in output, 'Should have executor_model');
-    assert.ok('checker_model' in output, 'Should have checker_model');
-    assert.ok('verifier_model' in output, 'Should have verifier_model');
-  });
-
-  test('returns commit_docs config field', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('commit_docs' in output, 'Should have commit_docs');
-  });
-
-  test('returns next_num starting at 1 when no quick tasks exist', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.next_num, 1);
-  });
-
-  test('returns correct next_num when existing quick tasks are present', () => {
-    const quickDir = path.join(tmpDir, '.planning', 'quick');
-    fs.mkdirSync(path.join(quickDir, '1-old-task'), { recursive: true });
-    fs.mkdirSync(path.join(quickDir, '3-another-task'), { recursive: true });
-
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.next_num, 4);
-  });
-
-  test('returns date and timestamp fields', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.ok('date' in output, 'Should have date');
-    assert.ok('timestamp' in output, 'Should have timestamp');
-    assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(output.date), 'date should be YYYY-MM-DD format');
-    assert.ok(output.timestamp.includes('T'), 'timestamp should be ISO format');
-  });
-
-  test('returns path fields', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.quick_dir, '.planning/quick');
-    assert.strictEqual(output.state_path, '.planning/STATE.md');
-    assert.strictEqual(output.roadmap_path, '.planning/ROADMAP.md');
-    assert.strictEqual(output.project_path, '.planning/PROJECT.md');
-    assert.strictEqual(output.config_path, '.planning/config.json');
-  });
-
-  test('returns planning_exists and roadmap_exists booleans', () => {
-    const result = runGsdTools('init pr-review', tmpDir);
-    assert.ok(result.success, `Command failed: ${result.error}`);
-
-    const output = JSON.parse(result.output);
-    assert.strictEqual(output.planning_exists, true);
-    assert.strictEqual(typeof output.roadmap_exists, 'boolean');
-  });
-});
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // roadmap analyze command

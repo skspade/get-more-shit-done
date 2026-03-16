@@ -63,13 +63,6 @@ describe('frontmatter get', () => {
     assert.ok(parsed.error.includes('Field not found'), 'Error should mention "Field not found"');
   });
 
-  test('returns error for missing file', () => {
-    const result = runGsdTools('frontmatter get /nonexistent/path/file.md');
-    assert.ok(result.success, 'Command should exit 0 with error JSON');
-    const parsed = JSON.parse(result.output);
-    assert.ok(parsed.error, 'Should have error field');
-  });
-
   test('handles file with no frontmatter', () => {
     const file = writeTempFile('Plain text with no frontmatter delimiters.');
     const result = runGsdTools(`frontmatter get ${file}`);
@@ -117,13 +110,6 @@ describe('frontmatter set', () => {
     assert.deepStrictEqual(fm.tags, ['a', 'b']);
   });
 
-  test('returns error for missing file', () => {
-    const result = runGsdTools('frontmatter set /nonexistent/file.md --field phase --value "01"');
-    assert.ok(result.success, 'Command should exit 0 with error JSON');
-    const parsed = JSON.parse(result.output);
-    assert.ok(parsed.error, 'Should have error field');
-  });
-
   test('preserves body content after set', () => {
     const bodyText = '\n\n# My Heading\n\nSome paragraph with special chars: $, %, &.';
     const file = writeTempFile('---\nphase: 01\n---' + bodyText);
@@ -161,13 +147,6 @@ describe('frontmatter merge', () => {
     const fm = extractFrontmatter(content);
     assert.strictEqual(fm.phase, '02', 'conflicting field should be overwritten');
     assert.strictEqual(fm.type, 'execute', 'non-conflicting field should be preserved');
-  });
-
-  test('returns error for missing file', () => {
-    const result = runGsdTools(`frontmatter merge /nonexistent/file.md --data '{"phase":"01"}'`);
-    assert.ok(result.success, 'Command should exit 0 with error JSON');
-    const parsed = JSON.parse(result.output);
-    assert.ok(parsed.error, 'Should have error field');
   });
 
   test('returns error for invalid JSON data', () => {
@@ -262,10 +241,24 @@ body`;
     assert.ok(result.error.includes('Unknown schema'), 'Error should mention unknown schema');
   });
 
-  test('returns error for missing file', () => {
-    const result = runGsdTools('frontmatter validate /nonexistent/file.md --schema plan');
-    assert.ok(result.success, 'Command should exit 0 with error JSON');
-    const parsed = JSON.parse(result.output);
-    assert.ok(parsed.error, 'Should have error field');
-  });
+});
+
+// ─── Frontmatter missing-file errors (parameterized) ────────────────────────
+
+describe('frontmatter missing-file errors (parameterized)', () => {
+  const missingFileCases = [
+    { subcommand: 'get', args: '/nonexistent/path/file.md' },
+    { subcommand: 'set', args: '/nonexistent/file.md --field phase --value "01"' },
+    { subcommand: 'merge', args: `/nonexistent/file.md --data '{"phase":"01"}'` },
+    { subcommand: 'validate', args: '/nonexistent/file.md --schema plan' },
+  ];
+
+  for (const { subcommand, args } of missingFileCases) {
+    test(`${subcommand}: returns error for missing file`, () => {
+      const result = runGsdTools(`frontmatter ${subcommand} ${args}`);
+      assert.ok(result.success, 'Command should exit 0 with error JSON');
+      const parsed = JSON.parse(result.output);
+      assert.ok(parsed.error, 'Should have error field');
+    });
+  }
 });

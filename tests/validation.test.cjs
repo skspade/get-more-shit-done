@@ -296,13 +296,6 @@ describe('STRUCT-02: config.json validation', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when config.json does not exist', () => {
-    const results = runChecks(tmpDir);
-    const check = results.find(c => c.id === 'STRUCT-02');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
-
   test('fails with error severity when config.json has invalid JSON', () => {
     fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), '{bad json}');
     const results = runChecks(tmpDir);
@@ -366,13 +359,6 @@ describe('STRUCT-03: phase directory naming', () => {
     assert.strictEqual(check.severity, 'warning');
   });
 
-  test('passes (skipped) when phases/ does not exist', () => {
-    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-    const results = runChecks(tmpDir);
-    const check = results.find(c => c.id === 'STRUCT-03');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── STRUCT-04: Orphaned Plans ──────────────────────────────────────────────
@@ -407,13 +393,6 @@ describe('STRUCT-04: orphaned plan detection', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when phases/ does not exist', () => {
-    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-    const results = runChecks(tmpDir);
-    const check = results.find(c => c.id === 'STRUCT-04');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── Category Filtering ──────────────────────────────────────────────────────
@@ -547,22 +526,6 @@ describe('STATE-01: milestone name match', () => {
     assert.strictEqual(check.severity, 'error');
   });
 
-  test('passes (skipped) when STATE.md missing', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
-    const results = runChecks(tmpDir, { categories: ['state'] });
-    const check = results.find(c => c.id === 'STATE-01');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
-
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
-      '---\nmilestone_name: Test\n---\n# State');
-    const results = runChecks(tmpDir, { categories: ['state'] });
-    const check = results.find(c => c.id === 'STATE-01');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── STATE-02: Completed Phases Count ───────────────────────────────────────
@@ -602,13 +565,6 @@ describe('STATE-02: completed phases count', () => {
     assert.strictEqual(check.severity, 'warning');
   });
 
-  test('passes (skipped) when STATE.md missing', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
-    const results = runChecks(tmpDir, { categories: ['state'] });
-    const check = results.find(c => c.id === 'STATE-02');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── STATE-03: Total Phases Count ───────────────────────────────────────────
@@ -648,14 +604,6 @@ describe('STATE-03: total phases count', () => {
     assert.strictEqual(check.severity, 'warning');
   });
 
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'),
-      '---\nmilestone_name: Test\nprogress:\n  total_phases: 3\n---\n# State');
-    const results = runChecks(tmpDir, { categories: ['state'] });
-    const check = results.find(c => c.id === 'STATE-03');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── STATE-04: Status Consistency ───────────────────────────────────────────
@@ -706,13 +654,6 @@ describe('STATE-04: status consistency', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when STATE.md missing', () => {
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
-    const results = runChecks(tmpDir, { categories: ['state'] });
-    const check = results.find(c => c.id === 'STATE-04');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── State Category Filtering ───────────────────────────────────────────────
@@ -771,13 +712,6 @@ describe('NAV-01: computePhaseStatus validation', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when phases/ directory missing', () => {
-    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-01');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── NAV-02: findFirstIncompletePhase Validation ────────────────────────────
@@ -814,12 +748,6 @@ describe('NAV-02: findFirstIncompletePhase validation', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-02');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── NAV-03: Deterministic Lifecycle Step ────────────────────────────────────
@@ -848,22 +776,6 @@ describe('NAV-03: deterministic lifecycle step', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-03');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
-
-  test('passes (skipped) when phases/ missing', () => {
-    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**');
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-03');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── NAV-04: Disk vs ROADMAP Phase Sync ──────────────────────────────────────
@@ -928,21 +840,6 @@ describe('NAV-04: disk vs ROADMAP phase sync', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when phases/ missing', () => {
-    fs.rmSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), '# Roadmap');
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-04');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
-
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    const results = runChecks(tmpDir, { categories: ['navigation'] });
-    const check = results.find(c => c.id === 'NAV-04');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── Navigation Category Filtering ──────────────────────────────────────────
@@ -1006,12 +903,6 @@ describe('READY-01: incomplete phases exist', () => {
     assert.strictEqual(check.severity, 'info');
   });
 
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    const results = runChecks(tmpDir, { categories: ['readiness'] });
-    const check = results.find(c => c.id === 'READY-01');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── READY-02: Deterministic Step for Next Phase ────────────────────────────
@@ -1062,12 +953,6 @@ describe('READY-02: deterministic step for next phase', () => {
     assert.strictEqual(check.passed, true);
   });
 
-  test('passes (skipped) when ROADMAP.md missing', () => {
-    const results = runChecks(tmpDir, { categories: ['readiness'] });
-    const check = results.find(c => c.id === 'READY-02');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── READY-03: No Truncated Artifacts ───────────────────────────────────────
@@ -1202,12 +1087,6 @@ describe('READY-04: config autopilot settings', () => {
     assert.strictEqual(check.severity, 'warning');
   });
 
-  test('passes (skipped) when config.json missing', () => {
-    const results = runChecks(tmpDir, { categories: ['readiness'] });
-    const check = results.find(c => c.id === 'READY-04');
-    assert.ok(check);
-    assert.strictEqual(check.passed, true);
-  });
 });
 
 // ─── nextPhase and phaseStep Population ──────────────────────────────────────
@@ -1297,6 +1176,68 @@ describe('all categories present', () => {
     assert.ok(categories.includes('navigation'));
     assert.ok(categories.includes('readiness'));
   });
+});
+
+// ─── Skip-Guard Tests (Parameterized) ────────────────────────────────────────
+
+describe('skip-guard: passes (skipped) when prerequisite missing', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-skip-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const skipGuardCases = [
+    { checkId: 'STRUCT-02', description: 'config.json does not exist', category: undefined,
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); } },
+    { checkId: 'STRUCT-03', description: 'phases/ does not exist', category: undefined,
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); } },
+    { checkId: 'STRUCT-04', description: 'phases/ does not exist', category: undefined,
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); } },
+    { checkId: 'STATE-01', description: 'STATE.md missing', category: 'state',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap'); } },
+    { checkId: 'STATE-01', description: 'ROADMAP.md missing', category: 'state',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '---\nmilestone_name: Test\n---\n# State'); } },
+    { checkId: 'STATE-02', description: 'STATE.md missing', category: 'state',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap'); } },
+    { checkId: 'STATE-03', description: 'ROADMAP.md missing', category: 'state',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'STATE.md'), '---\nmilestone_name: Test\nprogress:\n  total_phases: 3\n---\n# State'); } },
+    { checkId: 'STATE-04', description: 'STATE.md missing', category: 'state',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap'); } },
+    { checkId: 'NAV-01', description: 'phases/ directory missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); } },
+    { checkId: 'NAV-02', description: 'ROADMAP.md missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-setup'), { recursive: true }); } },
+    { checkId: 'NAV-03', description: 'ROADMAP.md missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-setup'), { recursive: true }); } },
+    { checkId: 'NAV-03', description: 'phases/ missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '### Phase 1: Setup\n\n- [ ] **Phase 1: Setup**'); } },
+    { checkId: 'NAV-04', description: 'phases/ missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); fs.writeFileSync(path.join(dir, '.planning', 'ROADMAP.md'), '# Roadmap'); } },
+    { checkId: 'NAV-04', description: 'ROADMAP.md missing', category: 'navigation',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning', 'phases'), { recursive: true }); } },
+    { checkId: 'READY-01', description: 'ROADMAP.md missing', category: 'readiness',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-setup'), { recursive: true }); } },
+    { checkId: 'READY-02', description: 'ROADMAP.md missing', category: 'readiness',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-setup'), { recursive: true }); } },
+    { checkId: 'READY-04', description: 'config.json missing', category: 'readiness',
+      setup: (dir) => { fs.mkdirSync(path.join(dir, '.planning')); } },
+  ];
+
+  for (const { checkId, description, category, setup } of skipGuardCases) {
+    test(`${checkId}: passes (skipped) when ${description}`, () => {
+      setup(tmpDir);
+      const opts = category ? { categories: [category] } : undefined;
+      const results = runChecks(tmpDir, opts);
+      const check = results.find(c => c.id === checkId);
+      assert.ok(check, `${checkId} should exist`);
+      assert.strictEqual(check.passed, true);
+    });
+  }
 });
 
 // ─── Auto-Repair ──────────────────────────────────────────────────────────────
