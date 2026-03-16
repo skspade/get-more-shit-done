@@ -1348,15 +1348,9 @@ describe('auto-repair', () => {
   }
 
   function readStateFm() {
+    const { extractFrontmatter } = require('../get-shit-done/bin/lib/frontmatter.cjs');
     const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
-    const match = content.match(/^---\n([\s\S]+?)\n---/);
-    if (!match) return {};
-    const fm = {};
-    for (const line of match[1].split('\n')) {
-      const kv = line.match(/^\s*(\w+):\s*(.+)/);
-      if (kv) fm[kv[1]] = kv[2].trim();
-    }
-    return fm;
+    return extractFrontmatter(content);
   }
 
   test('STATE-02 repair: fixes stale completed_phases count', () => {
@@ -1387,7 +1381,7 @@ describe('auto-repair', () => {
 
     // Verify file was actually fixed
     const fm = readStateFm();
-    assert.strictEqual(fm.completed_phases, '3');
+    assert.strictEqual(String(fm.progress?.completed_phases), '3');
   });
 
   test('STATE-03 repair: fixes stale total_phases count', () => {
@@ -1417,7 +1411,7 @@ describe('auto-repair', () => {
     assert.strictEqual(repair.success, true);
 
     const fm = readStateFm();
-    assert.strictEqual(fm.total_phases, '5');
+    assert.strictEqual(String(fm.progress?.total_phases), '5');
   });
 
   test('STATE-04 repair: fixes status from completed to active when unchecked phases remain', () => {
@@ -1558,7 +1552,7 @@ describe('auto-repair', () => {
 
     // Verify file was NOT changed
     const fm = readStateFm();
-    assert.strictEqual(fm.completed_phases, '0');
+    assert.strictEqual(String(fm.progress?.completed_phases), '0');
   });
 
   test('repair results have correct shape: { checkId, action, success, detail }', () => {

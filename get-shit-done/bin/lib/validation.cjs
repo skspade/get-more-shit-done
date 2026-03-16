@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { extractFrontmatter } = require('./frontmatter.cjs');
+const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 const { getMilestoneInfo, findPhaseInternal } = require('./core.cjs');
 const { computePhaseStatus, findFirstIncompletePhase, extractPhaseNumbers } = require('./phase.cjs');
 const { CONFIG_DEFAULTS } = require('./config.cjs');
@@ -256,6 +256,19 @@ const checks = [
         return { passed: true, message: 'Completed phases check skipped — error reading files' };
       }
     },
+    repair: (cwd) => {
+      const counts = countRoadmapPhases(cwd);
+      const statePath = path.join(cwd, '.planning', 'STATE.md');
+      const content = fs.readFileSync(statePath, 'utf-8');
+      const fm = extractFrontmatter(content);
+      if (!fm.progress) fm.progress = {};
+      fm.progress.completed_phases = counts.checked;
+      const yamlStr = reconstructFrontmatter(fm);
+      const bodyStart = content.indexOf('---', 3);
+      const body = bodyStart !== -1 ? content.slice(bodyStart + 3) : '';
+      fs.writeFileSync(statePath, '---\n' + yamlStr + '\n---' + body);
+      return { checkId: 'STATE-02', action: 'Updated completed_phases count', success: true, detail: `Set to ${counts.checked}` };
+    },
   },
   // STATE-03: Total phases count
   {
@@ -283,6 +296,19 @@ const checks = [
       } catch {
         return { passed: true, message: 'Total phases check skipped — error reading files' };
       }
+    },
+    repair: (cwd) => {
+      const counts = countRoadmapPhases(cwd);
+      const statePath = path.join(cwd, '.planning', 'STATE.md');
+      const content = fs.readFileSync(statePath, 'utf-8');
+      const fm = extractFrontmatter(content);
+      if (!fm.progress) fm.progress = {};
+      fm.progress.total_phases = counts.total;
+      const yamlStr = reconstructFrontmatter(fm);
+      const bodyStart = content.indexOf('---', 3);
+      const body = bodyStart !== -1 ? content.slice(bodyStart + 3) : '';
+      fs.writeFileSync(statePath, '---\n' + yamlStr + '\n---' + body);
+      return { checkId: 'STATE-03', action: 'Updated total_phases count', success: true, detail: `Set to ${counts.total}` };
     },
   },
   // STATE-04: Status consistency
@@ -312,6 +338,17 @@ const checks = [
       } catch {
         return { passed: true, message: 'Status consistency check skipped — error reading files' };
       }
+    },
+    repair: (cwd) => {
+      const statePath = path.join(cwd, '.planning', 'STATE.md');
+      const content = fs.readFileSync(statePath, 'utf-8');
+      const fm = extractFrontmatter(content);
+      fm.status = 'active';
+      const yamlStr = reconstructFrontmatter(fm);
+      const bodyStart = content.indexOf('---', 3);
+      const body = bodyStart !== -1 ? content.slice(bodyStart + 3) : '';
+      fs.writeFileSync(statePath, '---\n' + yamlStr + '\n---' + body);
+      return { checkId: 'STATE-04', action: 'Updated status from completed to active', success: true, detail: 'Unchecked phases remain' };
     },
   },
   // NAV-01: computePhaseStatus returns valid data
@@ -448,6 +485,40 @@ const checks = [
       } catch {
         return { passed: true, message: 'Phase sync check skipped — error' };
       }
+    },
+    repair: (cwd) => {
+      const phasesDir = path.join(cwd, '.planning', 'phases');
+      const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+      const content = fs.readFileSync(roadmapPath, 'utf-8');
+      const cleaned = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+      const stripLeadingZeros = (s) => s.replace(/^0+/, '') || '0';
+      const roadmapPhases = new Set(extractPhaseNumbers(cleaned).map(stripLeadingZeros));
+      const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+      const diskPhases = new Set();
+      for (const e of entries) {
+        if (e.isDirectory() && PHASE_DIR_REGEX.test(e.name)) {
+          const m = e.name.match(/^(\d+(?:\.\d+)*)/);
+          if (m) diskPhases.add(stripLeadingZeros(m[1]));
+        }
+      }
+      // Only create missing directories, do NOT delete orphans
+      const created = [];
+      const phaseNamePattern = /Phase\s+(\d+(?:\.\d+)*):\s*([^\n*]+)/gi;
+      const phaseNames = {};
+      let pm;
+      while ((pm = phaseNamePattern.exec(cleaned)) !== null) {
+        phaseNames[stripLeadingZeros(pm[1])] = pm[2].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+      }
+      for (const p of roadmapPhases) {
+        if (!diskPhases.has(p)) {
+          const padded = p.padStart(2, '0');
+          const slug = phaseNames[p] || `phase-${p}`;
+          const dirName = `${padded}-${slug}`;
+          fs.mkdirSync(path.join(phasesDir, dirName), { recursive: true });
+          created.push(dirName);
+        }
+      }
+      return { checkId: 'NAV-04', action: 'Created missing phase directories', success: true, detail: created.join(', ') };
     },
   },
   // READY-01: At least one incomplete phase exists
@@ -642,8 +713,26 @@ function runChecks(cwd, options = {}) {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 function validateProjectHealth(cwd, options = {}) {
-  const { categories } = options;
+  const { categories, autoRepair } = options;
   const results = runChecks(cwd, { categories });
+
+  // Execute repairs for failed repairable checks
+  const repairs = [];
+  if (autoRepair) {
+    for (const r of results) {
+      if (!r.passed && r.repairable) {
+        const entry = checks.find(c => c.id === r.id);
+        if (entry && typeof entry.repair === 'function') {
+          try {
+            const repairResult = entry.repair(cwd);
+            repairs.push(repairResult);
+          } catch (err) {
+            repairs.push({ checkId: r.id, action: 'repair', success: false, detail: err.message });
+          }
+        }
+      }
+    }
+  }
 
   const errors = results.filter(r => !r.passed && r.severity === 'error');
   const warnings = results.filter(r => !r.passed && r.severity === 'warning');
@@ -661,7 +750,7 @@ function validateProjectHealth(cwd, options = {}) {
     checks: results,
     errors,
     warnings,
-    repairs: [],
+    repairs,
     nextPhase,
     phaseStep,
   };
