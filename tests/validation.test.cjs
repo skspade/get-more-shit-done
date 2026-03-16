@@ -1298,3 +1298,294 @@ describe('all categories present', () => {
     assert.ok(categories.includes('readiness'));
   });
 });
+
+// ─── Auto-Repair ──────────────────────────────────────────────────────────────
+
+describe('auto-repair', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-val-repair-'));
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeState(fm) {
+    const lines = ['---'];
+    for (const [k, v] of Object.entries(fm)) {
+      if (typeof v === 'object' && !Array.isArray(v)) {
+        lines.push(`${k}:`);
+        for (const [sk, sv] of Object.entries(v)) {
+          lines.push(`  ${sk}: ${sv}`);
+        }
+      } else {
+        lines.push(`${k}: ${v}`);
+      }
+    }
+    lines.push('---', '', '# Project State', '');
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), lines.join('\n'));
+  }
+
+  function writeRoadmap(phases) {
+    const lines = ['# Roadmap', '', '## Active Milestone', '', '**v1.0 Test**', '', '## Phases', ''];
+    for (const p of phases) {
+      const check = p.done ? 'x' : ' ';
+      lines.push(`- [${check}] **Phase ${p.num}: ${p.name}**`);
+    }
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'ROADMAP.md'), lines.join('\n'));
+  }
+
+  function writeProject() {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'PROJECT.md'),
+      '# Project\n\n## What This Is\nTest\n\n## Core Value\nTest\n\n## Requirements\nTest\n');
+  }
+
+  function writeConfig() {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'config.json'), JSON.stringify({ model_profile: 'balanced' }));
+  }
+
+  function readStateFm() {
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    const match = content.match(/^---\n([\s\S]+?)\n---/);
+    if (!match) return {};
+    const fm = {};
+    for (const line of match[1].split('\n')) {
+      const kv = line.match(/^\s*(\w+):\s*(.+)/);
+      if (kv) fm[kv[1]] = kv[2].trim();
+    }
+    return fm;
+  }
+
+  test('STATE-02 repair: fixes stale completed_phases count', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: true },
+      { num: 3, name: 'three', done: true },
+      { num: 4, name: 'four', done: false },
+      { num: 5, name: 'five', done: false },
+    ]);
+    for (let i = 1; i <= 5; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 5, completed_phases: 0 },
+    });
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+    const repair = result.repairs.find(r => r.checkId === 'STATE-02');
+    assert.ok(repair, 'STATE-02 repair should be in repairs array');
+    assert.strictEqual(repair.success, true);
+
+    // Verify file was actually fixed
+    const fm = readStateFm();
+    assert.strictEqual(fm.completed_phases, '3');
+  });
+
+  test('STATE-03 repair: fixes stale total_phases count', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: false },
+      { num: 3, name: 'three', done: false },
+      { num: 4, name: 'four', done: false },
+      { num: 5, name: 'five', done: false },
+    ]);
+    for (let i = 1; i <= 5; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 2, completed_phases: 1 },
+    });
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+    const repair = result.repairs.find(r => r.checkId === 'STATE-03');
+    assert.ok(repair, 'STATE-03 repair should be in repairs array');
+    assert.strictEqual(repair.success, true);
+
+    const fm = readStateFm();
+    assert.strictEqual(fm.total_phases, '5');
+  });
+
+  test('STATE-04 repair: fixes status from completed to active when unchecked phases remain', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: false },
+    ]);
+    for (let i = 1; i <= 2; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'completed',
+      progress: { total_phases: 2, completed_phases: 1 },
+    });
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+    const repair = result.repairs.find(r => r.checkId === 'STATE-04');
+    assert.ok(repair, 'STATE-04 repair should be in repairs array');
+    assert.strictEqual(repair.success, true);
+
+    const fm = readStateFm();
+    assert.strictEqual(fm.status, 'active');
+  });
+
+  test('NAV-04 repair: creates missing phase directories', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: false },
+      { num: 3, name: 'three', done: false },
+    ]);
+    // Only create dir for phase 1, leaving 2 and 3 missing
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-one'), { recursive: true });
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 3, completed_phases: 1 },
+    });
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+    const repair = result.repairs.find(r => r.checkId === 'NAV-04');
+    assert.ok(repair, 'NAV-04 repair should be in repairs array');
+    assert.strictEqual(repair.success, true);
+
+    // Verify directories were created
+    const phasesDir = path.join(tmpDir, '.planning', 'phases');
+    const dirs = fs.readdirSync(phasesDir);
+    assert.ok(dirs.some(d => d.startsWith('02')), 'Phase 2 directory should be created');
+    assert.ok(dirs.some(d => d.startsWith('03')), 'Phase 3 directory should be created');
+  });
+
+  test('NAV-04 repair: does NOT delete orphan directories', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+    ]);
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-one'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '99-orphan'), { recursive: true });
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 1, completed_phases: 1 },
+    });
+
+    validateProjectHealth(tmpDir, { autoRepair: true });
+
+    // Orphan directory should still exist
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'phases', '99-orphan')));
+  });
+
+  test('repairs are independent: failure in one does not block others', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: true },
+      { num: 3, name: 'three', done: false },
+    ]);
+    for (let i = 1; i <= 3; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    // Write STATE.md with wrong counts (both STATE-02 and STATE-03 will fail)
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 1, completed_phases: 0 },
+    });
+
+    // Make STATE.md read-only to cause repair failure
+    const statePath = path.join(tmpDir, '.planning', 'STATE.md');
+    fs.chmodSync(statePath, 0o444);
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+
+    // Restore permissions for cleanup
+    fs.chmodSync(statePath, 0o644);
+
+    // Should have attempted repairs even though they failed
+    assert.ok(result.repairs.length > 0, 'Should have attempted repairs');
+    // At least some repairs should have success: false
+    const failed = result.repairs.filter(r => !r.success);
+    assert.ok(failed.length > 0, 'At least one repair should have failed');
+  });
+
+  test('without autoRepair flag: no repairs performed', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: false },
+    ]);
+    for (let i = 1; i <= 2; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 2, completed_phases: 0 },
+    });
+
+    const result = validateProjectHealth(tmpDir);
+    assert.deepStrictEqual(result.repairs, []);
+
+    // Verify file was NOT changed
+    const fm = readStateFm();
+    assert.strictEqual(fm.completed_phases, '0');
+  });
+
+  test('repair results have correct shape: { checkId, action, success, detail }', () => {
+    writeProject();
+    writeConfig();
+    writeRoadmap([
+      { num: 1, name: 'one', done: true },
+      { num: 2, name: 'two', done: false },
+    ]);
+    for (let i = 1; i <= 2; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `0${i}-phase-${i}`), { recursive: true });
+    }
+    writeState({
+      gsd_state_version: '1.0',
+      milestone: 'v1.0',
+      milestone_name: 'Test',
+      status: 'active',
+      progress: { total_phases: 2, completed_phases: 0 },
+    });
+
+    const result = validateProjectHealth(tmpDir, { autoRepair: true });
+    assert.ok(result.repairs.length > 0, 'Should have repairs');
+    for (const repair of result.repairs) {
+      assert.ok('checkId' in repair, 'repair should have checkId');
+      assert.ok('action' in repair, 'repair should have action');
+      assert.ok('success' in repair, 'repair should have success');
+      assert.ok('detail' in repair, 'repair should have detail');
+    }
+  });
+});
