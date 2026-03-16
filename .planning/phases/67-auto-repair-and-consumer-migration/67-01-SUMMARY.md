@@ -1,3 +1,30 @@
+---
+phase: 67-auto-repair-and-consumer-migration
+plan: 01
+subsystem: validation
+tags: [node:test, auto-repair, tdd, validation]
+requires:
+  - phase: 66-phase-navigation-and-autopilot-readiness
+    provides: validation.cjs with check registry
+provides:
+  - Auto-repair functions for STATE-02, STATE-03, STATE-04, NAV-04
+affects: []
+tech-stack:
+  added: []
+  patterns: [tdd-red-green-refactor]
+key-files:
+  created: []
+  modified: [get-shit-done/bin/lib/validation.cjs, tests/validation.test.cjs]
+key-decisions:
+  - "Repair functions added to existing check registry entries, not separate"
+  - "Independent try/catch per repair for atomic isolation"
+patterns-established:
+  - "Auto-repair pattern: check.repair() called only when autoRepair flag and check failed"
+requirements-completed: [REPAIR-01, REPAIR-02, REPAIR-03, REPAIR-04]
+duration: 5min
+completed: 2026-03-16
+---
+
 # Plan 67-01 Summary: Auto-Repair TDD
 
 **Status:** Complete

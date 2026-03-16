@@ -1,3 +1,31 @@
+---
+phase: 67-auto-repair-and-consumer-migration
+plan: 03
+subsystem: autopilot
+tags: [autopilot, pre-flight, dead-code-removal, migration]
+requires:
+  - phase: 67-auto-repair-and-consumer-migration
+    provides: CLI and gsd-tools migration to validation.cjs
+provides:
+  - Autopilot pre-flight using validateProjectHealth
+  - Dead code removal from verify.cjs
+affects: []
+tech-stack:
+  added: []
+  patterns: [pre-flight-validation]
+key-files:
+  created: []
+  modified: [get-shit-done/scripts/autopilot.mjs, get-shit-done/bin/lib/verify.cjs, tests/verify-health.test.cjs, tests/autopilot.test.cjs]
+key-decisions:
+  - "cmdValidateHealth (337 lines) fully removed"
+  - "extractPhasesFromContent kept — still used by cmdValidateConsistency"
+patterns-established:
+  - "Autopilot pre-flight: validateProjectHealth with autoRepair before phase loop"
+requirements-completed: [INT-03, INT-05]
+duration: 8min
+completed: 2026-03-16
+---
+
 # Plan 67-03 Summary: Autopilot Migration and Dead Code Removal
 
 **Status:** Complete

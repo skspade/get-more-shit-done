@@ -1,3 +1,31 @@
+---
+phase: 67-auto-repair-and-consumer-migration
+plan: 02
+subsystem: cli
+tags: [cli, gsd-tools, migration, backward-compat]
+requires:
+  - phase: 67-auto-repair-and-consumer-migration
+    provides: Auto-repair functions in validation.cjs
+provides:
+  - CLI health command delegating to validation.cjs
+  - gsd-tools validate health routing to validation.cjs
+affects: []
+tech-stack:
+  added: []
+  patterns: [legacy-adapter-pattern]
+key-files:
+  created: []
+  modified: [get-shit-done/bin/lib/cli.cjs, get-shit-done/bin/gsd-tools.cjs, tests/cli.test.cjs]
+key-decisions:
+  - "Legacy adapter preserves E001-E005, W003-W005, I001 error codes"
+  - "STRUCT-01f has no legacy mapping (tech debt for Phase 70)"
+patterns-established:
+  - "CHECK_ID_TO_LEGACY mapping for backward-compatible error codes"
+requirements-completed: [INT-01, INT-02, INT-04, INT-06]
+duration: 5min
+completed: 2026-03-16
+---
+
 # Plan 67-02 Summary: CLI and gsd-tools Consumer Migration
 
 **Status:** Complete
