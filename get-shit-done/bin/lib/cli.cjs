@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { getMilestoneInfo, comparePhaseNum } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
+const { validateProjectHealth } = require('./validation.cjs');
 const testing = require('./testing.cjs');
 
 // ─── Project Discovery ──────────────────────────────────────────────────────
@@ -401,201 +402,110 @@ function handleTodos(projectRoot, args) {
 
 // ─── Health Command ─────────────────────────────────────────────────────────
 
-/**
- * Gather health data by validating .planning/ directory structure,
- * config integrity, and state consistency.
- * Returns { status, checks, errors, warnings, info }.
- */
-function gatherHealthData(projectRoot) {
-  const planningDir = path.join(projectRoot, '.planning');
-  const checks = [];
-  const errors = [];
-  const warnings = [];
-  const info = [];
+// Check ID to legacy error code mapping
+const CHECK_ID_TO_LEGACY = {
+  'STRUCT-01a': { code: 'E001', fix: 'Run /gsd:new-project to initialize' },
+  'STRUCT-01b': { code: 'E002', fix: 'Run /gsd:new-project to create' },
+  'STRUCT-01c': { code: 'E003', fix: 'Run /gsd:new-milestone to create roadmap' },
+  'STRUCT-01d': { code: 'E004', fix: 'Run /gsd:health --fix to regenerate' },
+  'STRUCT-01e': { code: 'W003', fix: 'Run /gsd:health --fix to create with defaults' },
+  'STRUCT-03': { code: 'W005', fix: 'Rename to match pattern (e.g., 01-setup)' },
+  'STRUCT-04': { code: 'I001', fix: 'May be in progress' },
+};
 
-  const addIssue = (severity, code, message, fix) => {
-    const issue = { code, message, fix };
-    if (severity === 'error') errors.push(issue);
-    else if (severity === 'warning') warnings.push(issue);
-    else info.push(issue);
-  };
+// Human-friendly names for check IDs
+const CHECK_NAMES = {
+  'STRUCT-01a': '.planning/',
+  'STRUCT-01b': 'PROJECT.md',
+  'STRUCT-01c': 'ROADMAP.md',
+  'STRUCT-01d': 'STATE.md',
+  'STRUCT-01e': 'config.json',
+  'STRUCT-01f': 'phases/',
+};
 
-  // ─── HLTH-01: Required file checks ──────────────────────────────────────
-
-  // Check .planning/ directory
-  const planningExists = fs.existsSync(planningDir);
-  checks.push({
-    name: '.planning/',
-    path: '.planning/',
-    passed: planningExists,
-    detail: planningExists ? 'Directory exists' : 'Directory not found',
-  });
-  if (!planningExists) {
-    addIssue('error', 'E001', '.planning/ directory not found', 'Run /gsd:new-project to initialize');
-    const status = 'broken';
-    return { status, checks, errors, warnings, info };
-  }
-
-  // Check PROJECT.md
-  const projectPath = path.join(planningDir, 'PROJECT.md');
-  const projectExists = fs.existsSync(projectPath);
-  checks.push({
-    name: 'PROJECT.md',
-    path: '.planning/PROJECT.md',
-    passed: projectExists,
-    detail: projectExists ? 'File exists' : 'File not found',
-  });
-  if (!projectExists) {
-    addIssue('error', 'E002', 'PROJECT.md not found', 'Run /gsd:new-project to create');
-  } else {
-    const projectContent = fs.readFileSync(projectPath, 'utf-8');
-    const requiredSections = ['## What This Is', '## Core Value', '## Requirements'];
-    for (const section of requiredSections) {
-      if (!projectContent.includes(section)) {
-        addIssue('warning', 'W001', `PROJECT.md missing section: ${section}`, 'Add section manually');
-      }
-    }
-  }
-
-  // Check ROADMAP.md
-  const roadmapPath = path.join(planningDir, 'ROADMAP.md');
-  const roadmapExists = fs.existsSync(roadmapPath);
-  checks.push({
-    name: 'ROADMAP.md',
-    path: '.planning/ROADMAP.md',
-    passed: roadmapExists,
-    detail: roadmapExists ? 'File exists' : 'File not found',
-  });
-  if (!roadmapExists) {
-    addIssue('error', 'E003', 'ROADMAP.md not found', 'Run /gsd:new-milestone to create roadmap');
-  }
-
-  // Check STATE.md
-  const statePath = path.join(planningDir, 'STATE.md');
-  const stateExists = fs.existsSync(statePath);
-  checks.push({
-    name: 'STATE.md',
-    path: '.planning/STATE.md',
-    passed: stateExists,
-    detail: stateExists ? 'File exists' : 'File not found',
-  });
-  if (!stateExists) {
-    addIssue('error', 'E004', 'STATE.md not found', 'Run /gsd:health --repair to regenerate');
-  }
-
-  // Check config.json
-  const configPath = path.join(planningDir, 'config.json');
-  const configExists = fs.existsSync(configPath);
-  checks.push({
-    name: 'config.json',
-    path: '.planning/config.json',
-    passed: configExists,
-    detail: configExists ? 'File exists' : 'File not found',
-  });
-  if (!configExists) {
-    addIssue('warning', 'W003', 'config.json not found', 'Run /gsd:health --repair to create with defaults');
-  }
-
-  // Check phases/ directory
-  const phasesDir = path.join(planningDir, 'phases');
-  const phasesExists = fs.existsSync(phasesDir);
-  checks.push({
-    name: 'phases/',
-    path: '.planning/phases/',
-    passed: phasesExists,
-    detail: phasesExists ? 'Directory exists' : 'Directory not found',
-  });
-
-  // ─── HLTH-02: Config validation ─────────────────────────────────────────
-
-  if (configExists) {
-    try {
-      const configRaw = fs.readFileSync(configPath, 'utf-8');
-      const parsed = JSON.parse(configRaw);
-
-      const validProfiles = ['quality', 'balanced', 'budget'];
-      if (parsed.model_profile && !validProfiles.includes(parsed.model_profile)) {
-        addIssue('warning', 'W004', `config.json: invalid model_profile "${parsed.model_profile}"`, `Valid values: ${validProfiles.join(', ')}`);
-      }
-
-      const knownKeys = ['model_profile', 'commit_docs', 'search_gitignored', 'branching_strategy',
-        'workflow', 'parallelization', 'autopilot', 'mode', 'depth', 'model_overrides',
-        'research', 'plan_checker', 'verifier', 'nyquist_validation', 'test'];
-      for (const key of Object.keys(parsed)) {
-        if (!knownKeys.includes(key)) {
-          addIssue('info', 'I001', `config.json: unknown key "${key}"`, 'May be a custom extension');
-        }
-      }
-    } catch (err) {
-      addIssue('error', 'E005', `config.json: JSON parse error - ${err.message}`, 'Fix JSON syntax or run /gsd:health --repair to reset');
-    }
-  }
-
-  // ─── HLTH-03: State consistency ─────────────────────────────────────────
-
-  if (stateExists && roadmapExists) {
-    try {
-      const stateContent = fs.readFileSync(statePath, 'utf-8');
-
-      // Extract phase references from STATE.md
-      const phaseRefs = [...stateContent.matchAll(/[Pp]hase:?\s+(\d+(?:\.\d+)*)/g)].map(m => m[1]);
-
-      // Get phases on disk
-      const diskPhases = new Set();
-      if (phasesExists) {
-        try {
-          const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
-          for (const e of entries) {
-            if (e.isDirectory()) {
-              const dm = e.name.match(/^(\d+(?:\.\d+)*)/);
-              if (dm) diskPhases.add(dm[1]);
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Check for invalid phase references
-      // Build a set of normalized disk phase numbers for comparison
-      const normalizedDiskPhases = new Set([...diskPhases].map(p => String(parseInt(p, 10))));
-      for (const ref of phaseRefs) {
-        const normalizedRef = String(parseInt(ref, 10));
-        if (diskPhases.size > 0 && !diskPhases.has(ref) && !normalizedDiskPhases.has(normalizedRef)) {
-          addIssue('warning', 'W002', `STATE.md references Phase ${ref}, but no matching directory found`, 'Update STATE.md or create phase directory');
-        }
-      }
-
-      // Check STATE.md current phase vs ROADMAP completion
-      const roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-
-      // Find current phase from STATE.md body text
-      const currentPhaseMatch = stateContent.match(/Phase:\s*(\d+)\s+of\s+\d+/);
-      if (currentPhaseMatch) {
-        const currentPhaseNum = currentPhaseMatch[1];
-        // Check if ROADMAP shows this phase as already completed
-        const completedPattern = new RegExp(`\\[x\\]\\s+\\*\\*Phase\\s+${currentPhaseNum}:`, 'i');
-        if (completedPattern.test(roadmapContent)) {
-          addIssue('warning', 'W005', `STATE.md reports Phase ${currentPhaseNum} as current, but ROADMAP.md shows it completed`, 'Run /gsd:health --repair to sync state');
-        }
-      }
-    } catch { /* ignore read errors */ }
-  }
-
-  // ─── Determine overall status ──────────────────────────────────────────
-
+function mapValidationToLegacy(validationResult, fix) {
+  // Map healthy -> status string
   let status;
-  if (errors.length > 0) {
+  if (validationResult.errors.length > 0) {
     status = 'broken';
-  } else if (warnings.length > 0) {
+  } else if (validationResult.warnings.length > 0) {
     status = 'degraded';
   } else {
     status = 'healthy';
   }
 
-  return { status, checks, errors, warnings, info };
+  // Check if .planning/ itself is missing — short-circuit like old gatherHealthData
+  const planningCheck = validationResult.checks.find(c => c.id === 'STRUCT-01a');
+  if (planningCheck && !planningCheck.passed) {
+    return {
+      status: 'broken',
+      checks: [{ name: '.planning/', path: '.planning/', passed: false, detail: 'Directory not found' }],
+      errors: [{ code: 'E001', message: '.planning/ directory not found', fix: 'Run /gsd:new-project to initialize' }],
+      warnings: [],
+      info: [],
+    };
+  }
+
+  // Map checks to legacy format: { name, path, passed, detail }
+  const checks = validationResult.checks
+    .filter(c => c.id.startsWith('STRUCT-01'))
+    .map(c => ({
+      name: CHECK_NAMES[c.id] || c.id,
+      path: CHECK_NAMES[c.id] ? `.planning/${CHECK_NAMES[c.id]}` : c.id,
+      passed: c.passed,
+      detail: c.passed ? (CHECK_NAMES[c.id] ? 'File exists' : 'OK') : c.message,
+    }));
+
+  // Map failed checks to errors/warnings/info arrays with legacy codes
+  const errors = [];
+  const warnings = [];
+  const info = [];
+
+  for (const c of validationResult.checks) {
+    if (c.passed) continue;
+
+    const legacy = CHECK_ID_TO_LEGACY[c.id];
+    let code, fix;
+
+    if (c.id === 'STRUCT-02') {
+      // Dynamic mapping based on severity
+      if (c.severity === 'error') {
+        code = 'E005';
+        fix = 'Fix JSON syntax or run /gsd:health --fix to reset';
+      } else if (c.severity === 'warning') {
+        code = 'W004';
+        fix = 'Check config.json model_profile value';
+      } else {
+        code = 'I001';
+        fix = 'May be a custom extension';
+      }
+    } else if (legacy) {
+      code = legacy.code;
+      fix = legacy.fix;
+    } else {
+      code = c.id;
+      fix = c.message;
+    }
+
+    const issue = { code, message: c.message, fix };
+    if (c.severity === 'error') errors.push(issue);
+    else if (c.severity === 'warning') warnings.push(issue);
+    else info.push(issue);
+  }
+
+  const result = { status, checks, errors, warnings, info };
+  if (fix && validationResult.repairs.length > 0) {
+    result.repairs = validationResult.repairs;
+  }
+  return result;
 }
 
 function handleHealth(projectRoot) {
-  const data = gatherHealthData(projectRoot || '.');
+  // Parse --fix from process.argv (same pattern as handleTodos --area)
+  const fix = process.argv.includes('--fix');
+
+  const validationResult = validateProjectHealth(projectRoot || '.', { autoRepair: fix });
+  const data = mapValidationToLegacy(validationResult, fix);
 
   // Build rich-mode formatted string
   const BOLD = '\x1b[1m';
@@ -638,6 +548,16 @@ function handleHealth(projectRoot) {
     for (const warn of data.warnings) {
       lines.push(`  ${YELLOW}${warn.code}${RESET} ${warn.message}`);
       lines.push(`       ${DIM}Fix: ${warn.fix}${RESET}`);
+    }
+  }
+
+  // Repairs
+  if (data.repairs && data.repairs.length > 0) {
+    lines.push('');
+    lines.push(`${GREEN}Repairs:${RESET}`);
+    for (const repair of data.repairs) {
+      const icon = repair.success ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
+      lines.push(`  ${icon} ${repair.checkId}: ${repair.action} — ${repair.detail}`);
     }
   }
 
@@ -864,14 +784,16 @@ const COMMAND_DETAILS = {
     ],
   },
   health: {
-    usage: 'gsd health [--json] [--plain]',
-    description: 'Validate .planning/ directory integrity. Checks that required files exist, config.json is valid, and STATE.md is consistent with ROADMAP.md.',
+    usage: 'gsd health [--fix] [--json] [--plain]',
+    description: 'Validate .planning/ directory integrity. Checks that required files exist, config.json is valid, and STATE.md is consistent with ROADMAP.md. Use --fix to auto-repair fixable issues.',
     flags: [
+      { flag: '--fix', description: 'Auto-repair fixable issues (stale counts, missing dirs)' },
       { flag: '--json', description: 'Output as JSON' },
       { flag: '--plain', description: 'Output as plain text (no colors)' },
     ],
     examples: [
       'gsd health',
+      'gsd health --fix',
       'gsd health --json',
     ],
   },

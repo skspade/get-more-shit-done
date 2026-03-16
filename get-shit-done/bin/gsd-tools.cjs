@@ -142,6 +142,7 @@ const state = require('./lib/state.cjs');
 const phase = require('./lib/phase.cjs');
 const roadmap = require('./lib/roadmap.cjs');
 const verify = require('./lib/verify.cjs');
+const { validateProjectHealth } = require('./lib/validation.cjs');
 const config = require('./lib/config.cjs');
 const template = require('./lib/template.cjs');
 const milestone = require('./lib/milestone.cjs');
@@ -511,7 +512,18 @@ async function main() {
         verify.cmdValidateConsistency(cwd, raw);
       } else if (subcommand === 'health') {
         const repairFlag = args.includes('--repair');
-        verify.cmdValidateHealth(cwd, { repair: repairFlag }, raw);
+        const result = validateProjectHealth(cwd, { autoRepair: repairFlag });
+        // Map to backward-compatible output format for workflow consumers
+        const errors = result.errors.map(c => ({ code: c.id, message: c.message, repairable: c.repairable }));
+        const warnings = result.warnings.map(c => ({ code: c.id, message: c.message, repairable: c.repairable }));
+        const info = result.checks.filter(c => !c.passed && c.severity === 'info').map(c => ({ code: c.id, message: c.message }));
+        let status;
+        if (errors.length > 0) status = 'broken';
+        else if (warnings.length > 0) status = 'degraded';
+        else status = 'healthy';
+        const mapped = { status, errors, warnings, info, repairable_count: result.checks.filter(c => !c.passed && c.repairable).length };
+        if (repairFlag && result.repairs.length > 0) mapped.repairs_performed = result.repairs;
+        output(mapped, raw);
       } else {
         error('Unknown validate subcommand. Available: consistency, health');
       }
