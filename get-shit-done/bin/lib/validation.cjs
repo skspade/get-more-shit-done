@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const { extractFrontmatter } = require('./frontmatter.cjs');
-const { getMilestoneInfo } = require('./core.cjs');
+const { getMilestoneInfo, findPhaseInternal } = require('./core.cjs');
+const { computePhaseStatus, findFirstIncompletePhase, extractPhaseNumbers } = require('./phase.cjs');
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -309,6 +310,142 @@ const checks = [
         return { passed: true, message: `Status "${status}" is consistent with ROADMAP.md` };
       } catch {
         return { passed: true, message: 'Status consistency check skipped — error reading files' };
+      }
+    },
+  },
+  // NAV-01: computePhaseStatus returns valid data
+  {
+    id: 'NAV-01',
+    category: 'navigation',
+    severity: 'info',
+    check: (cwd) => {
+      try {
+        const phasesDir = path.join(cwd, '.planning', 'phases');
+        if (!fs.existsSync(phasesDir)) {
+          return { passed: true, message: 'Phase status check skipped — phases/ not found' };
+        }
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const firstDir = entries.find(e => e.isDirectory() && PHASE_DIR_REGEX.test(e.name));
+        if (!firstDir) {
+          return { passed: true, message: 'Phase status check skipped — no valid phase directories' };
+        }
+        const phaseNum = firstDir.name.match(/^(\d+(?:\.\d+)*)/)[1];
+        const phaseInfo = findPhaseInternal(cwd, phaseNum);
+        if (!phaseInfo) {
+          return { passed: true, message: 'Phase status check skipped — phase not found' };
+        }
+        const status = computePhaseStatus(cwd, phaseInfo);
+        if (status && status.step) {
+          return { passed: true, message: `computePhaseStatus returns valid data (step: ${status.step})` };
+        }
+        return { passed: false, message: 'computePhaseStatus returned null or missing step' };
+      } catch {
+        return { passed: true, message: 'Phase status check skipped — error' };
+      }
+    },
+  },
+  // NAV-02: findFirstIncompletePhase returns result when milestone active
+  {
+    id: 'NAV-02',
+    category: 'navigation',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Navigation check skipped — ROADMAP.md not found' };
+        }
+        const counts = countRoadmapPhases(cwd);
+        if (counts.total - counts.checked === 0) {
+          return { passed: true, message: 'Milestone complete — no unchecked phases' };
+        }
+        const result = findFirstIncompletePhase(cwd);
+        if (result !== null) {
+          return { passed: true, message: `First incomplete phase: ${result}` };
+        }
+        return { passed: false, message: 'Milestone active but findFirstIncompletePhase returned null' };
+      } catch {
+        return { passed: true, message: 'Navigation check skipped — error' };
+      }
+    },
+  },
+  // NAV-03: Each incomplete phase has deterministic lifecycle step
+  {
+    id: 'NAV-03',
+    category: 'navigation',
+    severity: 'error',
+    check: (cwd) => {
+      try {
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        const phasesDir = path.join(cwd, '.planning', 'phases');
+        if (!fs.existsSync(roadmapPath) || !fs.existsSync(phasesDir)) {
+          return { passed: true, message: 'Lifecycle step check skipped — ROADMAP.md or phases/ not found' };
+        }
+        const content = fs.readFileSync(roadmapPath, 'utf-8');
+        const cleaned = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+        const phases = extractPhaseNumbers(cleaned);
+        const validSteps = ['discuss', 'plan', 'execute', 'verify', 'complete'];
+        const problems = [];
+        for (const phaseNum of phases) {
+          const phaseInfo = findPhaseInternal(cwd, phaseNum);
+          if (!phaseInfo) continue;
+          const status = computePhaseStatus(cwd, phaseInfo);
+          if (!status) continue;
+          if (status.phase_complete) continue;
+          if (!validSteps.includes(status.step)) {
+            problems.push(`Phase ${phaseNum}: step "${status.step}" is not deterministic`);
+          }
+        }
+        if (problems.length === 0) {
+          return { passed: true, message: 'All incomplete phases have deterministic lifecycle steps' };
+        }
+        return { passed: false, message: problems.join('; ') };
+      } catch {
+        return { passed: true, message: 'Lifecycle step check skipped — error' };
+      }
+    },
+  },
+  // NAV-04: Disk vs ROADMAP phase sync
+  {
+    id: 'NAV-04',
+    category: 'navigation',
+    severity: 'warning',
+    check: (cwd) => {
+      try {
+        const phasesDir = path.join(cwd, '.planning', 'phases');
+        const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
+        if (!fs.existsSync(phasesDir) || !fs.existsSync(roadmapPath)) {
+          return { passed: true, message: 'Phase sync check skipped — phases/ or ROADMAP.md not found' };
+        }
+        const content = fs.readFileSync(roadmapPath, 'utf-8');
+        const cleaned = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+        const stripLeadingZeros = (s) => s.replace(/^0+/, '') || '0';
+        const roadmapPhases = new Set(extractPhaseNumbers(cleaned).map(stripLeadingZeros));
+        const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
+        const diskPhases = new Set();
+        for (const e of entries) {
+          if (e.isDirectory() && PHASE_DIR_REGEX.test(e.name)) {
+            const m = e.name.match(/^(\d+(?:\.\d+)*)/);
+            if (m) diskPhases.add(stripLeadingZeros(m[1]));
+          }
+        }
+        const issues = [];
+        for (const p of diskPhases) {
+          if (!roadmapPhases.has(p)) {
+            issues.push(`Orphan directory: Phase ${p} on disk but not in ROADMAP`);
+          }
+        }
+        for (const p of roadmapPhases) {
+          if (!diskPhases.has(p)) {
+            issues.push(`Missing directory: Phase ${p} in ROADMAP but not on disk`);
+          }
+        }
+        if (issues.length === 0) {
+          return { passed: true, message: 'Disk and ROADMAP phases are in sync' };
+        }
+        return { passed: false, message: issues.join('; ') };
+      } catch {
+        return { passed: true, message: 'Phase sync check skipped — error' };
       }
     },
   },

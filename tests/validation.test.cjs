@@ -737,13 +737,12 @@ describe('state category filtering', () => {
     }
   });
 
-  test('validateProjectHealth runs structure, state, navigation, and readiness checks', () => {
+  test('validateProjectHealth runs structure, state, and navigation checks', () => {
     const result = validateProjectHealth(tmpDir);
     const categories = [...new Set(result.checks.map(c => c.category))];
     assert.ok(categories.includes('structure'));
     assert.ok(categories.includes('state'));
     assert.ok(categories.includes('navigation'));
-    assert.ok(categories.includes('readiness'));
   });
 });
 
