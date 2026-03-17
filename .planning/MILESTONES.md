@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.6 Unified Validation Module (Shipped: 2026-03-17)
+
+**Phases completed:** 7 phases, 12 plans
+**Timeline:** 3 days (2026-03-15 → 2026-03-17)
+**Git range:** 5528f97 → 8891f32 (62 files, +7,764/-1,597)
+
+**Key accomplishments:**
+- Created `validation.cjs` unified module with check registry pattern, 21 checks across 4 categories (structure, state, navigation, readiness), structured `ValidationResult` return type, and category-filtered execution
+- Implemented artifact-based phase navigation via `computePhaseStatus()` and `findFirstIncompletePhase()`, replacing regex parsing of STATE.md
+- Built atomic auto-repair system for STATE.md drift (completed_phases, total_phases, status field, missing phase directories) with independent try/catch per repair
+- Migrated all 3 consumers (CLI `gsd health`, autopilot pre-flight, `gsd-tools validate`) to delegate to `validateProjectHealth()` with backward-compatible legacy error codes via `CHECK_ID_TO_LEGACY` mapping
+- Removed legacy `gatherHealthData()` and `cmdValidateHealth()` dead code from verify.cjs (337 lines)
+- Consolidated test suite from 822 to 796 tests via parameterization of skip-guard, init, and frontmatter tests (within 800 budget)
+- Milestone audit passed: 35/35 requirements satisfied, 35/35 integrations wired, 4/4 E2E flows verified
+
+---
+
 ## v2.5 New-Milestone Auto Mode (Shipped: 2026-03-14)
 
 **Phases completed:** 5 phases, 6 plans

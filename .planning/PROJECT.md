@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A zx-based Node.js script (`autopilot.mjs`) reinvokes Claude Code with fresh context per phase, importing CJS modules directly for phase navigation, verification status, and config defaults — eliminating the JSON serialization boundary of the original bash implementation. Real-time streaming output via `--output-format stream-json` replaces buffered JSON — `runClaudeStreaming()` consolidates all Claude CLI invocations with NDJSON parsing, live assistant text to stdout, tool call indicators to stderr, configurable stall detection (default 5 min with repeating warnings), and `--quiet` fallback for CI/scripted use. An auto-context agent replaces interactive discuss, verification gates pause for human review via TTY, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Legacy bash autopilot preserved as `autopilot-legacy.sh` with `--legacy` flag fallback.
+An autonomous orchestrator command (`/gsd:autopilot`) for a fork of the GSD framework that drives milestones from start to completion — or resumes mid-milestone — without human intervention. A zx-based Node.js script (`autopilot.mjs`) reinvokes Claude Code with fresh context per phase, importing CJS modules directly for phase navigation, verification status, and config defaults — eliminating the JSON serialization boundary of the original bash implementation. Real-time streaming output via `--output-format stream-json` replaces buffered JSON — `runClaudeStreaming()` consolidates all Claude CLI invocations with NDJSON parsing, live assistant text to stdout, tool call indicators to stderr, configurable stall detection (default 5 min with repeating warnings), and `--quiet` fallback for CI/scripted use. An auto-context agent replaces interactive discuss, verification gates pause for human review via TTY, debug-retry handles failures automatically, and a milestone audit loop automatically verifies requirements coverage and closes gaps before completing the milestone. A unified `validation.cjs` module provides 21 health checks across 4 categories (structure, state, navigation, readiness) with a check registry pattern, structured `ValidationResult` return type, category-filtered execution, and atomic auto-repair for STATE.md drift — consumed by CLI (`gsd health`), autopilot pre-flight, and `gsd-tools validate`. Linear issue integration (`/gsd:linear`) enables issue-driven workflows — fetching issues via MCP, routing to quick or milestone based on complexity scoring, and posting summary comments back. Brainstorming integration (`/gsd:brainstorm`) bridges idea exploration to execution — running collaborative design sessions that produce design docs and auto-route into GSD milestone/project creation. PR review integration (`/gsd:pr-review`) captures PR review toolkit findings, deduplicates via file-region grouping, scores complexity, and routes to quick task or milestone for stateful resolution. Dual-layer test architecture provides a hard test gate during execution (baseline comparison, TDD awareness, output summarization), human-owned acceptance tests in Given/When/Then/Verify format, and a test steward agent for suite health (redundancy detection, budget enforcement, consolidation proposals). README rewritten as a minimal 97-line quick start guide with fork branding, core workflow, and command reference. Legacy bash autopilot preserved as `autopilot-legacy.sh` with `--legacy` flag fallback.
 
 ## Core Value
 
@@ -92,17 +92,19 @@ A single command that takes a milestone from zero to done autonomously, reading 
 - ✓ Auto-accept version, always research, auto-approve requirements and roadmap — v2.5
 - ✓ Auto-chain to `/gsd:discuss-phase {N} --auto` after roadmap creation — v2.5
 - ✓ Simplify brainstorm.md milestone routing to use `/gsd:new-milestone --auto` — v2.5
+- ✓ Unified validation module (`validation.cjs`) with 21 checks across 4 categories and check registry pattern — v2.6
+- ✓ State consistency checks (STATE.md ↔ ROADMAP.md milestone name, phase counts, status) — v2.6
+- ✓ Phase navigation checks using `computePhaseStatus()` artifact inspection replacing regex parsing — v2.6
+- ✓ Autopilot readiness checks (incomplete phases, deterministic step, truncated artifacts, valid config) — v2.6
+- ✓ Atomic auto-repair for STATE.md drift (counts, status, missing phase directories) — v2.6
+- ✓ `gsd health` refactored to delegate to `validation.cjs` with backward-compatible legacy codes, `--fix` for auto-repair — v2.6
+- ✓ Autopilot pre-flight calls `validateProjectHealth({ autoRepair: true })` before phase loop — v2.6
+- ✓ `gsd-tools validate health` dispatch with `--repair` flag — v2.6
+- ✓ Test suite consolidated from 822 to 796 via parameterization (within 800 budget) — v2.6
 
 ### Active
 
-- Unified validation module (`validation.cjs`) with shared checks for health CLI and autopilot — v2.6
-- State consistency checks (STATE.md ↔ ROADMAP.md milestone name, phase counts, status) — v2.6
-- Phase navigation checks using `phase.cjs` functions (`findFirstIncompletePhase`, `computePhaseStatus`) — v2.6
-- Autopilot readiness checks (incomplete phases exist, deterministic step, valid config) — v2.6
-- Auto-repair for trivially fixable state drift (stale STATE.md counts, missing phase directories) — v2.6
-- `gsd health` refactored to delegate to `validation.cjs`, `--fix` flag for auto-repair — v2.6
-- Autopilot pre-flight validation with auto-repair at startup — v2.6
-- `gsd-tools.cjs` `validate` dispatch entry for workflow access — v2.6
+(None — ready for next milestone)
 
 ### Out of Scope
 
@@ -185,15 +187,21 @@ A single command that takes a milestone from zero to done autonomously, reading 
 | Auto-mode detection: flag + config + persist | Mirrors discuss-phase/plan-phase pattern; consistent UX across all --auto commands | ✓ Good |
 | SlashCommand delegation for brainstorm→milestone | Eliminates ~70 lines of inline duplication; single source of truth for milestone creation | ✓ Good |
 | Dynamic first phase via phase find-next | Avoids hardcoded phase numbers; works correctly after phase insertion/renumbering | ✓ Good |
+| Check registry pattern for validation | Checks as `{ id, category, severity, check, repair? }` objects — extensible, filterable, self-documenting | ✓ Good |
+| Category-filtered check execution | `runChecks({ categories: ['readiness'] })` — consumers run only relevant checks instead of full suite | ✓ Good |
+| Separated auto-repair from validation | `autoRepair` option keeps repair optional; repairs attempted independently with try/catch | ✓ Good |
+| Legacy code mapping via CHECK_ID_TO_LEGACY | Preserves E001-E005, W003-W006 codes for backward compatibility while using semantic IDs internally | ✓ Good |
+| Three consumers sharing one validation module | CLI, autopilot, gsd-tools all call `validateProjectHealth()` — single source of truth | ✓ Good |
+| Test parameterization for budget compliance | for...of loops with case arrays vs duplicated test blocks — same coverage, fewer test count | ✓ Good |
 
 ## Context
 
-Shipped v2.5 with new-milestone auto mode. 13 milestones shipped (v1.0-v2.5) across 63 phases, 93 plans. 750 tests (budget at 93.75%). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete now works without human input. v2.6 addresses disparity between `gsd health` (regex on STATE.md) and autopilot (`phase.cjs` artifact inspection) by creating unified `validation.cjs` module.
+Shipped v2.6 with unified validation module. 14 milestones shipped (v1.0-v2.6) across 70 phases, 105 plans. 796 tests (budget at 99.5%). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete works without human input. Unified `validation.cjs` eliminates disparity between `gsd health` and autopilot — both now delegate to `validateProjectHealth()` with shared check registry.
 
-**Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-route to `/gsd:new-milestone --auto`. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
+**Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. Unified `validation.cjs` with 21 checks across 4 categories (structure, state, navigation, readiness), auto-repair, and 3 consumer paths (CLI, autopilot, gsd-tools). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-route to `/gsd:new-milestone --auto`. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation).
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP
-**Codebase:** ~64,151 LOC (JS/CJS/MJS/Bash/MD)
-**Known tech debt:** Test budget at 93.75% (750/800) — 7 redundant tests (parameterization candidate), 1 consolidation proposal; PARSE-02 config default via error suppression; INT-03 orphaned auto_mode signal in init output
+**Codebase:** ~4,700 LOC across core modules (validation.cjs, cli.cjs, phase.cjs, gsd-tools.cjs, autopilot.mjs)
+**Known tech debt:** Test budget at 99.5% (796/800) — 4 redundant tests, 3 consolidation proposals; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys); 10 pre-existing test failures across 4 files (not v2.6 regressions)
 
 ---
-*Last updated: 2026-03-15 after v2.6 milestone start*
+*Last updated: 2026-03-17 after v2.6 milestone*
