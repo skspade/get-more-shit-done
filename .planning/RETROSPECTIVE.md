@@ -548,6 +548,51 @@
 
 ---
 
+## Milestone: v2.6 — Unified Validation Module
+
+**Shipped:** 2026-03-17
+**Phases:** 7 | **Plans:** 12
+
+### What Was Built
+- `validation.cjs` unified module with 21 checks across 4 categories (structure, state, navigation, readiness)
+- Check registry pattern: `{ id, category, severity, check, repair? }` objects with category-filtered execution
+- Atomic auto-repair for STATE.md drift (counts, status, missing directories) with independent try/catch per repair
+- Consumer migration: CLI `gsd health`, autopilot pre-flight, and `gsd-tools validate` all delegate to `validateProjectHealth()`
+- Legacy code mapping via `CHECK_ID_TO_LEGACY` preserving E001-E005, W003-W006 backward compatibility
+- Test parameterization reducing 822 → 796 tests (within 800 budget)
+
+### What Worked
+- TDD workflow was effective: failing tests first, then implementation, caught shape mismatches early
+- Auto-advance pipeline (discuss → plan → execute) completed phases 64-68 without manual intervention
+- Check registry pattern made each phase mechanical: add checks to array, write tests, done
+- Gap closure phases (69-70) cleanly resolved audit findings: verification artifacts + test budget + legacy mapping
+- 3-source cross-reference (VERIFICATION + SUMMARY frontmatter + REQUIREMENTS traceability) caught all gaps systematically
+
+### What Was Inefficient
+- Phase 70 agent produced code changes but didn't create VERIFICATION.md — had to verify via self-check instead
+- Phase 67 SUMMARY files initially lacked `requirements-completed` frontmatter — required Phase 69 gap closure
+- Test count discrepancy: Phase 68 reported 750 but actual was 822 — caused by counting runtime tests vs static test definitions
+- Auto-repair tests have 4 pre-existing failures that weren't caught before this milestone — need investigation
+
+### Patterns Established
+- Check registry pattern: extensible, filterable, self-documenting — reusable for any categorized validation
+- `CHECK_ID_TO_LEGACY` mapping: clean way to evolve internal IDs while preserving backward-compatible output codes
+- Test parameterization via `for...of` loops: same coverage, fewer test count, cleaner test files
+- Category-filtered execution: consumers run only the checks they need (`{ categories: ['readiness'] }`)
+
+### Key Lessons
+1. Static test count (regex `test()` matches) and runtime test count (actual tests executed) can diverge significantly — use the tool's count, not manual assertions
+2. VERIFICATION.md should be created during execute-phase, not deferred — this is the 12th milestone to need gap closure for missing verification
+3. The auto-advance pipeline works well for infrastructure phases with clear success criteria — less well for gap closure phases that need manual verification
+4. `KNOWN_SETTINGS_KEYS` duplication (validation.cjs vs cli.cjs) is a maintenance hazard — should have been resolved during migration, not deferred
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents including integration checker and test steward)
+- Sessions: 7 phase executions, 2 gap closure phases
+- Notable: first milestone focused entirely on internal refactoring (validation module consolidation) — no new user-facing features
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -567,12 +612,13 @@
 | v2.3 | 49 | 7 | Autopilot CJS consolidation — zx rewrite with direct CJS imports, legacy bash preserved |
 | v2.4 | 45 | 5 | Autopilot streaming — NDJSON real-time output, stall detection, consolidated invocations |
 | v2.5 | 30 | 5 | New-milestone auto mode — flag+config+persist pattern, 6 skip points, auto-chain, SlashCommand delegation |
+| v2.6 | ~40 | 7 | Unified validation module — check registry pattern, 3 consumer migration, auto-repair, test parameterization |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 12 of 13 milestones (v2.1 is only clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 11 of 13 milestones; only v2.1 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 11 of 13 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 13 of 14 milestones (v2.1 is only clean pass)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 14 milestones; only v2.1 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 14 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -584,3 +630,5 @@
 12. Consolidating scattered invocations into a single function simplifies subsequent integration phases — each new consumer just calls the one function (v2.4)
 13. SlashCommand delegation eliminates workflow duplication — proven in v2.5 where brainstorm→milestone handoff dropped ~70 lines to 3 lines
 14. Auto-mode flag+config+persist pattern is now battle-tested across 3 workflows (discuss, plan, new-milestone) — consistent UX for autonomous execution
+15. Check registry pattern (`{ id, category, severity, check, repair? }`) enables extensible, filterable validation — proven in v2.6 with 21 checks across 4 categories
+16. Static vs runtime test counts can diverge — always use the tooling's count, not manual assertions from execution summaries
