@@ -211,14 +211,11 @@ Design written to: .planning/designs/{date}-{topic-slug}-design.md
 
 ## 8. Commit Design File
 
-Stage and commit the design file individually:
+Commit the design file:
 
 ```bash
-git add ".planning/designs/{date}-{topic-slug}-design.md"
-git commit -m "docs(brainstorm): design for {topic}"
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(brainstorm): design for {topic}" --files ".planning/designs/{date}-{topic-slug}-design.md"
 ```
-
-Do NOT use `git add .` or `git add -A`.
 
 Display:
 ```
