@@ -26,7 +26,7 @@ Milestone: v2.6 Unified Validation Module
 Phase: 64 of 68 (Module Foundation and Check Registry)
 Plans: 0 of 0 in current phase
 Status: Ready to discuss
-Last activity: 2026-03-15 — Roadmap created for v2.6
+Last activity: 2026-03-18 - Completed quick task 9: Fix brainstorm.md to use gsd-tools commit CLI instead of raw git commands to respect commit_docs config
 
 Progress: [░░░░░░░░░░] 0%
 
