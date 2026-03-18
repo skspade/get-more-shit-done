@@ -86,9 +86,10 @@ None.
 | 6 | Fix brainstorm.md commit inconsistency — use gsd-tools CLI | 2026-03-06 | e98b78f | [6-fix-brainstorming-skill-commit-inconsist](./quick/6-fix-brainstorming-skill-commit-inconsist/) |
 | 7 | Add file-based logging to GSD Autopilot | 2026-03-08 | db88863 | [7-add-file-based-logging-to-gsd-autopilot-](./quick/7-add-file-based-logging-to-gsd-autopilot-/) |
 | 8 | Add stdin redirect regression and argument validation tests | 2026-03-12 | 8db1a94 | [8-test-gsd-autopilot-node-script](./quick/8-test-gsd-autopilot-node-script/) |
+| 9 | Fix brainstorm.md Step 8 to use gsd-tools commit CLI | 2026-03-18 | a449753 | [9-fix-brainstorm-md-to-use-gsd-tools-commi](./quick/9-fix-brainstorm-md-to-use-gsd-tools-commi/) |
 
 ## Session Continuity
 
-Last session: 2026-03-15
-Stopped at: Roadmap created for v2.6 — ready to discuss Phase 64
+Last session: 2026-03-18
+Stopped at: Completed quick task 9
 Resume file: None
