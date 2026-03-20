@@ -219,10 +219,10 @@ Plans:
   2. A consolidation phase is created only when `test_health.budget_status` is Warning or Over Budget; OK budget status defers to tech debt
   3. All proposals are grouped into a single "Test Suite Consolidation" phase positioned last in the gap closure sequence, with each proposal appearing as a task
   4. Prune proposals map to delete tasks, parameterize to refactor tasks, promote to delete-and-verify tasks, and merge to reorganize tasks -- each with verbatim steward file paths and estimated_reduction counts
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 76-01: TBD
+- [ ] 76-01: Add budget gating, strategy-to-task mapping, and consolidation phase presentation
 
 ### Phase 77: Edge Case Hardening and Validation
 **Goal**: All edge cases produce correct behavior and existing gap types remain unaffected by the new consolidation bridge
@@ -260,6 +260,6 @@ Phases execute in numeric order: 75 → 76 → 77
 | 59-63 | v2.5 | 6/6 | Complete | 2026-03-14 |
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
-| 75. Schema Design and Status Routing | 1/1 | Complete   | 2026-03-20 | - |
+| 75. Schema Design and Status Routing | 1/1 | Complete    | 2026-03-20 | - |
 | 76. Proposal Extraction and Task Mapping | v2.8 | 0/0 | Not started | - |
 | 77. Edge Case Hardening and Validation | v2.8 | 0/0 | Not started | - |
