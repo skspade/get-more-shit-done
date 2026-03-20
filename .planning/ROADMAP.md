@@ -206,7 +206,8 @@
   3. Agent executes tests via `npx playwright test` and returns a structured `## PLAYWRIGHT COMPLETE` block with pass/fail/skipped counts
   4. Agent distinguishes test-level failures (locator not found) from application-level failures (timeout, connection refused) in its report
   5. Agent surfaces screenshot and trace file paths when tests fail
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 72-01-PLAN.md — Create gsd-playwright agent with full lifecycle (detect, scaffold, generate, execute, report)
 
 ### Phase 73: /gsd:ui-test Command
 **Goal**: Users can invoke `/gsd:ui-test` with a phase number to generate and run Playwright tests against their application
