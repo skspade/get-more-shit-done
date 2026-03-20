@@ -41,9 +41,9 @@ Requirements for Test Steward Consolidation Bridge. Each maps to roadmap phases.
 
 ### Edge Cases
 
-- [ ] **EDGE-01**: When only test consolidation gaps exist (no other gap types), plan-milestone-gaps creates just the consolidation phase
-- [ ] **EDGE-02**: Autopilot audit-fix-reaudit loop handles consolidation phases without special-casing
-- [ ] **EDGE-03**: Steward proposals use verbatim source file paths and test names from the steward report
+- [x] **EDGE-01**: When only test consolidation gaps exist (no other gap types), plan-milestone-gaps creates just the consolidation phase
+- [x] **EDGE-02**: Autopilot audit-fix-reaudit loop handles consolidation phases without special-casing
+- [x] **EDGE-03**: Steward proposals use verbatim source file paths and test names from the steward report
 
 ## Future Requirements
 
@@ -87,9 +87,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TASK-03 | Phase 76 | Complete |
 | TASK-04 | Phase 76 | Complete |
 | TASK-05 | Phase 76 | Complete |
-| EDGE-01 | Phase 77 | Pending |
-| EDGE-02 | Phase 77 | Pending |
-| EDGE-03 | Phase 77 | Pending |
+| EDGE-01 | Phase 77 | Complete |
+| EDGE-02 | Phase 77 | Complete |
+| EDGE-03 | Phase 77 | Complete |
 
 **Coverage:**
 - v2.8 requirements: 20 total

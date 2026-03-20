@@ -191,7 +191,7 @@
 
 - [x] **Phase 75: Schema Design and Status Routing** - Define gaps.test_consolidation schema and lock tech_debt routing for consolidation-only audits, modifying both workflow files atomically (completed 2026-03-20)
 - [x] **Phase 76: Proposal Extraction and Task Mapping** - Parse steward proposals into structured data and map all four strategies to executable tasks with budget gating (completed 2026-03-20)
-- [ ] **Phase 77: Edge Case Hardening and Validation** - Verify graceful behavior for empty proposals, steward-disabled, consolidation-only gaps, and autopilot flow
+- [x] **Phase 77: Edge Case Hardening and Validation** - Verify graceful behavior for empty proposals, steward-disabled, consolidation-only gaps, and autopilot flow (completed 2026-03-20)
 
 ## Phase Details
 
@@ -236,7 +236,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 77-01: Edge case tests for consolidation frontmatter parsing and autopilot compatibility
+- [x] 77-01: Edge case tests for consolidation frontmatter parsing and autopilot compatibility
 
 ## Progress
 
@@ -262,4 +262,4 @@ Phases execute in numeric order: 75 → 76 → 77
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75. Schema Design and Status Routing | 1/1 | Complete    | 2026-03-20 | - |
 | 76. Proposal Extraction and Task Mapping | 1/1 | Complete   | 2026-03-20 | - |
-| 77. Edge Case Hardening and Validation | v2.8 | 0/0 | Not started | - |
+| 77. Edge Case Hardening and Validation | v2.8 | 1/1 | Complete | 2026-03-20 |
