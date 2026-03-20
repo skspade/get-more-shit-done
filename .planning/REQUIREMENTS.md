@@ -9,15 +9,15 @@ Requirements for Test Steward Consolidation Bridge. Each maps to roadmap phases.
 
 ### Schema
 
-- [ ] **SCHEMA-01**: audit-milestone step 6 writes `gaps.test_consolidation` array to MILESTONE-AUDIT.md YAML frontmatter when steward proposals exist
-- [ ] **SCHEMA-02**: Each `gaps.test_consolidation` entry contains strategy, source, action, and estimated_reduction fields matching the steward's proposal structure
-- [ ] **SCHEMA-03**: `gaps.test_consolidation` is structurally parallel to existing `gaps.requirements`, `gaps.integration`, `gaps.flows` arrays
+- [x] **SCHEMA-01**: audit-milestone step 6 writes `gaps.test_consolidation` array to MILESTONE-AUDIT.md YAML frontmatter when steward proposals exist
+- [x] **SCHEMA-02**: Each `gaps.test_consolidation` entry contains strategy, source, action, and estimated_reduction fields matching the steward's proposal structure
+- [x] **SCHEMA-03**: `gaps.test_consolidation` is structurally parallel to existing `gaps.requirements`, `gaps.integration`, `gaps.flows` arrays
 
 ### Status Routing
 
-- [ ] **ROUTE-01**: Audit with consolidation proposals but no requirement/integration/flow gaps returns `tech_debt` status, not `gaps_found`
-- [ ] **ROUTE-02**: Audit with consolidation proposals AND other gaps returns `gaps_found` (other gaps take precedence)
-- [ ] **ROUTE-03**: Audit with no consolidation proposals (steward disabled or no findings) behaves identically to current behavior
+- [x] **ROUTE-01**: Audit with consolidation proposals but no requirement/integration/flow gaps returns `tech_debt` status, not `gaps_found`
+- [x] **ROUTE-02**: Audit with consolidation proposals AND other gaps returns `gaps_found` (other gaps take precedence)
+- [x] **ROUTE-03**: Audit with no consolidation proposals (steward disabled or no findings) behaves identically to current behavior
 
 ### Gap Parsing
 
@@ -70,12 +70,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | Phase 75 | Pending |
-| SCHEMA-02 | Phase 75 | Pending |
-| SCHEMA-03 | Phase 75 | Pending |
-| ROUTE-01 | Phase 75 | Pending |
-| ROUTE-02 | Phase 75 | Pending |
-| ROUTE-03 | Phase 75 | Pending |
+| SCHEMA-01 | Phase 75 | Complete |
+| SCHEMA-02 | Phase 75 | Complete |
+| SCHEMA-03 | Phase 75 | Complete |
+| ROUTE-01 | Phase 75 | Complete |
+| ROUTE-02 | Phase 75 | Complete |
+| ROUTE-03 | Phase 75 | Complete |
 | PARSE-01 | Phase 76 | Pending |
 | PARSE-02 | Phase 76 | Pending |
 | PARSE-03 | Phase 76 | Pending |
