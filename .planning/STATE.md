@@ -89,6 +89,7 @@ See PROJECT.md Key Decisions table for full history.
 | 7 | Add file-based logging to GSD Autopilot | 2026-03-08 | db88863 | [7-add-file-based-logging-to-gsd-autopilot-](./quick/7-add-file-based-logging-to-gsd-autopilot-/) |
 | 8 | Add stdin redirect regression and argument validation tests | 2026-03-12 | 8db1a94 | [8-test-gsd-autopilot-node-script](./quick/8-test-gsd-autopilot-node-script/) |
 | 9 | Fix brainstorm.md Step 8 to use gsd-tools commit CLI | 2026-03-18 | a449753 | [9-fix-brainstorm-md-to-use-gsd-tools-commi](./quick/9-fix-brainstorm-md-to-use-gsd-tools-commi/) |
+| 10 | Update README and User Guide for v2.7 Playwright features | 2026-03-20 | 3d3f50b | [10-update-our-readme-and-user-guide-for-mil](./quick/10-update-our-readme-and-user-guide-for-mil/) |
 
 ## Session Continuity
 
