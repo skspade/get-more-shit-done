@@ -45,32 +45,6 @@ test_health:
 # Audit Report
 `;
 
-const MIXED_GAPS_FM = `---
-milestone: "2.8"
-audited: "2026-03-20"
-status: gaps_found
-gaps:
-  requirements:
-    - id: "REQ-01"
-      status: unsatisfied
-      phase: "75"
-  integration:
-    - id: "INT-01"
-      type: "missing-wiring"
-  flows:
-    - name: "E2E login"
-      broken_at: "step 3"
-  test_consolidation:
-    - strategy: parameterize
-      source: "tests/state.test.cjs"
-      action: "Convert repeated assertions to test.each"
-      estimated_reduction: 5
-test_health:
-  budget_status: "Warning"
----
-# Audit Report
-`;
-
 const NO_CONSOLIDATION_FM = `---
 milestone: "2.7"
 audited: "2026-03-19"
