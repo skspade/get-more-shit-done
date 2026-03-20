@@ -8,6 +8,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 
 - [Workflow Diagrams](#workflow-diagrams)
 - [Test Architecture](#test-architecture)
+- [UI Testing (Playwright)](#ui-testing-playwright)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -258,6 +259,56 @@ During `/gsd:plan-phase`, the planner receives current budget status and generat
 
 ---
 
+## UI Testing (Playwright)
+
+GSD can generate and run Playwright E2E tests against your running application using the `gsd-playwright` agent. Tests are derived from the acceptance criteria in your phase's CONTEXT.md.
+
+### The `/gsd:ui-test` Command
+
+Generate and execute Playwright E2E tests for a phase:
+
+```
+/gsd:ui-test [phase] [url]
+```
+
+| Flag | Effect |
+|------|--------|
+| `--scaffold` | Force Playwright scaffolding even if already configured |
+| `--run-only` | Skip test generation, run existing tests only |
+| `--headed` | Run tests in a visible browser window |
+
+`--scaffold` and `--run-only` are mutually exclusive.
+
+### How It Works
+
+1. **Detect** -- Checks if Playwright is installed and configured in your project
+2. **Scaffold** -- If not configured, installs `@playwright/test`, creates `playwright.config.ts`, an `e2e/` directory with a smoke test, and installs Chromium
+3. **Generate** -- Reads acceptance tests from CONTEXT.md and maps Given/When/Then/Verify blocks to `.spec.ts` files in `e2e/`
+4. **Execute** -- Runs `npx playwright test` and parses results
+5. **Report** -- Categorizes failures as application-level (server not running) or test-level (assertion mismatch), and includes screenshot and trace paths for debugging
+
+### Integration with `/gsd:add-tests`
+
+When you run `/gsd:add-tests [phase]`, GSD classifies implementation files into unit test and E2E test categories. If Playwright is detected (or scaffolded), E2E tests are generated alongside unit tests using the same `gsd-playwright` agent.
+
+### Example Usage
+
+```
+# Generate and run E2E tests for phase 71
+/gsd:ui-test 71 http://localhost:3000
+
+# Scaffold Playwright even if already detected
+/gsd:ui-test --scaffold
+
+# Run existing tests only (skip generation)
+/gsd:ui-test --run-only
+
+# Run in visible browser mode
+/gsd:ui-test --headed
+```
+
+---
+
 ## Command Reference
 
 ### Core Workflow
@@ -310,6 +361,8 @@ During `/gsd:plan-phase`, the planner receives current budget status and generat
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 | `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone | Have a Linear issue to implement |
 | `/gsd:brainstorm [topic]` | Collaborative brainstorming that produces a design doc and routes into milestone/project creation | Want to explore an idea before committing to implementation |
+| `/gsd:ui-test [phase] [url]` | Generate and run Playwright E2E tests | After UI is deployed or running locally |
+| `/gsd:add-tests [phase]` | Add unit and E2E tests to a phase | After execution, to boost test coverage |
 | `/gsd:pr-review [flags] [aspects...]` | Route PR review findings to quick task or milestone | Have PR review feedback to act on |
 
 ---
@@ -428,6 +481,7 @@ All test settings use zero-config defaults. The `test.command` and `test.framewo
 | gsd-plan-checker | Sonnet | Sonnet | Haiku |
 | gsd-integration-checker | Sonnet | Sonnet | Haiku |
 | gsd-test-steward | Sonnet | Sonnet | Haiku |
+| gsd-playwright | Sonnet | Sonnet | Haiku |
 
 **Profile philosophy:**
 - **quality** -- Opus for all decision-making agents, Sonnet for read-only verification. Use when quota is available and the work is critical.
@@ -692,6 +746,10 @@ Acceptance test gathering only happens in interactive mode (not autopilot/auto-c
 
 To disable acceptance test gathering entirely: `gsd settings set test.acceptance_tests false`
 
+### E2E Tests Fail with Connection Refused
+
+Make sure your dev server is running before running `/gsd:ui-test`. Playwright tests need a live server at the URL you provide.
+
 ### Subagent Appears to Fail but Work Was Done
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
@@ -714,6 +772,7 @@ A known workaround exists for a Claude Code classification bug. GSD's orchestrat
 | Tests blocking execution | `gsd settings set test.hard_gate false` to disable gate temporarily |
 | Test budget warnings | `gsd settings set test.budget.per_phase N` to increase limit |
 | Test suite health concerns | `/gsd:audit-tests` for on-demand health check |
+| Need E2E test coverage | `/gsd:ui-test [phase] [url]` or `/gsd:add-tests [phase]` |
 
 ---
 
