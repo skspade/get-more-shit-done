@@ -180,7 +180,7 @@
 
 - [x] **Phase 71: Test Infrastructure and Detection Foundation** - Playwright detection, output parsing, and budget safety in testing.cjs and gsd-tools.cjs (completed 2026-03-20)
 - [x] **Phase 72: gsd-playwright Agent** - Full lifecycle agent for Playwright detection, scaffolding, generation, execution, and reporting (completed 2026-03-20)
-- [ ] **Phase 73: /gsd:ui-test Command** - User-facing command that spawns gsd-playwright agent with argument parsing and flags
+- [x] **Phase 73: /gsd:ui-test Command** - User-facing command that spawns gsd-playwright agent with argument parsing and flags (completed 2026-03-20)
 - [ ] **Phase 74: add-tests Workflow Enhancement** - Surgical E2E path modification in add-tests.md with Playwright detection and RED-GREEN pattern
 
 ## Phase Details
@@ -255,5 +255,5 @@ Phases execute in numeric order: 71 -> 72 -> 73 -> 74
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71. Infrastructure | 2/2 | Complete    | 2026-03-20 | - |
 | 72. Agent | 1/1 | Complete    | 2026-03-20 | - |
-| 73. Command | v2.7 | 0/0 | Not started | - |
+| 73. Command | 1/1 | Complete    | 2026-03-20 | - |
 | 74. Workflow | v2.7 | 0/0 | Not started | - |
