@@ -230,7 +230,8 @@
   2. When Playwright is not detected, add-tests prompts whether to scaffold before proceeding with E2E generation
   3. E2E test results appear in the existing add-tests summary table alongside unit test results
   4. The TDD path (unit test generation, RED-GREEN cycle) works identically to before this change with zero behavioral differences
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 74-01-PLAN.md — Playwright-aware execute_e2e_generation and summary_and_commit
 
 ## Progress
 
