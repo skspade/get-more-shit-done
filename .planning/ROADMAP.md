@@ -205,10 +205,10 @@
   3. The `gaps.test_consolidation` array is structurally parallel to existing `gaps.requirements`, `gaps.integration`, `gaps.flows` arrays (same nesting, same parser path)
   4. An audit with consolidation proposals but no other gaps returns `tech_debt` status, and an audit with both returns `gaps_found`
   5. An audit with no consolidation proposals (steward disabled or no findings) behaves identically to current pre-v2.8 behavior
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 75-01: TBD
+- [ ] 75-01: Add gaps.test_consolidation schema and status routing to both workflow files
 
 ### Phase 76: Proposal Extraction and Task Mapping
 **Goal**: Steward free-text proposals are defensively parsed into structured objects and translated into concrete, strategy-specific tasks within a single cleanup phase
