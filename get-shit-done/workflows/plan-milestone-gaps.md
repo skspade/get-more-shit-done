@@ -120,6 +120,16 @@ These gaps are optional. Include them?
 
 ---
 
+{If consolidation proposals exist and budget gating passed:}
+
+**Phase {N+M}: Test Suite Consolidation** (last in sequence)
+Estimated total reduction: {sum of all estimated_reduction} tests
+Tasks:
+- [{strategy}] {task name} — {source} (est. -{estimated_reduction} tests)
+- [{strategy}] {task name} — {source} (est. -{estimated_reduction} tests)
+
+---
+
 Create these {X} phases? (yes / adjust / defer all optional)
 ```
 
@@ -271,6 +281,36 @@ becomes:
 
 # Usually same phase as requirement/integration gap
 # Flow gaps often overlap with other gap types
+```
+
+**Test consolidation gap → Tasks:**
+
+Each strategy maps to a specific task type. All field values (`{source}`, `{action}`, `{estimated_reduction}`) come verbatim from the `gaps.test_consolidation` entries — do not re-interpret or generalize.
+
+```yaml
+# Prune → Delete task
+- name: "Remove stale tests in {source}"
+  type: "delete"
+  files: ["{source}"]
+  action: "Delete test cases: {action}. Estimated reduction: {estimated_reduction} tests. Run test suite to confirm no regressions."
+
+# Parameterize → Refactor task
+- name: "Parameterize tests in {source}"
+  type: "refactor"
+  files: ["{source}"]
+  action: "{action}. Estimated reduction: {estimated_reduction} tests. Run test suite to confirm no regressions."
+
+# Promote → Delete-and-verify task
+- name: "Remove unit tests subsumed in {source}"
+  type: "delete-and-verify"
+  files: ["{source}"]
+  action: "{action}. Estimated reduction: {estimated_reduction} tests. Verify subsuming integration test still covers assertions. Run test suite."
+
+# Merge → Reorganize task
+- name: "Consolidate tests from {source}"
+  type: "reorganize"
+  files: ["{source}"]
+  action: "{action}. Estimated reduction: {estimated_reduction} tests. Run test suite to confirm no regressions."
 ```
 
 </gap_to_phase_mapping>
