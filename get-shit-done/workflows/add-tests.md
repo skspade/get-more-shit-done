@@ -238,33 +238,179 @@ For each approved TDD test:
 </step>
 
 <step name="execute_e2e_generation">
+
+**1. Detect Playwright:**
+
+Before generating any E2E tests, detect Playwright availability (run once, not per-file):
+
+```bash
+DETECT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" playwright-detect --raw 2>/dev/null)
+```
+
+Parse the JSON result. The `status` field determines the path:
+
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `configured` | Config file exists, Playwright ready | Proceed to spec generation (section 3) |
+| `installed` | Package in deps, no config file | Present scaffolding prompt (section 2) |
+| `not-detected` | No Playwright at all | Present scaffolding prompt (section 2) |
+
+**2. Scaffolding Prompt (when Playwright not configured):**
+
+```
+AskUserQuestion(
+  header: "Playwright Not Detected",
+  question: "Playwright is not configured in this project. E2E test generation requires Playwright. How would you like to proceed?",
+  options:
+    - "Scaffold Playwright and continue" — creates playwright.config.ts, e2e/ directory, installs Chromium
+    - "Skip E2E tests" — bypass E2E generation, record zeros in summary
+    - "Cancel" — stop add-tests workflow
+)
+```
+
+**If "Scaffold Playwright and continue":**
+
+Execute inline scaffolding (mirrors gsd-playwright agent Step 2):
+
+a. Install Playwright (only if status was `not-detected`):
+```bash
+npm install -D @playwright/test
+```
+
+b. Create `playwright.config.ts`:
+```typescript
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'line',
+  use: {
+    baseURL: 'http://localhost:3000',
+    screenshot: 'only-on-failure',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+});
+```
+
+c. Create `e2e/` directory with example smoke test (`e2e/example.spec.ts`):
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('has title', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle(/.+/);
+});
+```
+
+d. Update `.gitignore` — append these entries if not already present:
+```
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+```
+
+e. Install browser binaries:
+```bash
+npx playwright install chromium
+```
+
+After scaffolding completes, proceed to spec generation (section 3).
+
+**If "Skip E2E tests":** Set E2E counts to zero (generated=0, passing=0, failing=0, blocked=0). Skip to summary_and_commit step.
+
+**If "Cancel":** Exit workflow.
+
+**3. Spec Generation (Playwright configured):**
+
 For each approved E2E test:
 
-1. **Check for existing tests** covering the same scenario:
-   ```bash
-   grep -r "{scenario keyword}" {e2e test directory} 2>/dev/null
-   ```
-   If found, extend rather than duplicate.
+a. **Check for existing tests** covering the same scenario:
+```bash
+grep -r "{scenario keyword}" e2e/ 2>/dev/null
+```
+If found, extend rather than duplicate.
 
-2. **Create test file** targeting the user scenario from CONTEXT.md/VERIFICATION.md
+b. **Create spec file** at `e2e/{feature-slug}.spec.ts`:
 
-3. **Run the E2E test**:
-   ```bash
-   {discovered e2e command}
-   ```
+```typescript
+import { test, expect } from '@playwright/test';
 
-4. **Evaluate result:**
-   - **GREEN (passes)**: Record success
-   - **RED (fails)**: Determine if it's a test issue or a genuine application bug. Flag bugs:
-     ```
-     ⚠️ E2E failure: {test name}
-     Scenario: {description}
-     Error: {error message}
-     ```
-   - **Cannot run**: Report blocker. Do NOT mark as complete.
-     ```
-     🛑 E2E blocker: {reason tests cannot run}
-     ```
+test.describe('{Feature Name}', () => {
+  test('{description from acceptance criterion}', async ({ page }) => {
+    // Given — test setup from acceptance criteria
+    await page.goto('{path}');
+
+    // When — user actions
+    await page.getByRole('button', { name: '{action}' }).click();
+
+    // Then — assertions
+    await expect(page.getByText('{expected}')).toBeVisible();
+  });
+});
+```
+
+Map acceptance criteria from CONTEXT.md/VERIFICATION.md:
+- **Given** sections map to test setup (navigation, state preparation)
+- **When** sections map to user actions (clicks, fills, navigates)
+- **Then/Verify** sections map to assertions (`expect` statements)
+
+**Locator priority hierarchy** (use the highest-priority locator that works):
+1. `page.getByRole()` — semantic role-based (buttons, headings, links)
+2. `page.getByText()` — visible text content
+3. `page.getByLabel()` — form field labels
+4. `page.getByTestId()` — data-testid attributes
+5. CSS selectors — last resort only
+
+**4. RED-GREEN Execution:**
+
+Run each generated spec via Playwright:
+```bash
+npx playwright test --project=chromium {spec-file}
+```
+
+Evaluate results:
+
+- **GREEN (passes):** Record success.
+
+- **RED (fails):** Categorize using error message patterns:
+
+  **Application-level failures** (flag as blocker, do NOT fix the test):
+  - `ERR_CONNECTION_REFUSED`, `net::ERR_`, `ECONNREFUSED`
+  - `NS_ERROR_CONNECTION_REFUSED`
+  - `page.goto: Timeout`, `Navigation timeout`
+  - `Target page, context or browser has been closed`
+  ```
+  🛑 E2E app-level failure: {test name}
+  Scenario: {description}
+  Error: {error message}
+  ```
+
+  **Test-level failures** (fix the test and re-run):
+  - `locator.`, `strict mode violation`
+  - `expect(received)`, `Expected`, `Received`
+  - `toHaveText`, `toBe`, `toBeVisible`, `toHaveCount`
+  - `not found`, `element not visible`
+  ```
+  ⚠️ E2E test-level failure: {test name}
+  Scenario: {description}
+  Error: {error message}
+  ```
+
+- **Cannot run:** Report blocker. Do NOT mark as complete.
+  ```
+  🛑 E2E blocker: {reason tests cannot run}
+  ```
 
 **No-skip rule:** If E2E tests cannot execute (missing dependencies, environment issues), report the blocker and mark the test as incomplete. Never mark success without actually running the test.
 </step>
@@ -283,15 +429,31 @@ Create a test coverage report and present to user:
 |----------|-----------|---------|---------|---------|
 | Unit     | {N}       | {n1}    | {n2}    | {n3}    |
 | E2E      | {M}       | {m1}    | {m2}    | {m3}    |
+```
 
+**E2E row values from Playwright execution:**
+- `{M}` = number of `.spec.ts` files generated in `e2e/`
+- `{m1}` = number of passing Playwright tests (from `npx playwright test` output)
+- `{m2}` = number of failing Playwright tests (both test-level and app-level)
+- `{m3}` = number of blocked tests (could not execute)
+
+**When E2E tests were skipped** (user declined scaffolding, no E2E-classified files, or Playwright not configured and user chose "Skip E2E tests"), show zeros: `| E2E | 0 | 0 | 0 | 0 |`
+
+```
 ## Files Created/Modified
 {list of test files with paths}
+{if Playwright scaffolding was performed: include playwright.config.ts, e2e/example.spec.ts, .gitignore (updated)}
+{include any generated e2e/{feature-slug}.spec.ts files}
 
 ## Coverage Gaps
 {areas that couldn't be tested and why}
+{if E2E tests were skipped: note reason — e.g., "E2E tests skipped: Playwright not configured, user declined scaffolding"}
 
 ## Bugs Discovered
 {any assertion failures that indicate implementation bugs}
+{for E2E failures, distinguish:}
+{- Test-level failures (locator/assertion errors): test needs fixing, not an app bug}
+{- App-level failures (connection refused, timeout): application issue or environment not running}
 ```
 
 Record test generation in project state:
@@ -318,6 +480,9 @@ Present next steps:
 
 {if blocked tests:}
 **Resolve test blockers:** {description of what's needed}
+
+{if app-level E2E failures:}
+**Application issues detected:** E2E tests found app-level failures. Ensure the application is running before re-running E2E tests.
 
 {otherwise:}
 **All tests passing!** Phase ${phase_number} is fully tested.
