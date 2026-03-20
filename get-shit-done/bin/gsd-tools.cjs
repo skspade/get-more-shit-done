@@ -56,6 +56,7 @@
  * Testing:
  *   test-count [--phase N]             Count test cases in project (optionally per-phase)
  *   test-detect-framework              Auto-detect test framework from project files
+ *   playwright-detect                  Detect Playwright installation state
  *   test-config                        Return merged test configuration with defaults
  *   test-run [--baseline] [--baseline-data JSON] [--commit-msg MSG]  Run tests and return structured results
  *
@@ -647,6 +648,11 @@ async function main() {
 
     case 'test-detect-framework': {
       testing.cmdTestDetectFramework(cwd, raw);
+      break;
+    }
+
+    case 'playwright-detect': {
+      testing.cmdPlaywrightDetect(cwd, raw);
       break;
     }
 

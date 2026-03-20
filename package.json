@@ -24,6 +24,7 @@
     "zx": "^8.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "c8": "^11.0.0",
     "esbuild": "^0.24.0"
   },

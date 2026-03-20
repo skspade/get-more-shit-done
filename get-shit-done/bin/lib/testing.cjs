@@ -83,10 +83,43 @@ function detectFramework(cwd) {
   return null;
 }
 
+// ─── Playwright Detection ────────────────────────────────────────────────────
+
+/**
+ * Detect Playwright installation state in a project.
+ * Returns: { status: 'configured'|'installed'|'not-detected', config_path: string|null }
+ */
+function detectPlaywright(cwd) {
+  // 1. Check for config files (highest confidence)
+  const configFiles = ['playwright.config.ts', 'playwright.config.js'];
+  for (const cfg of configFiles) {
+    const cfgPath = path.join(cwd, cfg);
+    if (fs.existsSync(cfgPath)) {
+      return { status: 'configured', config_path: cfgPath };
+    }
+  }
+
+  // 2. Check package.json for @playwright/test
+  const pkgPath = path.join(cwd, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+      if (deps['@playwright/test']) {
+        return { status: 'installed', config_path: null };
+      }
+    } catch {
+      // Invalid package.json — treat as not detected
+    }
+  }
+
+  return { status: 'not-detected', config_path: null };
+}
+
 // ─── Test File Discovery ────────────────────────────────────────────────────
 
 const TEST_FILE_PATTERNS = /\.(test|spec)\.(js|ts|cjs|mjs)$/;
-const EXCLUDE_DIRS = new Set(['node_modules', '.git', '.planning', 'dist', 'build', 'coverage']);
+const EXCLUDE_DIRS = new Set(['node_modules', '.git', '.planning', 'dist', 'build', 'coverage', 'e2e']);
 
 /**
  * Recursively find test files in a directory.
@@ -340,6 +373,27 @@ function parseTestOutput(stdout, stderr, framework) {
       break;
     }
 
+    case 'playwright': {
+      // Playwright line reporter: "N passed", "N failed", "N skipped"
+      const pwPassMatch = combined.match(/(\d+)\s+passed/);
+      const pwFailMatch = combined.match(/(\d+)\s+failed/);
+      const skipMatch = combined.match(/(\d+)\s+skipped/);
+      if (pwPassMatch) result.passed = parseInt(pwPassMatch[1], 10);
+      if (pwFailMatch) result.failed = parseInt(pwFailMatch[1], 10);
+      const skipped = skipMatch ? parseInt(skipMatch[1], 10) : 0;
+      result.total = result.passed + result.failed + skipped;
+
+      // Extract failing test names from numbered list: "  1) file.spec.ts:12:5 > test name"
+      const pwFailedLines = combined.match(/^\s+\d+\)\s+(.+)$/gm);
+      if (pwFailedLines) {
+        for (const line of pwFailedLines) {
+          const nameMatch = line.match(/^\s+\d+\)\s+(.+)$/);
+          if (nameMatch) result.failedTests.push(nameMatch[1].trim());
+        }
+      }
+      break;
+    }
+
     default:
       // Unknown framework: cannot parse, return zeros
       break;
@@ -526,6 +580,11 @@ function cmdTestDetectFramework(cwd, raw) {
   output({ framework }, raw, framework || 'unknown');
 }
 
+function cmdPlaywrightDetect(cwd, raw) {
+  const result = detectPlaywright(cwd);
+  output(result, raw, result.status);
+}
+
 function cmdTestConfig(cwd, raw) {
   const config = getTestConfig(cwd);
   output(config, raw, JSON.stringify(config));
@@ -533,6 +592,7 @@ function cmdTestConfig(cwd, raw) {
 
 module.exports = {
   detectFramework,
+  detectPlaywright,
   findTestFiles,
   countTestsInFile,
   countTestsInProject,
@@ -540,6 +600,7 @@ module.exports = {
   parseTestOutput,
   cmdTestCount,
   cmdTestDetectFramework,
+  cmdPlaywrightDetect,
   cmdTestConfig,
   cmdTestRun,
 };
