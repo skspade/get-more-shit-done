@@ -17,6 +17,7 @@
 - ✅ **v2.5 New-Milestone Auto Mode** — Phases 59-63 (shipped 2026-03-14)
 - ✅ **v2.6 Unified Validation Module** — Phases 64-70 (shipped 2026-03-17)
 - ✅ **v2.7 Playwright UI Testing Integration** — Phases 71-74 (shipped 2026-03-20)
+- [ ] **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (in progress)
 
 ## Phases
 
@@ -184,7 +185,63 @@
 
 </details>
 
+### v2.8 Test Steward Consolidation Bridge (In Progress)
+
+**Milestone Goal:** Bridge the test steward's consolidation proposals into actionable cleanup phases during milestone gap closure.
+
+- [ ] **Phase 75: Schema Design and Status Routing** - Define gaps.test_consolidation schema and lock tech_debt routing for consolidation-only audits, modifying both workflow files atomically
+- [ ] **Phase 76: Proposal Extraction and Task Mapping** - Parse steward proposals into structured data and map all four strategies to executable tasks with budget gating
+- [ ] **Phase 77: Edge Case Hardening and Validation** - Verify graceful behavior for empty proposals, steward-disabled, consolidation-only gaps, and autopilot flow
+
+## Phase Details
+
+### Phase 75: Schema Design and Status Routing
+**Goal**: Audit-milestone writes structured consolidation proposals to frontmatter, plan-milestone-gaps reads them, and consolidation-only audits route to tech_debt (not gaps_found)
+**Depends on**: Phase 74 (v2.7 complete)
+**Requirements**: SCHEMA-01, SCHEMA-02, SCHEMA-03, ROUTE-01, ROUTE-02, ROUTE-03
+**Success Criteria** (what must be TRUE):
+  1. MILESTONE-AUDIT.md contains a `gaps.test_consolidation` array in YAML frontmatter after audit-milestone step 6 runs with steward proposals present
+  2. Each entry in `gaps.test_consolidation` has strategy, source, action, and estimated_reduction fields matching steward proposal structure
+  3. The `gaps.test_consolidation` array is structurally parallel to existing `gaps.requirements`, `gaps.integration`, `gaps.flows` arrays (same nesting, same parser path)
+  4. An audit with consolidation proposals but no other gaps returns `tech_debt` status, and an audit with both returns `gaps_found`
+  5. An audit with no consolidation proposals (steward disabled or no findings) behaves identically to current pre-v2.8 behavior
+**Plans**: TBD
+
+Plans:
+- [ ] 75-01: TBD
+
+### Phase 76: Proposal Extraction and Task Mapping
+**Goal**: Steward free-text proposals are defensively parsed into structured objects and translated into concrete, strategy-specific tasks within a single cleanup phase
+**Depends on**: Phase 75
+**Requirements**: PARSE-01, PARSE-02, PARSE-03, PHASE-01, PHASE-02, PHASE-03, TASK-01, TASK-02, TASK-03, TASK-04, TASK-05
+**Success Criteria** (what must be TRUE):
+  1. plan-milestone-gaps reads `gaps.test_consolidation` from frontmatter and creates tasks from it; when the field is absent or empty, it skips with no error
+  2. A consolidation phase is created only when `test_health.budget_status` is Warning or Over Budget; OK budget status defers to tech debt
+  3. All proposals are grouped into a single "Test Suite Consolidation" phase positioned last in the gap closure sequence, with each proposal appearing as a task
+  4. Prune proposals map to delete tasks, parameterize to refactor tasks, promote to delete-and-verify tasks, and merge to reorganize tasks -- each with verbatim steward file paths and estimated_reduction counts
+**Plans**: TBD
+
+Plans:
+- [ ] 76-01: TBD
+
+### Phase 77: Edge Case Hardening and Validation
+**Goal**: All edge cases produce correct behavior and existing gap types remain unaffected by the new consolidation bridge
+**Depends on**: Phase 76
+**Requirements**: EDGE-01, EDGE-02, EDGE-03
+**Success Criteria** (what must be TRUE):
+  1. When only test consolidation gaps exist (no requirement/integration/flow gaps), plan-milestone-gaps creates just the consolidation phase without error
+  2. The autopilot audit-fix-reaudit loop processes consolidation phases the same way it processes any other gap closure phase -- no special-casing required
+  3. Steward proposals in the generated tasks use verbatim source file paths and test names from the steward report, not re-interpreted or generalized descriptions
+  4. Existing gap types (requirements, integration, flows) produce identical behavior to pre-v2.8 -- no regressions
+**Plans**: TBD
+
+Plans:
+- [ ] 77-01: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 75 → 76 → 77
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -203,3 +260,6 @@
 | 59-63 | v2.5 | 6/6 | Complete | 2026-03-14 |
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
+| 75. Schema Design and Status Routing | v2.8 | 0/0 | Not started | - |
+| 76. Proposal Extraction and Task Mapping | v2.8 | 0/0 | Not started | - |
+| 77. Edge Case Hardening and Validation | v2.8 | 0/0 | Not started | - |

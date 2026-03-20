@@ -70,32 +70,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | Pending | Pending |
-| SCHEMA-02 | Pending | Pending |
-| SCHEMA-03 | Pending | Pending |
-| ROUTE-01 | Pending | Pending |
-| ROUTE-02 | Pending | Pending |
-| ROUTE-03 | Pending | Pending |
-| PARSE-01 | Pending | Pending |
-| PARSE-02 | Pending | Pending |
-| PARSE-03 | Pending | Pending |
-| PHASE-01 | Pending | Pending |
-| PHASE-02 | Pending | Pending |
-| PHASE-03 | Pending | Pending |
-| TASK-01 | Pending | Pending |
-| TASK-02 | Pending | Pending |
-| TASK-03 | Pending | Pending |
-| TASK-04 | Pending | Pending |
-| TASK-05 | Pending | Pending |
-| EDGE-01 | Pending | Pending |
-| EDGE-02 | Pending | Pending |
-| EDGE-03 | Pending | Pending |
+| SCHEMA-01 | Phase 75 | Pending |
+| SCHEMA-02 | Phase 75 | Pending |
+| SCHEMA-03 | Phase 75 | Pending |
+| ROUTE-01 | Phase 75 | Pending |
+| ROUTE-02 | Phase 75 | Pending |
+| ROUTE-03 | Phase 75 | Pending |
+| PARSE-01 | Phase 76 | Pending |
+| PARSE-02 | Phase 76 | Pending |
+| PARSE-03 | Phase 76 | Pending |
+| PHASE-01 | Phase 76 | Pending |
+| PHASE-02 | Phase 76 | Pending |
+| PHASE-03 | Phase 76 | Pending |
+| TASK-01 | Phase 76 | Pending |
+| TASK-02 | Phase 76 | Pending |
+| TASK-03 | Phase 76 | Pending |
+| TASK-04 | Phase 76 | Pending |
+| TASK-05 | Phase 76 | Pending |
+| EDGE-01 | Phase 77 | Pending |
+| EDGE-02 | Phase 77 | Pending |
+| EDGE-03 | Phase 77 | Pending |
 
 **Coverage:**
 - v2.8 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 after initial definition*
+*Last updated: 2026-03-20 after roadmap creation*
