@@ -1,5 +1,21 @@
 # Milestones
 
+## v2.8 Test Steward Consolidation Bridge (Shipped: 2026-03-20)
+
+**Phases completed:** 3 phases, 3 plans, 6 tasks
+**Timeline:** 1 day (2026-03-20)
+**Git range:** 5b8e325 → 76a7c73 (18 files, +1,637/-62)
+
+**Key accomplishments:**
+- Added `gaps.test_consolidation` schema to MILESTONE-AUDIT.md YAML frontmatter with strategy/source/action/estimated_reduction fields, structurally parallel to existing gap types
+- Consolidation-aware status routing: consolidation-only audits return `tech_debt` (not `gaps_found`), mixed audits preserve `gaps_found`, no-proposal audits unchanged
+- Budget gating for test consolidation phases — OK budget skips, Warning/Over Budget creates a consolidation phase
+- Four strategy-to-task mapping templates: prune→delete, parameterize→refactor, promote→delete-and-verify, merge→reorganize with verbatim steward fields
+- 19 edge case tests validating all consolidation bridge scenarios including empty proposals, steward-disabled, consolidation-only gaps, and autopilot compatibility
+- Milestone audit: 20/20 requirements satisfied, 8/8 integrations wired, 3/3 E2E flows verified (tech_debt — 2 minor items)
+
+---
+
 ## v2.7 Playwright UI Testing Integration (Shipped: 2026-03-20)
 
 **Phases completed:** 4 phases, 5 plans, 16 tasks

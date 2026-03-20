@@ -639,6 +639,48 @@
 
 ---
 
+## Milestone: v2.8 — Test Steward Consolidation Bridge
+
+**Shipped:** 2026-03-20
+**Phases:** 3 | **Plans:** 3 | **Commits:** 11
+
+### What Was Built
+- `gaps.test_consolidation` schema in MILESTONE-AUDIT.md YAML frontmatter with strategy/source/action/estimated_reduction fields
+- Consolidation-aware status routing: consolidation-only audits → `tech_debt`, mixed audits → `gaps_found`
+- Budget gating: OK budget skips consolidation phase, Warning/Over Budget creates it
+- Four strategy-to-task mapping templates (prune→delete, parameterize→refactor, promote→delete-and-verify, merge→reorganize)
+- 19 edge case regression tests validating all consolidation bridge scenarios
+
+### What Worked
+- Atomic workflow modification pattern: Phase 75 updated both write side (audit-milestone) and read side (plan-milestone-gaps) atomically — no partial state
+- Guard clause pattern for optional gap types (`const x = gaps.type || []`) made absent/empty handling trivial
+- All 3 phases completed in < 10 minutes total execution — well-scoped with clear success criteria
+- Zero gap closure needed — audit returned `tech_debt` (all requirements met, only minor parsing fidelity debt)
+- Source-text structural validation pattern for autopilot.mjs tests — avoids ESM/CJS incompatibility while still verifying behavior
+
+### What Was Inefficient
+- Test budget now at 826/800 (103.25%) — 19 new tests added without first applying consolidation proposals from v2.7 audit
+- `extractFrontmatter` doesn't parse nested YAML array-of-objects — tech debt noted but not fixed (LLM path unaffected)
+- EDGE-03 tests assert truthy on `gaps.test_consolidation` but don't validate field-level object structure — weaker than possible
+
+### Patterns Established
+- Gap type addition pattern: modify audit-milestone step 6 template AND plan-milestone-gaps step 1 enumeration atomically
+- Budget gating pattern: check `test_health.budget_status` before creating optional cleanup phases
+- Strategy-to-task mapping: each steward strategy has a named task type (delete, refactor, delete-and-verify, reorganize)
+
+### Key Lessons
+1. Workflow-only milestones (no new CJS code, only .md changes + tests) can ship very quickly — 3 phases, ~8 minutes total
+2. Test budget should be consolidated before adding new tests — applying v2.7's consolidation proposals first would have kept budget under 800
+3. Source-text validation is a viable pattern for testing non-importable scripts — read file content and assert on structural patterns
+4. Guard clauses for optional gap types (`|| []`) are simpler than conditional parsing blocks — established as the standard pattern
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents)
+- Sessions: 3 plan executions across 3 phases
+- Notable: smallest milestone by phase count (tied with v2.0/v2.1) — fastest execution at ~2.7 min/plan
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -660,12 +702,13 @@
 | v2.5 | 30 | 5 | New-milestone auto mode — flag+config+persist pattern, 6 skip points, auto-chain, SlashCommand delegation |
 | v2.6 | ~40 | 7 | Unified validation module — check registry pattern, 3 consumer migration, auto-repair, test parameterization |
 | v2.7 | ~20 | 4 | Playwright UI testing — three-tier detection, agent lifecycle, command, workflow integration, zero gap closure |
+| v2.8 | 11 | 3 | Test steward consolidation bridge — workflow-only milestone, gap type addition, budget gating, zero gap closure |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 13 of 15 milestones (v2.1 and v2.7 are clean passes)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 15 milestones; v2.1 and v2.7 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 15 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 13 of 16 milestones (v2.1, v2.7, v2.8 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 16 milestones; v2.1, v2.7, v2.8 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 16 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
