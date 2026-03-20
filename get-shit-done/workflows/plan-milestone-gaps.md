@@ -23,6 +23,8 @@ Parse YAML frontmatter to extract structured gaps:
 
 If `gaps.test_consolidation` is absent or empty, skip test consolidation with no error. Treat as: `const consolidationGaps = gaps.test_consolidation || [];`
 
+Also extract `test_health.budget_status` from the frontmatter (values: `OK`, `Warning`, `Over Budget`). If absent, default to `OK`.
+
 If no audit file exists or has no gaps, error:
 ```
 No audit gaps found. Run `/gsd:audit-milestone` first.
@@ -50,7 +52,12 @@ Cluster related gaps into logical phases:
 - Dependency order (fix stubs before wiring)
 - Keep phases focused: 2-4 tasks each
 
-**Test consolidation grouping:**
+**Budget gating for test consolidation:**
+- Read `test_health.budget_status` (extracted in step 1, defaults to `OK` if absent)
+- If `budget_status` is `OK`: skip consolidation phase creation entirely, even if proposals exist — defer to tech debt. Log: "Skipping test consolidation — budget status OK, deferring to tech debt"
+- If `budget_status` is `Warning` or `Over Budget`: proceed with consolidation phase creation below
+
+**Test consolidation grouping** (only when budget gating passes):
 - All test consolidation proposals are grouped into a single phase called "Test Suite Consolidation"
 - The consolidation phase is always the last phase in the gap closure sequence
 - Each proposal appears as a task in the consolidation phase
