@@ -109,7 +109,15 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+## Current Milestone: v2.8 Test Steward Consolidation Bridge
+
+**Goal:** Bridge the test steward's consolidation proposals into actionable cleanup phases during milestone gap closure.
+
+**Target features:**
+- Add `gaps.test_consolidation` to MILESTONE-AUDIT.md frontmatter as fourth gap type
+- Extend plan-milestone-gaps to parse and create test consolidation phases from steward proposals
+- Define proposal-to-task mapping for prune, parameterize, promote, merge strategies
+- Handle edge cases: no proposals, steward disabled, only test gaps, autopilot flow
 
 ### Out of Scope
 
@@ -219,4 +227,4 @@ Shipped v2.7 with Playwright UI testing integration. 15 milestones shipped (v1.0
 **Known tech debt:** Test budget at 100.9% (807/800) — 3 redundant tests, 2 consolidation proposals would bring to ~798; `playwright-detect --raw` documented as JSON in 3 consumers but returns plain string; SUMMARY frontmatter references non-existent `parsePlaywrightOutput()` (actual: `parseTestOutput` with 'playwright' arg); scaffolding templates omit `webServer` block; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys)
 
 ---
-*Last updated: 2026-03-20 after v2.7 milestone*
+*Last updated: 2026-03-20 after v2.8 milestone start*
