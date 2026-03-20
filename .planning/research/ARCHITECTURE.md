@@ -1,411 +1,502 @@
 # Architecture Research
 
-**Domain:** Unified validation module integration into existing CJS module ecosystem
-**Researched:** 2026-03-15
+**Domain:** Playwright UI Testing Integration into GSD Command/Workflow/Agent Architecture
+**Researched:** 2026-03-19
 **Confidence:** HIGH
 
-## System Overview -- Current Architecture
+## System Overview — Existing GSD Architecture
+
+The GSD architecture has three tiers that interact in a strict pattern:
 
 ```
-                          CONSUMERS
-  ┌────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-  │   gsd-cli.cjs      │  │   autopilot.mjs      │  │   gsd-tools.cjs      │
-  │  (CLI binary)      │  │  (ESM/zx outer loop) │  │  (workflow dispatch)  │
-  │                    │  │  createRequire()      │  │                      │
-  └────────┬───────────┘  └───────┬──────────────┘  └──────────┬───────────┘
-           │                      │                             │
-           │ routeCommand()       │ direct CJS import           │ switch/case
-           ▼                      ▼                             ▼
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │                         bin/lib/ CJS MODULES                            │
-  ├─────────┬──────────┬──────────┬──────────┬──────────┬──────────────────┤
-  │ cli.cjs │phase.cjs │verify.cjs│ core.cjs │config.cjs│ state.cjs  ...  │
-  └─────────┴──────────┴──────────┴──────────┴──────────┴──────────────────┘
+USER INVOCATION
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    COMMANDS  (commands/gsd/*.md)                         │
+│  User-facing entry points. Parse arguments, load context via            │
+│  gsd-tools.cjs init, then delegate to a workflow or agent directly.     │
+│                                                                         │
+│  /gsd:add-tests   /gsd:audit-tests   /gsd:linear   /gsd:pr-review      │
+└───────────────────────────┬─────────────────────────────────────────────┘
+                            │ delegates to (via @workflow or Task spawn)
+                            ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   WORKFLOWS  (~/.claude/get-shit-done/workflows/*.md)    │
+│  Multi-step logic with gates, decisions, and agent spawning.            │
+│  NOT re-entrant from within agents (subagent cannot spawn subagent).    │
+│                                                                         │
+│  add-tests.md   linear.md   pr-review.md   execute-phase.md ...        │
+└───────────────────────────┬─────────────────────────────────────────────┘
+                            │ spawns via Task()
+                            ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     AGENTS  (agents/*.md)                                │
+│  Specialized task handlers. Read-only or narrowly scoped writes.        │
+│  Cannot spawn subagents. Return structured results to caller.           │
+│                                                                         │
+│  gsd-test-steward   gsd-executor   gsd-planner   gsd-verifier ...      │
+└─────────────────────────────────────────────────────────────────────────┘
+                            │ all backed by
+                            ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│              gsd-tools.cjs  +  bin/lib/*.cjs  MODULES                   │
+│  Deterministic data: phase resolution, config, init bundles, state.     │
+│  Consumed by commands and workflows via bash subprocess calls.          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Current Health/Validation Split (the problem)
+### Key Architectural Rules (must preserve for v2.7)
 
-Today, validation logic lives in three disconnected places:
+1. **Commands are orchestrators.** They parse args, call `gsd-tools.cjs init`, then delegate.
+2. **Workflows contain multi-step logic.** They can spawn agents via `Task()` and have gates.
+3. **Agents are leaf nodes.** A spawned agent cannot spawn another agent.
+4. **Cross-session state lives in `.planning/` markdown.** No in-memory state survives between Claude sessions.
+5. **`gsd-tools.cjs` is the data layer.** All deterministic data (phase lookup, config, model resolution) goes through it.
 
-1. **cli.cjs `gatherHealthData()`** (lines 409-595) -- Uses regex on STATE.md to find phase references, checks file existence, validates config JSON syntax. Returns `{ status, checks, errors, warnings, info }`.
+## New Components for v2.7
 
-2. **verify.cjs `cmdValidateHealth()`** (lines 535-871) -- More thorough: `.completed` marker checks, ROADMAP checkbox/disk phase sync, stale STATE.md detection, autopilot phase detection via `findFirstIncompletePhase()`. Supports `--repair`. Returns `{ status, errors, warnings, info, repairable_count }`.
-
-3. **autopilot.mjs** (line 74, 450, 1053-1065) -- Does its own ad-hoc pre-flight: checks `.planning/` exists, then uses `findPhaseInternal()` + `computePhaseStatus()` to determine lifecycle step. No unified readiness check.
-
-**Result:** Three consumers each do partial validation with different approaches. `gsd health` (via cli.cjs) misses things that `validate health` (via verify.cjs) catches, and autopilot has no pre-flight validation at all.
-
-## Recommended Architecture -- validation.cjs Integration
+Three new components integrate with the existing architecture. Two are new files, one is a modification:
 
 ```
-                          CONSUMERS
-  ┌────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-  │   gsd-cli.cjs      │  │   autopilot.mjs      │  │   gsd-tools.cjs      │
-  │  handleHealth()    │  │  preFlight()         │  │  validate dispatch   │
-  │  delegates to      │  │  calls validation    │  │  routes to           │
-  │  validation.cjs    │  │  + auto-repair       │  │  validation.cjs      │
-  └────────┬───────────┘  └───────┬──────────────┘  └──────────┬───────────┘
-           │                      │                             │
-           ▼                      ▼                             ▼
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │                    validation.cjs (NEW)                                  │
-  │                                                                         │
-  │  runChecks(cwd, options)        -> { status, checks, errors, warnings } │
-  │  checkStateConsistency(cwd)     -> { errors, warnings }                 │
-  │  checkAutopilotReadiness(cwd)   -> { ready, step, phase, errors }       │
-  │  autoRepair(cwd, issues)        -> { repairs[] }                        │
-  │                                                                         │
-  │  IMPORTS FROM (reads only):                                             │
-  │    phase.cjs  -- findFirstIncompletePhase, computePhaseStatus            │
-  │    core.cjs   -- findPhaseInternal, getMilestoneInfo                     │
-  │    verify.cjs -- getVerificationStatus (optional, for enrichment)        │
-  │    config.cjs -- CONFIG_DEFAULTS                                         │
-  │    state.cjs  -- writeStateMd (repair only)                              │
-  │    frontmatter.cjs -- extractFrontmatter                                 │
-  └──────────────────────────────────────────────────────────────────────────┘
-           │
-           ▼ (uses but does NOT modify)
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │    phase.cjs    core.cjs    verify.cjs    config.cjs    state.cjs       │
-  └──────────────────────────────────────────────────────────────────────────┘
+NEW                                          MODIFIED
+─────────────────────────────────────────────────────────────────────────────
+commands/gsd/ui-test.md    (NEW command)
+agents/gsd-playwright.md   (NEW agent)
+workflows/add-tests.md     (MODIFIED — existing workflow, enhanced E2E step)
+─────────────────────────────────────────────────────────────────────────────
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Changes for v2.6 |
-|-----------|----------------|-------------------|
-| **validation.cjs** (NEW) | All structural/consistency checks, autopilot readiness, auto-repair | New module |
-| **cli.cjs** | CLI formatting, command routing, `handleHealth()` presentation | `gatherHealthData()` replaced by `validation.runChecks()` delegation |
-| **verify.cjs** | Plan/summary/artifact verification, VERIFICATION.md parsing | `cmdValidateHealth()` replaced by `validation.runChecks()` delegation |
-| **autopilot.mjs** | Outer loop orchestration | Adds pre-flight call to `validation.checkAutopilotReadiness()` |
-| **gsd-tools.cjs** | CLI dispatch for workflows | Adds `validate` entries routing to `validation.cjs` |
-| **phase.cjs** | Phase CRUD and lifecycle status | No changes (consumed by validation.cjs) |
-| **core.cjs** | Shared utilities | No changes (consumed by validation.cjs) |
-| **config.cjs** | Config CRUD and defaults | No changes (consumed by validation.cjs) |
+| Component | Type | Responsibility | New or Modified |
+|-----------|------|----------------|-----------------|
+| `commands/gsd/ui-test.md` | Command | User-facing entry point; parse args (phase, URL, flags), call `init phase-op`, delegate to `gsd-playwright` agent | NEW |
+| `agents/gsd-playwright.md` | Agent | Detection, scaffolding, generation, execution, reporting for Playwright tests; returns structured result to caller | NEW |
+| `workflows/add-tests.md` | Workflow | Add Playwright detection and scaffolding prompt to `execute_e2e_generation` step; spawn `gsd-playwright` for E2E files | MODIFIED |
+| `bin/lib/testing.cjs` | Module | Playwright detection logic (config file presence, package.json deps); potentially add `detectPlaywright()` | MODIFIED (optional) |
 
-## Module Boundary and Export Surface
-
-### validation.cjs -- Proposed Exports
-
-```javascript
-module.exports = {
-  // Primary entry point -- runs all checks, returns unified result
-  runChecks,           // (cwd, { repair?: boolean }) => ValidationResult
-
-  // Granular check functions (composable building blocks)
-  checkStructure,      // (cwd) => { checks[], errors[], warnings[] }
-  checkStateConsistency, // (cwd) => { errors[], warnings[] }
-  checkConfig,         // (cwd) => { errors[], warnings[] }
-  checkPhaseSync,      // (cwd) => { errors[], warnings[] }
-  checkAutopilotReadiness, // (cwd) => AutopilotReadiness
-
-  // Repair
-  autoRepair,          // (cwd, issues[]) => { repairs[] }
-};
-```
-
-### Return Type Contracts
-
-```javascript
-// ValidationResult -- returned by runChecks()
-{
-  status: 'healthy' | 'degraded' | 'broken',
-  checks: [{ name, path, passed, detail }],
-  errors: [{ code, message, fix, repairable }],
-  warnings: [{ code, message, fix, repairable }],
-  info: [{ code, message, fix }],
-  repairable_count: number,
-  repairs_performed: [{ action, success, path?, error? }] | undefined,
-}
-
-// AutopilotReadiness -- returned by checkAutopilotReadiness()
-{
-  ready: boolean,
-  phase: string | null,       // first incomplete phase number
-  step: string | null,        // 'discuss' | 'plan' | 'execute' | 'verify'
-  errors: string[],           // blocking issues
-  warnings: string[],         // non-blocking issues
-  repaired: string[],         // auto-repairs performed
-}
-```
-
-## Dependency Direction (Critical)
+## Recommended Architecture — v2.7 Integration
 
 ```
-validation.cjs IMPORTS FROM:
-  ├── phase.cjs        (findFirstIncompletePhase, computePhaseStatus, extractPhaseNumbers)
-  ├── core.cjs         (findPhaseInternal, getMilestoneInfo, safeReadFile)
-  ├── verify.cjs       (getVerificationStatus -- for enrichment only)
-  ├── config.cjs       (CONFIG_DEFAULTS)
-  ├── state.cjs        (writeStateMd -- repair path only)
-  └── frontmatter.cjs  (extractFrontmatter)
+                    TWO ENTRY PATHS TO gsd-playwright AGENT
+                    ──────────────────────────────────────────
 
-validation.cjs IS IMPORTED BY:
-  ├── cli.cjs          (gatherHealthData delegation)
-  ├── autopilot.mjs    (pre-flight readiness check)
-  ├── gsd-tools.cjs    (validate dispatch)
-  └── verify.cjs       (cmdValidateHealth delegation) -- SEE BELOW
+PATH 1: Direct command (on-demand UI testing)
+
+/gsd:ui-test <phase> [url] [--scaffold] [--run-only] [--headed]
+    │
+    ▼ parse args + gsd-tools init phase-op
+    │
+    ▼ Task(gsd-playwright, mode=ui-test, phase_dir, url, flags)
+    │
+    ▼ Playwright detection → scaffold if needed → generate → execute → report
+
+PATH 2: Via add-tests workflow (test generation for a phase)
+
+/gsd:add-tests <phase>
+    │
+    ▼ add-tests.md workflow: analyze_implementation → classify files
+    │
+    │ (files classified as E2E)
+    ▼
+    execute_e2e_generation step (MODIFIED):
+        detect Playwright → prompt if not found → scaffold
+        │
+        ▼ Task(gsd-playwright, mode=generate, files[], phase_dir)
+        │
+        ▼ Generate .spec.ts → execute → RED-GREEN report
 ```
 
-**Circular dependency risk:** `validation.cjs` imports from `verify.cjs` AND `verify.cjs` would import from `validation.cjs`. This is a real concern.
+### New Component: /gsd:ui-test Command
 
-**Resolution:** Move `cmdValidateHealth()` out of `verify.cjs` entirely. The `validate health` dispatch in `gsd-tools.cjs` routes directly to `validation.cjs` instead. `verify.cjs` keeps its verification-specific functions (`getVerificationStatus`, `getGapsSummary`, etc.) and does NOT import from `validation.cjs`. The dependency is one-way: `validation.cjs` -> `verify.cjs`, never reverse.
+Follows the same pattern as `/gsd:pr-review` and `/gsd:linear`:
 
 ```
-AFTER REFACTOR:
+1. Parse $ARGUMENTS:
+   - Phase number (optional) → $PHASE_ARG
+   - URL (optional) → $BASE_URL
+   - --scaffold flag → $FORCE_SCAFFOLD
+   - --run-only flag → $RUN_ONLY
+   - --headed flag → $HEADED_MODE
 
-verify.cjs exports: cmdVerifySummary, cmdVerifyPlanStructure, cmdVerifyPhaseCompleteness,
-                     cmdVerifyReferences, cmdVerifyCommits, cmdVerifyArtifacts, cmdVerifyKeyLinks,
-                     cmdValidateConsistency, getVerificationStatus, getGapsSummary
-                     (cmdValidateHealth REMOVED)
+2. Call gsd-tools init:
+   INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
 
-validation.cjs exports: runChecks, checkStructure, checkStateConsistency, checkConfig,
-                         checkPhaseSync, checkAutopilotReadiness, autoRepair
+3. Gather Playwright status:
+   PW_STATUS=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" playwright-detect)
 
-gsd-tools.cjs validate dispatch:
-  'health' -> validation.runChecks()     (was verify.cmdValidateHealth)
-  'readiness' -> validation.checkAutopilotReadiness()   (new)
-  'consistency' -> verify.cmdValidateConsistency()      (unchanged)
+4. Display banner:
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    GSD ► UI TEST — Phase ${phase_number}: ${phase_name}
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. Spawn gsd-playwright agent via Task()
 ```
+
+The command is a thin wrapper. All logic lives in the agent (consistent with `audit-tests.md` which is also a direct agent spawn with no separate workflow file).
+
+### New Component: gsd-playwright Agent
+
+The agent handles the full Playwright lifecycle in a single execution context. It follows the same read-then-act structure as `gsd-test-steward`:
+
+```
+INPUT RECEIVED (from Task() call):
+  mode: 'ui-test' | 'generate' | 'run-only'
+  phase_dir: string | null
+  base_url: string | null
+  e2e_files: string[] | null  (mode=generate only, from add-tests)
+  flags: { scaffold, run_only, headed }
+
+STEP 1: Playwright Detection (three-tier)
+  Tier 1: playwright.config.ts exists → configured
+  Tier 2: @playwright/test in package.json deps → installed, not configured
+  Tier 3: neither → not present
+
+STEP 2: Scaffolding (if not configured and not --run-only)
+  Create playwright.config.ts (Chromium-only, baseURL from input or prompt)
+  Create tests/e2e/ directory
+  Create tests/e2e/example.spec.ts (hello-world smoke test)
+  Add tests/e2e/ pattern to .gitignore or extend existing entry
+
+STEP 3: Test Generation (if not --run-only)
+  Read phase context: CONTEXT.md acceptance criteria → Given/When/Then → spec
+  Locator priority: getByRole > getByText > getByLabel > getByTestId
+  Output: tests/e2e/{phase-slug}.spec.ts
+
+STEP 4: Execution
+  npx playwright test [--headed] [--project=chromium]
+  Parse output: passed/failed/skipped counts + failure details
+
+STEP 5: Structured Return
+  ## PLAYWRIGHT COMPLETE
+  Status: GREEN | RED | BLOCKED
+  Tests: N passed, M failed, K skipped
+  {failure details if RED}
+  {blocker reason if BLOCKED}
+```
+
+### Modified Component: add-tests Workflow (execute_e2e_generation step)
+
+The existing `execute_e2e_generation` step in `add-tests.md` currently:
+1. Checks for existing tests covering the scenario
+2. Creates a test file
+3. Runs the E2E command
+4. Evaluates result
+
+The modification adds a **detection + scaffolding gate before step 2**:
+
+```
+execute_e2e_generation (MODIFIED):
+
+  [NEW] Detect Playwright:
+    PW_STATUS=$(node gsd-tools.cjs playwright-detect)
+    if PW_STATUS == 'not_present':
+      AskUserQuestion("Playwright not found. Scaffold it now?")
+      if yes: spawn gsd-playwright(mode=scaffold)
+      if no: mark E2E tests as BLOCKED, continue to TDD tests
+
+  [NEW] Delegate to gsd-playwright agent:
+    For E2E-classified files, spawn:
+    Task(gsd-playwright, mode=generate,
+         e2e_files=[...], phase_dir, base_url)
+    Rather than inline generation logic
+
+  [EXISTING] Evaluate result from agent:
+    GREEN → record success
+    RED → flag as potential application bug
+    BLOCKED → report blocker (unchanged behavior)
+```
+
+This is a minimal modification — the existing `execute_tdd_generation` step is untouched. The change is surgical: add detection at the start of the E2E step and delegate generation to the agent instead of doing it inline.
 
 ## Data Flow
 
-### Health Command Flow (gsd health)
+### Full ui-test Flow (PATH 1 — direct command)
 
 ```
-User runs: gsd health [--fix]
+User: /gsd:ui-test 12 https://localhost:3000 --headed
     │
     ▼
-gsd-cli.cjs -> cli.cjs handleHealth()
+commands/gsd/ui-test.md
+    │ parse args: phase=12, url=localhost:3000, headed=true
+    ├── node gsd-tools.cjs init phase-op 12
+    │   └── returns: { phase_dir, phase_number, phase_name }
+    ├── node gsd-tools.cjs playwright-detect
+    │   └── returns: { status: 'configured'|'installed'|'not_present', config_path? }
     │
-    ▼ (delegation replaces inline logic)
-validation.runChecks(projectRoot, { repair: hasFix })
-    │
-    ├── checkStructure()    -> file existence checks
-    ├── checkConfig()       -> JSON validity, known keys
-    ├── checkStateConsistency() -> STATE.md <-> ROADMAP.md sync
-    ├── checkPhaseSync()    -> disk <-> roadmap phase agreement
-    │
-    ├── if repair: autoRepair(cwd, repairableIssues)
-    │
-    ▼
-ValidationResult -> cli.cjs formats with ANSI -> stdout
+    ▼ Task(gsd-playwright)
+        │
+        ├── STEP 1: Read phase artifacts
+        │   └── CONTEXT.md acceptance criteria → extract Given/When/Then scenarios
+        │
+        ├── STEP 2: Detection result = 'not_present' AND no --run-only?
+        │   └── Scaffold: create playwright.config.ts, tests/e2e/, example.spec.ts
+        │
+        ├── STEP 3: Generate tests/e2e/phase-12-<slug>.spec.ts
+        │   └── Map each acceptance criterion to a Playwright test
+        │
+        ├── STEP 4: Execute
+        │   └── npx playwright test --project=chromium [--headed]
+        │       → parse NDJSON or text output
+        │
+        └── STEP 5: Return structured result to ui-test command
+            → command formats and displays to user
 ```
 
-### Autopilot Pre-Flight Flow
+### add-tests E2E Flow (PATH 2 — via workflow)
 
 ```
-autopilot.mjs startup
+/gsd:add-tests 12
     │
-    ▼ (new, after existing .planning/ check)
-validation.checkAutopilotReadiness(PROJECT_DIR)
+    ▼ add-tests workflow: classify files
+    │   Files: [auth.tsx → E2E, pricing.ts → TDD, config.ts → Skip]
     │
-    ├── checkStructure()    -> .planning/, ROADMAP.md, STATE.md exist
-    ├── checkConfig()       -> config.json valid
-    ├── findFirstIncompletePhase() -> phase exists to work on
-    ├── computePhaseStatus() -> deterministic lifecycle step
+    ├── execute_tdd_generation (unchanged)
+    │   └── pricing.ts → unit tests → run → pass/fail
     │
-    ├── if trivial issues: autoRepair() silently
-    │
-    ▼
-{ ready: true, phase: '64', step: 'discuss' }
-    │
-    ▼
-autopilot proceeds with CURRENT_PHASE = result.phase
+    └── execute_e2e_generation (MODIFIED)
+        │
+        ├── node gsd-tools.cjs playwright-detect
+        │   └── not_present → AskUserQuestion → user approves scaffold
+        │       → Task(gsd-playwright, mode=scaffold)
+        │
+        ├── Task(gsd-playwright, mode=generate, files=[auth.tsx])
+        │   └── → tests/e2e/phase-12-auth.spec.ts generated + executed
+        │
+        └── Return result → add-tests formats coverage report + commits
 ```
 
-### Workflow Dispatch Flow (gsd-tools validate)
+### gsd-tools.cjs Playwright Detection Data Flow
 
 ```
-Workflow runs: node gsd-tools.cjs validate health --repair
+node gsd-tools.cjs playwright-detect
     │
-    ▼
-gsd-tools.cjs switch('validate')
-    │
-    ├── 'health' -> validation.runChecks(cwd, { repair })
-    ├── 'readiness' -> validation.checkAutopilotReadiness(cwd)
-    └── 'consistency' -> verify.cmdValidateConsistency(cwd)  (unchanged)
+    ▼ testing.detectPlaywright(cwd)
+        ├── fs.existsSync('playwright.config.ts') → 'configured'
+        ├── fs.existsSync('playwright.config.js') → 'configured'
+        ├── package.json deps has '@playwright/test' → 'installed'
+        └── none → 'not_present'
+
+Returns JSON:
+{
+  status: 'configured' | 'installed' | 'not_present',
+  config_path: string | null,
+  install_command: 'npx playwright install' | null
+}
 ```
+
+## New vs Modified: Explicit Component Table
+
+| Component | Action | Justification |
+|-----------|--------|---------------|
+| `commands/gsd/ui-test.md` | **CREATE** | New user-facing command follows existing command pattern; no existing command handles Playwright lifecycle |
+| `agents/gsd-playwright.md` | **CREATE** | Playwright lifecycle (detect, scaffold, generate, execute, report) is agent scope; test-steward precedent for read/execute agents |
+| `workflows/add-tests.md` | **MODIFY** | The `execute_e2e_generation` step explicitly needs enhancement per PROJECT.md v2.7 requirements; minimal surgical change |
+| `bin/lib/testing.cjs` | **MODIFY** | Add `detectPlaywright()` function and `cmdPlaywrightDetect` command; follows existing `detectFramework()` pattern |
+| `bin/gsd-tools.cjs` | **MODIFY** | Add `playwright-detect` dispatch case; follows existing `test-detect-framework` pattern |
+| `agents/gsd-test-steward.md` | **NO CHANGE** | Unit test budget/health analysis; Playwright is E2E scope, separate concern |
+| `workflows/execute-plan.md` | **NO CHANGE** | Hard test gate uses unit test runner; Playwright execution is on-demand, not part of the commit gate |
+| `commands/gsd/add-tests.md` | **NO CHANGE** | Command file just delegates to workflow; workflow modification is sufficient |
 
 ## Architectural Patterns
 
-### Pattern 1: Check Composition
+### Pattern 1: Command as Thin Orchestrator
 
-**What:** Individual check functions return `{ errors[], warnings[] }`. `runChecks()` composes them into a unified result.
-**When to use:** Always -- each check is independently testable and reusable.
-**Trade-offs:** Slight overhead from multiple function calls, but gains independent testability and selective use (autopilot only needs readiness, not all checks).
+**What:** Command files parse arguments and call `gsd-tools.cjs init` to gather context, then spawn one agent directly — no inline logic.
+**When to use:** When the entire operation fits within a single agent execution context (no multi-step workflow gates needed).
+**Trade-offs:** Simple, consistent. Use when the operation doesn't need user interaction mid-flight.
+**Precedent:** `audit-tests.md` command spawns `gsd-test-steward` directly without a separate workflow.
 
-```javascript
-function runChecks(cwd, options = {}) {
-  const structure = checkStructure(cwd);
-  if (structure.errors.some(e => e.code === 'E001')) {
-    // .planning/ missing -- short-circuit
-    return { status: 'broken', ...structure, repairable_count: 0 };
-  }
-
-  const configResult = checkConfig(cwd);
-  const stateResult = checkStateConsistency(cwd);
-  const phaseSyncResult = checkPhaseSync(cwd);
-
-  const errors = [...structure.errors, ...configResult.errors,
-                  ...stateResult.errors, ...phaseSyncResult.errors];
-  const warnings = [...structure.warnings, ...configResult.warnings,
-                    ...stateResult.warnings, ...phaseSyncResult.warnings];
-
-  if (options.repair) {
-    const repairable = [...errors, ...warnings].filter(i => i.repairable);
-    if (repairable.length > 0) {
-      autoRepair(cwd, repairable);
-    }
-  }
-
-  return {
-    status: errors.length > 0 ? 'broken' : warnings.length > 0 ? 'degraded' : 'healthy',
-    checks: structure.checks,
-    errors, warnings,
-  };
-}
+```
+# ui-test.md follows audit-tests.md pattern exactly:
+1. Check prerequisites (playwright installed?)
+2. Gather init data (gsd-tools init phase-op)
+3. Display banner
+4. Spawn gsd-playwright agent
+5. Present agent report
 ```
 
-### Pattern 2: Consumer Delegation (not duplication)
+### Pattern 2: Agent Structured Return
 
-**What:** `cli.cjs handleHealth()` and `gsd-tools.cjs validate health` delegate to `validation.cjs` instead of reimplementing checks.
-**When to use:** When multiple consumers need the same logic.
-**Trade-offs:** Creates a dependency, but eliminates the current divergence where `gsd health` and `gsd-tools validate health` produce different results.
+**What:** Agents return a fixed markdown header block so the calling workflow can parse success/failure deterministically.
+**When to use:** Every agent that can be spawned via `Task()`.
+**Trade-offs:** Slight verbosity in agent output, but enables reliable caller parsing.
+**Precedent:** `gsd-test-steward` returns `## STEWARD COMPLETE` or `## STEWARD SKIPPED`.
 
-```javascript
-// cli.cjs -- AFTER refactor
-function gatherHealthData(projectRoot) {
-  const validation = require('./validation.cjs');
-  return validation.runChecks(projectRoot);
-}
-
-// handleHealth stays the same -- it formats the result for CLI display
+```
+## PLAYWRIGHT COMPLETE
+Status: GREEN | RED | BLOCKED
+Scaffolded: yes | no
+Generated: N tests in M files
+Passed: N | Failed: M | Skipped: K
+{failure details table if RED}
+{blocker reason if BLOCKED}
 ```
 
-### Pattern 3: Lazy Require for Circular Avoidance
+### Pattern 3: Surgical Workflow Enhancement
 
-**What:** If a module is only needed in one code path, require it inside the function, not at module top.
-**When to use:** When imports would create circular dependencies.
-**Trade-offs:** Slightly less discoverable, but Node.js CJS handles this well.
+**What:** When modifying an existing workflow, add the new capability at the exact integration point, preserving all existing behavior.
+**When to use:** Adding Playwright support to `execute_e2e_generation` step — TDD path must not change.
+**Trade-offs:** Requires careful reading of existing workflow logic to find the right insertion point.
+**Implementation:** Add detection + scaffolding gate at the START of `execute_e2e_generation`. Wrap the E2E generation in a `Task(gsd-playwright)` call instead of inline logic. All other steps (classification, test plan presentation, TDD generation, summary/commit) remain identical.
+
+### Pattern 4: Three-Tier Detection
+
+**What:** Check for Playwright in three states — fully configured (config file exists), installed but not configured (package.json dep), or absent.
+**When to use:** Any time a tool's absence requires different handling (prompt to scaffold vs. error vs. proceed).
+**Trade-offs:** More nuanced than binary present/absent, enables appropriate guidance.
 
 ```javascript
-// validation.cjs -- state.cjs only needed for repair
-function autoRepair(cwd, issues) {
-  const { writeStateMd } = require('./state.cjs');  // lazy require
-  // ...
+// testing.cjs addition — mirrors detectFramework() pattern
+function detectPlaywright(cwd) {
+  // Tier 1: config file present → fully configured
+  if (fs.existsSync(path.join(cwd, 'playwright.config.ts'))) {
+    return { status: 'configured', config_path: 'playwright.config.ts' };
+  }
+  if (fs.existsSync(path.join(cwd, 'playwright.config.js'))) {
+    return { status: 'configured', config_path: 'playwright.config.js' };
+  }
+  // Tier 2: dep in package.json → installed, needs config
+  const pkg = safeReadPackageJson(cwd);
+  const deps = { ...(pkg?.dependencies || {}), ...(pkg?.devDependencies || {}) };
+  if (deps['@playwright/test']) {
+    return { status: 'installed', config_path: null, install_command: 'npx playwright install' };
+  }
+  // Tier 3: not present
+  return { status: 'not_present', config_path: null, install_command: 'npm install -D @playwright/test && npx playwright install chromium' };
 }
 ```
 
 ## Integration Points
 
-### Changes to Existing Files
+### New gsd-tools.cjs Dispatch Entry
 
-| File | Change Type | What Changes |
-|------|-------------|--------------|
-| **bin/lib/validation.cjs** | NEW | All validation/check/repair logic |
-| **bin/lib/cli.cjs** | MODIFY | `gatherHealthData()` delegates to `validation.runChecks()`. Add `--fix` flag parsing to `handleHealth()`. Formatting logic stays. |
-| **bin/lib/verify.cjs** | MODIFY | Remove `cmdValidateHealth()`. Keep `cmdValidateConsistency()`, `getVerificationStatus()`, `getGapsSummary()`. |
-| **bin/gsd-tools.cjs** | MODIFY | `validate health` routes to `validation.runChecks()` instead of `verify.cmdValidateHealth()`. Add `validate readiness` entry. Import validation.cjs. |
-| **scripts/autopilot.mjs** | MODIFY | Add `createRequire` import of `validation.cjs`. Call `checkAutopilotReadiness()` after existing `.planning/` check (line 74-78). Use returned phase/step. |
-| **bin/gsd-cli.cjs** | NO CHANGE | Already routes through `cli.cjs` |
-| **bin/lib/phase.cjs** | NO CHANGE | Consumed by validation.cjs |
-| **bin/lib/core.cjs** | NO CHANGE | Consumed by validation.cjs |
-| **bin/lib/config.cjs** | NO CHANGE | Consumed by validation.cjs |
+```
+playwright-detect → testing.detectPlaywright(cwd)
+```
 
-### Internal Boundaries
+Follows the exact pattern of `test-detect-framework → testing.cmdTestDetectFramework(cwd, raw)` already in `gsd-tools.cjs`.
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| validation.cjs -> phase.cjs | Direct CJS require, function calls | Read-only: `findFirstIncompletePhase`, `computePhaseStatus`, `extractPhaseNumbers` |
-| validation.cjs -> core.cjs | Direct CJS require, function calls | Read-only: `findPhaseInternal`, `getMilestoneInfo`, `safeReadFile` |
-| validation.cjs -> verify.cjs | Direct CJS require, function calls | Read-only: `getVerificationStatus` for enrichment. One-way dependency. |
-| validation.cjs -> state.cjs | Lazy require in autoRepair only | Write: `writeStateMd` for STATE.md regeneration |
-| cli.cjs -> validation.cjs | Direct CJS require, function calls | `gatherHealthData` delegates to `runChecks` |
-| autopilot.mjs -> validation.cjs | createRequire CJS import | `checkAutopilotReadiness` called at startup |
-| gsd-tools.cjs -> validation.cjs | Direct CJS require, dispatch routing | `validate health`, `validate readiness` |
+### add-tests.md Modification Boundary
 
-## Anti-Patterns
+The modification is scoped to `execute_e2e_generation` step only. The change surface is:
 
-### Anti-Pattern 1: Bidirectional Dependencies Between validation.cjs and verify.cjs
+| Location in add-tests.md | Change |
+|--------------------------|--------|
+| `execute_e2e_generation` step start | Add: call `playwright-detect`, gate on result |
+| `execute_e2e_generation` step body | Change: delegate to `Task(gsd-playwright)` instead of inline generation |
+| `execute_e2e_generation` step result handling | Change: parse structured return from agent instead of direct test run |
+| All other steps | **NO CHANGE** |
 
-**What people do:** Have verify.cjs import from validation.cjs AND validation.cjs import from verify.cjs.
-**Why it's wrong:** CJS circular requires cause subtle bugs (empty objects at import time). Even if Node resolves it, it creates a maintenance trap.
-**Do this instead:** Move `cmdValidateHealth` out of verify.cjs. validation.cjs imports from verify.cjs (one-way). gsd-tools.cjs routes `validate health` to validation.cjs directly.
+### Agent Tool Access
 
-### Anti-Pattern 2: Duplicating Check Logic Across Consumers
+The `gsd-playwright` agent needs broader tool access than `gsd-test-steward` (which is read-only) because it writes scaffold files and executes tests:
 
-**What people do:** Copy the same STATE.md parsing regex into validation.cjs, cli.cjs, and autopilot.mjs.
-**Why it's wrong:** This is the exact problem v2.6 is solving. Three implementations drift apart.
-**Do this instead:** Single implementation in validation.cjs. All consumers call it.
+```yaml
+tools: Read, Write, Edit, Bash, Glob, Grep
+```
 
-### Anti-Pattern 3: Validation Module Doing Formatting
+The `Bash` tool is required for `npx playwright test` execution. Write is required for scaffold file creation.
 
-**What people do:** Have validation.cjs produce ANSI-colored strings.
-**Why it's wrong:** Breaks `--json` mode, breaks workflow consumption via gsd-tools. Mixes concerns.
-**Do this instead:** validation.cjs returns structured data only. cli.cjs handles ANSI formatting. gsd-tools.cjs returns JSON.
+### No New .planning/ State Files Required
 
-### Anti-Pattern 4: Putting Auto-Repair in Check Functions
-
-**What people do:** Each `check*()` function both detects AND repairs issues.
-**Why it's wrong:** Makes checks non-idempotent, impossible to do a dry-run, and couples detection to mutation.
-**Do this instead:** Check functions are pure (read-only, return issues). `autoRepair()` is separate, takes issues as input.
+Unlike `linear.md` (which uses `linear-context.md`) or `pr-review.md` (which uses `review-context.md`), the Playwright workflow does not need a temporary state file. The phase context already lives in `${phase_dir}/CONTEXT.md`. The agent reads it directly. Generated test files live in the project's test directory, not in `.planning/`.
 
 ## Suggested Build Order
 
-Based on dependency analysis, build in this order:
+Dependencies drive this order. Each step can be verified independently before proceeding.
 
-1. **Create `validation.cjs`** with `checkStructure()`, `checkConfig()`, `checkStateConsistency()`, `checkPhaseSync()`, `runChecks()`, and `autoRepair()`. This is pure new code with no breaking changes. Test in isolation.
+### Step 1: gsd-tools.cjs Playwright Detection
 
-2. **Add `checkAutopilotReadiness()`** to validation.cjs. Uses `findFirstIncompletePhase`, `computePhaseStatus`. Test independently.
+**Files:** `bin/lib/testing.cjs` (add `detectPlaywright()`), `bin/gsd-tools.cjs` (add `playwright-detect` case)
 
-3. **Refactor `gsd-tools.cjs` dispatch** to route `validate health` to `validation.runChecks()` and add `validate readiness`. Remove verify.cjs dependency for health validation.
+**Why first:** Both the new command and the modified workflow depend on `playwright-detect`. This is pure additive code with no breaking changes. Add `detectPlaywright()` alongside existing `detectFramework()`. Add `playwright-detect` dispatch case alongside existing `test-detect-framework` case.
 
-4. **Refactor `cli.cjs gatherHealthData()`** to delegate to `validation.runChecks()`. Add `--fix` flag to `handleHealth()`. Keep all ANSI formatting in cli.cjs.
+**Verification:** `node gsd-tools.cjs playwright-detect` returns correct JSON in a project with and without Playwright configured.
 
-5. **Remove `cmdValidateHealth()` from `verify.cjs`** now that no consumer references it.
+### Step 2: gsd-playwright Agent
 
-6. **Add pre-flight to `autopilot.mjs`** by importing `checkAutopilotReadiness()` via createRequire and calling it after existing prerequisites check.
+**Files:** `agents/gsd-playwright.md`
 
-**Rationale:** Steps 1-2 are additive (no existing code changes). Steps 3-5 are the refactor (swap consumers to new module, then remove old code). Step 6 is the autopilot integration. Each step can be verified independently.
+**Why second:** The agent is a leaf node — it has no dependencies on the command or workflow changes. Write it once `playwright-detect` exists so the agent can call the detection tool programmatically.
 
-## Check Consolidation Matrix
+**Verification:** Agent can be spawned directly via Task() with a phase dir, runs detection, scaffolds in a test project, generates a spec from a CONTEXT.md file, and returns the structured `## PLAYWRIGHT COMPLETE` block.
 
-Mapping existing checks to validation.cjs functions:
+**Note on subagent constraint:** The agent uses `Bash` to run `npx playwright test` directly. It does NOT spawn another agent. This complies with the "subagents cannot spawn subagents" constraint.
 
-| Check | Currently In | Moves To | Function |
-|-------|-------------|----------|----------|
-| .planning/ exists | cli.cjs, verify.cjs, autopilot.mjs | validation.cjs | `checkStructure()` |
-| PROJECT.md exists + sections | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
-| ROADMAP.md exists | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
-| STATE.md exists | cli.cjs, verify.cjs | validation.cjs | `checkStructure()` |
-| config.json valid JSON | cli.cjs, verify.cjs | validation.cjs | `checkConfig()` |
-| config.json known keys | cli.cjs | validation.cjs | `checkConfig()` |
-| STATE.md phase refs valid | cli.cjs, verify.cjs | validation.cjs | `checkStateConsistency()` |
-| STATE.md current vs ROADMAP completed | cli.cjs | validation.cjs | `checkStateConsistency()` |
-| STATE.md milestone name matches ROADMAP | nowhere (new) | validation.cjs | `checkStateConsistency()` |
-| STATE.md phase count matches disk | nowhere (new) | validation.cjs | `checkStateConsistency()` |
-| Disk phases vs ROADMAP phases | verify.cjs | validation.cjs | `checkPhaseSync()` |
-| Phase directory naming | verify.cjs | validation.cjs | `checkPhaseSync()` |
-| .completed vs ROADMAP checkbox | verify.cjs | validation.cjs | `checkPhaseSync()` |
-| Autopilot phase detection | verify.cjs | validation.cjs | `checkAutopilotReadiness()` |
-| Incomplete phases exist | autopilot.mjs (ad-hoc) | validation.cjs | `checkAutopilotReadiness()` |
-| Deterministic lifecycle step | autopilot.mjs (ad-hoc) | validation.cjs | `checkAutopilotReadiness()` |
-| Missing phase directories (auto-repair) | nowhere (new) | validation.cjs | `autoRepair()` |
-| Stale STATE.md counts (auto-repair) | nowhere (new) | validation.cjs | `autoRepair()` |
+### Step 3: /gsd:ui-test Command
+
+**Files:** `commands/gsd/ui-test.md`
+
+**Why third:** The command is just a wrapper around the agent. Build the agent first, then wrap it.
+
+**Verification:** `/gsd:ui-test 12 https://localhost:3000` invokes the agent correctly, displays the result.
+
+### Step 4: add-tests Workflow Enhancement
+
+**Files:** `~/.claude/get-shit-done/workflows/add-tests.md` (modify `execute_e2e_generation` step)
+
+**Why fourth (last):** This modifies existing behavior. All three new dependencies (detection, agent, command) must be proven before modifying the existing workflow. The risk here is regressions in the TDD path — do this last so the riskier new components are validated first.
+
+**Verification:** `/gsd:add-tests` on a phase with E2E-classified files correctly detects Playwright state, scaffolds if needed, spawns the agent, and integrates the structured result into the existing coverage report.
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Inlining Playwright Logic in the Workflow
+
+**What people do:** Add Playwright detection, scaffolding, and test generation code directly into `add-tests.md` without creating a separate agent.
+**Why it's wrong:** The workflow already has 7 steps. Adding inline Playwright logic duplicates what the `gsd-playwright` agent does, and it can't be reused by `/gsd:ui-test` without copy-paste. Agents exist precisely to encapsulate reusable behavior.
+**Do this instead:** Create `gsd-playwright.md` agent. Both paths (`/gsd:ui-test` and the modified `add-tests.md`) spawn it via `Task()`.
+
+### Anti-Pattern 2: Creating a Separate Playwright Workflow File
+
+**What people do:** Create `workflows/playwright.md` for the Playwright logic, then have both the command and `add-tests.md` delegate to it.
+**Why it's wrong:** Workflows cannot be spawned from within other workflows (subagent constraint). An agent is the correct primitive for reusable leaf-node logic.
+**Do this instead:** `gsd-playwright.md` in `agents/`, not `workflows/`.
+
+### Anti-Pattern 3: Skipping the Detection Step
+
+**What people do:** Have the agent assume Playwright is installed and immediately try `npx playwright test`.
+**Why it's wrong:** The command is used on web app projects that may not have Playwright at all. A hard failure mid-execution is worse UX than a pre-flight check and scaffolding prompt.
+**Do this instead:** Three-tier detection at agent start. Gate scaffolding on detection result. `--run-only` flag bypasses generation for projects that already have specs.
+
+### Anti-Pattern 4: Modifying execute-plan.md's Hard Test Gate
+
+**What people do:** Add `npx playwright test` to the hard test gate that runs after every task commit in `execute-plan.md`.
+**Why it's wrong:** E2E tests take seconds to minutes per run. Running them on every commit during execute-phase would make the phase loop unbearably slow. UI tests are on-demand, not CI gates in this tool.
+**Do this instead:** Playwright runs only when explicitly invoked via `/gsd:ui-test` or `/gsd:add-tests`. The hard test gate stays unit-test only.
+
+### Anti-Pattern 5: Using a Temporary .planning/ File for Playwright Context
+
+**What people do:** Write `playwright-context.md` to `.planning/` to pass state between the command and the agent, following the `linear-context.md` pattern.
+**Why it's wrong:** The agent receives all needed context in the `Task()` prompt (mode, phase_dir, url, flags). The phase context it needs (CONTEXT.md) already exists. There's no inter-session state to preserve — the operation is atomic.
+**Do this instead:** Pass all context in the `Task()` prompt directly. Keep `.planning/` clean.
+
+## Scaling Considerations
+
+This is a local CLI tool. Scaling in the traditional sense doesn't apply. The relevant scaling question is: **how does this hold up as the user's project grows?**
+
+| Concern | Approach |
+|---------|----------|
+| Large number of acceptance criteria per phase | Agent generates one spec file per phase; test count scales with criteria count. No architectural limit. |
+| Multiple web pages to test | `BASE_URL` passed to agent; agent generates one `describe` block per acceptance criterion. Multi-page tests are naturally handled. |
+| Slow Playwright runs in CI | Out of scope per PROJECT.md (visual reports, CI integration deferred). On-demand execution only. |
+| Test budget pressure (currently 796/800) | Playwright `.spec.ts` files are detected by `findTestFiles()` regex `\.(test|spec)\.(js|ts)`. Budget counter will include them. This is intentional — E2E specs count toward the budget. |
 
 ## Sources
 
-- Direct analysis of existing codebase (HIGH confidence):
-  - `bin/lib/cli.cjs` -- `gatherHealthData()` lines 409-595, `handleHealth()` lines 597-655
-  - `bin/lib/verify.cjs` -- `cmdValidateHealth()` lines 535-871, `getVerificationStatus()` lines 878-899
-  - `bin/lib/phase.cjs` -- `computePhaseStatus()` lines 895-979, `findFirstIncompletePhase()` lines 1034-1055
-  - `bin/gsd-tools.cjs` -- validate dispatch lines 508-519
-  - `scripts/autopilot.mjs` -- CJS imports lines 27-30, pre-flight lines 60-83
-  - `bin/gsd-cli.cjs` -- routing through cli.cjs
-  - `bin/lib/core.cjs` -- `findPhaseInternal`, `getMilestoneInfo`
-  - `.planning/PROJECT.md` -- v2.6 active requirements
+All findings are HIGH confidence — based on direct codebase inspection with no external dependencies.
+
+- `commands/gsd/audit-tests.md` — precedent for command-as-direct-agent-spawn pattern (no intermediate workflow)
+- `commands/gsd/linear.md` + `~/.claude/get-shit-done/workflows/linear.md` — precedent for command argument parsing + workflow delegation pattern
+- `~/.claude/get-shit-done/workflows/add-tests.md` — target for modification; `execute_e2e_generation` step analyzed in full
+- `agents/gsd-test-steward.md` — agent structure precedent: `<input>`, `<process>`, `<output>` with structured return block
+- `bin/lib/testing.cjs` `detectFramework()` — direct pattern for `detectPlaywright()` three-tier detection
+- `bin/gsd-tools.cjs` lines 648-656 — `test-detect-framework` dispatch case; direct pattern for `playwright-detect`
+- `bin/lib/init.cjs` — init bundle pattern for phase-op (returns phase_dir, phase_number, phase_name)
+- `.planning/PROJECT.md` lines 107-111 — v2.7 active requirements defining exact scope
 
 ---
-*Architecture research for: GSD Autopilot v2.6 unified validation module*
-*Researched: 2026-03-15*
+*Architecture research for: GSD Playwright UI Testing Integration (v2.7)*
+*Researched: 2026-03-19*

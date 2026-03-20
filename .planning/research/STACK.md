@@ -1,16 +1,25 @@
 # Stack Research
 
-**Domain:** Unified validation module for CJS-based CLI tooling
-**Researched:** 2026-03-15
-**Confidence:** HIGH
+**Domain:** Playwright UI testing integration for GSD (on-demand E2E test scaffolding and generation)
+**Researched:** 2026-03-19
+**Confidence:** HIGH (core Playwright package), MEDIUM (output parsing format — verified via official docs + community)
 
 ## Scope
 
-This research covers ONLY what's needed for the unified validation module (`validation.cjs`). The existing validated stack (CJS modules, gsd-tools.cjs dispatcher, gsd-cli.cjs binary, autopilot.mjs with createRequire, node:test suite with 750 tests) is NOT re-evaluated.
+This research covers ONLY what is new for v2.7 (Playwright UI testing integration). The existing validated
+stack (Node.js CJS, zx/ESM, node:test suite, gsd-tools dispatcher, testing.cjs, cli.cjs, autopilot.mjs,
+validation.cjs) is NOT re-evaluated.
 
-## Verdict: No New Dependencies
+## Verdict: One New DevDependency — @playwright/test
 
-This milestone requires zero new libraries, frameworks, or tools. All implementation uses existing patterns, Node.js built-ins, and internal CJS module imports. The work is a refactoring of scattered validation logic into a single canonical module.
+The target app under test installs `@playwright/test` in its own project. GSD itself only needs knowledge of
+how to detect, scaffold, and invoke Playwright in a user's project — not to have Playwright as a production
+dependency. However, GSD's own test coverage for the new `playwright-detect` logic in `testing.cjs` may
+benefit from having `@playwright/test` available in devDependencies to avoid calling `npx playwright test`
+in integration tests.
+
+**Decision:** `@playwright/test` as devDependency of GSD (for testing the detector without live installs),
+plus clear documentation that user projects must install it themselves via the scaffold flow.
 
 ## Recommended Stack
 
@@ -18,140 +27,211 @@ This milestone requires zero new libraries, frameworks, or tools. All implementa
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Node.js (CJS) | >=16.7.0 | Module format for validation.cjs | Matches all existing lib/ modules (phase.cjs, verify.cjs, cli.cjs, core.cjs). No ESM conversion needed. CJS `require()` gives synchronous loading which is correct for validation checks that run at startup. |
-| node:fs (sync) | built-in | File I/O for state inspection and repair | Every existing module uses `fs.readFileSync`/`fs.writeFileSync`/`fs.existsSync`. Async fs is unnecessary -- validation runs sequentially before autopilot starts, and `gsd health` is synchronous. |
-| node:path | built-in | Path resolution for .planning/ structure | Standard across all modules. No alternatives to consider. |
-| node:test | built-in | Test runner | Already used for all 750 tests. `describe`/`test`/`beforeEach`/`afterEach` from `node:test`, `assert` from `node:assert`. |
+| `@playwright/test` | `^1.50.0` (current: 1.58.2) | E2E test framework that users will install in their apps; GSD detects and drives it | The only first-class Playwright integration package. Bundles test runner, browser download CLI, assertion library, and `defineConfig`. No separate `playwright` package needed for web testing. Microsoft-backed, actively maintained (releases monthly). |
+| `npx playwright install chromium` | Bundled with `@playwright/test` | Download Chromium browser binary | Chromium-only by default keeps binary footprint small (~140MB vs ~400MB for all 3 browsers). Cross-platform (macOS, Linux, Windows). |
+| Node.js | >=20.x (required by Playwright 1.50+) | Runtime for Playwright test execution | Playwright's current docs state "Node.js latest 20.x, 22.x or 24.x" as system requirements. This is a constraint on user app environments, not GSD itself (GSD requires >=16.7.0). |
 
-### Internal Module Dependencies
+### TypeScript Config (for generated `playwright.config.ts`)
 
-| Module | Imports Used | Purpose |
-|--------|-------------|---------|
-| core.cjs | `findPhaseInternal`, `getMilestoneInfo`, `safeReadFile`, `output`, `error` | Phase directory lookup, milestone metadata, safe file reads, output formatting |
-| phase.cjs | `computePhaseStatus`, `findFirstIncompletePhase`, `extractPhaseNumbers` | Canonical phase lifecycle checks -- validation.cjs must call these, not reimplement them |
-| frontmatter.cjs | `extractFrontmatter` | Parsing STATE.md and config frontmatter for consistency checks |
-| state.cjs | `writeStateMd` | State repair operations that preserve frontmatter hashing |
-| config.cjs | `CONFIG_DEFAULTS` | Validating config values against known defaults |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `typescript` | already in user project or bundled | Type-checking for generated `.spec.ts` files | Playwright ships its own `tsconfig.json` when using TypeScript mode; no separate TS install required in the user's project — Playwright handles transpilation internally via its own ESM handling. |
 
-### Development Tools
+### Supporting Libraries
+
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| None beyond `@playwright/test` | — | — | Playwright bundles everything needed: `test`, `expect`, `defineConfig`, `devices`, `Page`, screenshot capture, trace viewer. No `@testing-library/playwright` needed — Playwright's built-in locators (getByRole, getByText, getByLabel, getByTestId) cover all common cases. |
+
+### Development Tools (GSD-internal)
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| node:test runner | Test execution | Via `node scripts/run-tests.cjs`. No Jest -- project uses built-in runner. |
-| c8 | Coverage reporting | Already in devDependencies at ^11.0.0. `--include 'get-shit-done/bin/lib/*.cjs'` automatically picks up validation.cjs. |
+| `node:test` (built-in) | Test suite for `testing.cjs` Playwright-detection logic | No change to existing test runner. New tests for `detectPlaywright()`, `scaffoldPlaywright()`, `parsePlaywrightOutput()` use same `createTempProject()`/`cleanup()` helpers. |
+| Existing `testing.cjs` | Where Playwright detection and output parsing land | Add `detectPlaywright(cwd)`, `parsePlaywrightOutput(stdout, stderr)`, and `getPlaywrightCommand(cwd)` alongside existing `detectFramework()`. Keep CJS module format. |
 
 ## Installation
 
 ```bash
-# No new packages needed.
-# validation.cjs uses only Node.js built-ins and existing internal modules.
+# In GSD itself (devDependency for testing detection logic without live Playwright installs):
+npm install -D @playwright/test
+
+# In the USER'S app project (performed by gsd-playwright agent scaffold step):
+npm install -D @playwright/test
+npx playwright install chromium
 ```
 
-## Existing Patterns to Follow
+**Note:** GSD never runs `npm install @playwright/test` in the user's project automatically without
+confirmation. The `gsd-playwright` agent and `add-tests` E2E path ask before scaffolding.
 
-### Result Type Pattern
+## Config File Pattern
 
-Every check function returns a plain object. No classes, no Zod schemas. Matches `gatherHealthData` in cli.cjs and `cmdValidateHealth` in verify.cjs.
+Generated `playwright.config.ts` (the canonical GSD scaffold template):
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'line',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+  ],
+});
+```
+
+**Why `reporter: 'line'`** instead of `html`: Line reporter produces parseable stdout output with a
+summary line that GSD's `parsePlaywrightOutput()` can extract pass/fail counts from. HTML reporter
+writes files but produces minimal stdout — harder to parse programmatically. GSD's design uses
+`testing.cjs`'s output parsing layer, which requires stdout.
+
+**Why `workers: 1` on CI**: Prevents flaky CI failures from parallel browser processes competing for
+resources.
+
+## Integration Points with Existing Architecture
+
+### Where Playwright hooks into `testing.cjs`
+
+The existing `testing.cjs` module (in `get-shit-done/bin/lib/testing.cjs`) is the single place where
+framework detection, output parsing, and test execution live. Playwright integration follows this pattern:
+
+```
+detectFramework(cwd)       — returns 'vitest' | 'jest' | 'mocha' | 'node:test' | null
+                           ← ADD: detectPlaywright(cwd) → boolean
+                           ← ADD: getPlaywrightCommand(cwd, opts) → string | null
+
+parseTestOutput(stdout, stderr, framework)
+                           ← ADD: 'playwright' case in switch
+
+getDefaultCommand(framework)
+                           ← ADD: 'playwright' → 'npx playwright test'
+```
+
+**Detection logic** (`detectPlaywright(cwd)`):
+1. `playwright.config.ts` or `playwright.config.js` in project root → fully detected
+2. `@playwright/test` in `package.json` devDependencies → partially detected (installed, no config)
+3. Neither → not detected
+
+**Why separate from `detectFramework()`**: Playwright is an E2E runner, not a unit test framework.
+`detectFramework()` is used by the hard test gate to run unit tests. Playwright detection is used by
+`add-tests` E2E path and `/gsd:ui-test` — different code paths, different purpose.
+
+### Playwright Output Parsing
+
+Playwright's line reporter stdout ends with a summary line. Examples from community usage:
+
+```
+  2 passed (3.1s)
+  1 failed (2.4s)
+  3 passed, 1 failed (5.2s)
+  5 passed, 2 skipped (8.1s)
+```
+
+Parsing regex for `parsePlaywrightOutput(stdout, stderr)`:
 
 ```javascript
-// Individual check result
-{ passed: true, code: 'HLTH-01', message: '.planning/ directory exists', fix: null, repairable: false }
-
-// Aggregate result
-{ status: 'healthy'|'degraded'|'broken', checks: [], errors: [], warnings: [], info: [] }
+// Match final summary: "N passed" and/or "N failed"
+const passMatch = combined.match(/(\d+)\s+passed/);
+const failMatch = combined.match(/(\d+)\s+failed/);
+const skipMatch = combined.match(/(\d+)\s+skipped/);
 ```
 
-### Module Export Pattern
+**Confidence:** MEDIUM. The line reporter format is consistent with community-reported examples and
+official Playwright reporter documentation. The JSON reporter (`--reporter=json`) would be more reliable
+for structured parsing but writes to a file (not stdout) unless `PLAYWRIGHT_JSON_OUTPUT_NAME` is unset
+and the output is piped — which complicates the `runTestCommand()` flow in `testing.cjs`. The line
+reporter stdout approach is simpler and consistent with how the existing Jest/Vitest parsers work.
 
-Named function exports via `module.exports = { ... }`. No default exports, no classes. Functions accept `(cwd, options)` and return plain objects. Matches every existing lib/*.cjs module.
+**Alternative (higher confidence, more complexity):** Use `--reporter=json` with
+`PLAYWRIGHT_JSON_OUTPUT_NAME=/dev/stdout` to get JSON on stdout. Deferred — adds complexity, implement
+if line reporter parsing proves fragile.
 
-### File I/O Pattern for Repair
+### `.gitignore` additions (scaffold step)
 
-- `writeStateMd(statePath, content, cwd)` for STATE.md writes (preserves frontmatter hashing)
-- `fs.writeFileSync` for config.json writes (matches existing repair in `cmdValidateHealth`)
-- `fs.mkdirSync({ recursive: true })` for missing phase directories (matches `cmdPhaseStatus` auto-create)
-- Timestamped `.bak` files before destructive repairs (matches existing backup pattern in `cmdValidateHealth`)
+```
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+```
 
-### Test Pattern
-
-- One test file: `tests/validation.test.cjs`
-- `createTempProject()` from `helpers.cjs` for isolated temp directories
-- `runGsdTools('validate ...')` for integration tests through the dispatcher
-- Direct `require('../get-shit-done/bin/lib/validation.cjs')` for unit tests
-- `beforeEach`/`afterEach` with `createTempProject()`/`cleanup()` for test isolation
-- Budget constraint: 750/800 tests used. Target ~20-30 tests for validation.cjs.
-
-### Dispatch Integration
-
-Add `validation` require to gsd-tools.cjs and route new subcommands under the existing `validate` case. The current `validate` case routes to `verify.cmdValidateConsistency` and `verify.cmdValidateHealth` -- these will delegate to validation.cjs.
+These are the Playwright-generated directories that must not be committed. The scaffold step appends
+these if not already present.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Plain object result types | Zod/io-ts runtime validation schemas | Never for this project. Adding a validation library to validate a validation module is circular complexity. The codebase uses plain objects everywhere. |
-| Sync fs operations | Async fs with `fs.promises` | Never for this use case. Validation runs once at startup. No concurrent I/O benefit. Every other module is sync. |
-| Single `validation.cjs` module | Split into `validation-checks.cjs` + `validation-repair.cjs` | Only if validation.cjs exceeds ~600 lines. The codebase tolerates larger modules (verify.cjs: 950 lines, cli.cjs: 1050 lines). |
-| Import from core.cjs/phase.cjs | Reimplement phase inspection in validation.cjs | Never. The disparity between regex-based checks and artifact-based checks is the bug v2.6 fixes. |
+| `@playwright/test` | Cypress | Never for this integration. Downstream consumer spec explicitly excludes Cypress. |
+| `@playwright/test` | Selenium/WebdriverIO | Never. Playwright is the modern standard with better DX, faster execution, and built-in auto-waiting. |
+| `@playwright/test` | Puppeteer | Only if user needs Chrome-specific automation without assertions. Playwright is strictly superior for testing. |
+| `reporter: 'line'` for parsing | `reporter: 'json'` with file | Use JSON reporter if line-format parsing proves unreliable across Playwright versions. JSON is structured and stable but requires file I/O or stdout pipe tricks. |
+| Chromium-only by default | All 3 browsers | Use all browsers when user explicitly needs cross-browser testing. Chromium is sufficient for most web apps and dramatically reduces CI time and binary size. |
+| `testDir: './e2e'` | `testDir: './tests/e2e'` | Use `tests/e2e` only if user already has `tests/` as their unit test directory AND wants co-location. `e2e/` at root is the Playwright community default. |
+| Inline scaffold in workflow | `npm init playwright@latest` | `npm init playwright@latest` prompts interactively (language, directory, CI, browser install) — unsuitable for GSD's programmatic scaffold. Manual config creation is deterministic. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| External validation libraries (Zod, Joi, Ajv) | Adds dependency for file structure validation, not schema validation. Overkill. | Plain conditional checks with structured result objects |
-| TypeScript / JSDoc type annotations | Project is untyped CJS. Adding types to one module creates inconsistency. | Document result shapes in code comments (matches existing pattern) |
-| Class-based check architecture | Over-engineering. Existing pattern is exported functions returning plain objects. | Exported functions: `runAllChecks(cwd, opts)`, `runCheck(cwd, id)`, `repairIssue(cwd, code)` |
-| async/await | No concurrent I/O benefit. Introduces complexity in a sync call chain. | Synchronous `fs.readFileSync` / `fs.existsSync` |
-| Event emitters for results | Check pipeline is synchronous and sequential. Events add indirection with no benefit. | Return arrays of check results directly |
-| New test framework | 750 tests use `node:test` + `node:assert`. | Continue using `node:test` with `helpers.cjs` patterns |
+| Cypress | Explicitly out of scope per project spec; different architecture (all-JS, no multi-tab), higher npm install weight | `@playwright/test` |
+| Selenium / WebdriverIO | Legacy architecture requiring separate WebDriver server; worse DX than Playwright | `@playwright/test` |
+| `playwright` (base package) | Only needed for low-level browser automation without the test runner. `@playwright/test` includes everything. | `@playwright/test` |
+| `@playwright/browser-tools` MCP | Separate tool for Claude-driven browser inspection; not the same as `@playwright/test` for writing test specs | `@playwright/test` for test generation |
+| HTML reporter as default | Writes to files, minimal stdout, can't be parsed by `testing.cjs` output parser | `reporter: 'line'` for stdout parsing |
+| All 3 browser projects by default | 3x longer CI runs, 3x binary download size; most projects only need Chromium | Single Chromium project |
+| `npm init playwright@latest` for scaffolding | Interactive prompts — not usable from GSD's non-interactive workflow steps | Manual config + directory creation as documented in design |
 
-## Integration Points
+## Stack Patterns by Variant
 
-### Where validation.cjs gets consumed:
+**If user project already has `playwright.config.ts`:**
+- Skip scaffold entirely
+- Read existing `testDir` from config and use it for spec generation
+- Do not overwrite user's config
+- Run `npx playwright test` using their existing setup
 
-1. **gsd-tools.cjs dispatcher** -- existing `validate` case routes to validation.cjs functions
-2. **cli.cjs `handleHealth`** -- refactored to call `validation.runAllChecks(cwd)` instead of inline `gatherHealthData`
-3. **autopilot.mjs** -- pre-flight validation via `createRequire` import, calls `validation.runAllChecks(cwd, { autoRepair: true })`
-4. **verify.cjs `cmdValidateHealth`** -- delegates to validation.cjs (or deprecated in favor of unified module)
+**If `@playwright/test` is in devDependencies but no config exists:**
+- "Partially detected" path: create `playwright.config.ts` only, skip `npm install`
+- Run `npx playwright install chromium` to ensure browser binaries are available
+- Create `e2e/` directory with example test
 
-### What validation.cjs imports:
+**If neither config nor package exists:**
+- Full scaffold: install + config + directory + example test + `.gitignore` additions
+- Requires user confirmation before running
 
-1. **core.cjs** -- `findPhaseInternal`, `getMilestoneInfo`, `safeReadFile`, `output`, `error`
-2. **phase.cjs** -- `computePhaseStatus`, `findFirstIncompletePhase`, `extractPhaseNumbers`
-3. **frontmatter.cjs** -- `extractFrontmatter`
-4. **state.cjs** -- `writeStateMd`
-
-### Circular Dependency Avoidance
-
-- validation.cjs imports FROM core.cjs, phase.cjs, frontmatter.cjs, state.cjs (lower-level modules)
-- verify.cjs and cli.cjs import FROM validation.cjs (for delegating health checks)
-- validation.cjs must NOT import from verify.cjs or cli.cjs -- this would create a cycle
-- Health check logic moves OUT of verify.cjs/cli.cjs INTO validation.cjs
+**If user's app uses Vite (port 5173) or Angular (port 4200):**
+- Override `baseURL` in the scaffold config
+- Detected by checking `package.json` for `vite`, `@angular/core`, `next`, `nuxt` dependencies
 
 ## Version Compatibility
 
-| Component | Compatible With | Notes |
-|-----------|-----------------|-------|
-| validation.cjs | Node.js >=16.7.0 | Same engine requirement as package.json. Uses no APIs newer than Node 16. |
-| validation.cjs | All existing lib/*.cjs | Pure CJS with `require()`. No ESM interop needed. |
-| autopilot.mjs | validation.cjs | Uses `createRequire(import.meta.url)` to import CJS (established v2.3 pattern). |
-| test suite | validation.test.cjs | Budget: 800 tests, current: 750 (93.75%). Target 20-30 validation tests. |
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `@playwright/test@^1.50.0` | Node.js >=20.x | Node 16/18 dropped in Playwright 1.49+. User's app must run Node 20+. GSD itself still supports Node >=16.7.0. |
+| `@playwright/test@^1.50.0` | TypeScript 5.x | Ships its own TS transpilation; user's tsconfig is optional |
+| `@playwright/test@^1.50.0` | macOS 14+, Ubuntu 22.04+, Windows 11+ | System requirements from official docs. M1/M2/M3 Mac supported. |
+| `testing.cjs` Playwright parser | `@playwright/test@^1.50.0` | Line reporter summary format has been stable across Playwright 1.x; regex for "N passed" / "N failed" is resilient to minor format changes |
+| GSD test suite (node:test, 796 tests) | No conflict | Playwright tests live in user's project, not in GSD's test suite. GSD tests only test the detection + parsing logic. |
 
 ## Sources
 
-All findings based on direct codebase inspection (HIGH confidence):
-
-- `get-shit-done/bin/lib/cli.cjs` -- `gatherHealthData` (lines 409-595), `handleHealth`, `KNOWN_SETTINGS_KEYS`
-- `get-shit-done/bin/lib/verify.cjs` -- `cmdValidateHealth` (lines 535-871), `cmdValidateConsistency`
-- `get-shit-done/bin/lib/phase.cjs` -- `computePhaseStatus`, `findFirstIncompletePhase`, `extractPhaseNumbers`
-- `get-shit-done/bin/lib/core.cjs` -- `output`, `error`, `findPhaseInternal`, `safeReadFile`
-- `get-shit-done/bin/lib/state.cjs` -- `writeStateMd`
-- `get-shit-done/bin/lib/config.cjs` -- `CONFIG_DEFAULTS`
-- `get-shit-done/bin/gsd-tools.cjs` -- dispatcher routing, `validate` case (lines 508-519)
-- `tests/helpers.cjs` -- `runGsdTools`, `createTempProject`, `cleanup`
-- `tests/verify-health.test.cjs` -- test patterns for health validation
-- `package.json` -- dependencies (zx only), devDeps (c8, esbuild), engine >=16.7.0
+- [@playwright/test on npm](https://www.npmjs.com/package/@playwright/test) — version 1.58.2 current as of March 2026 (MEDIUM confidence; 403 on direct fetch, version from WebSearch result summary)
+- [Playwright Installation Docs](https://playwright.dev/docs/intro) — Node.js >=20.x requirement, `npm init playwright@latest` behavior (HIGH confidence, official docs)
+- [Playwright Configuration Docs](https://playwright.dev/docs/test-configuration) — `defineConfig` options: testDir, baseURL, retries, workers, reporter, projects (HIGH confidence, official docs)
+- [Playwright Reporters Docs](https://playwright.dev/docs/test-reporters) — Built-in reporters, JSON reporter with `PLAYWRIGHT_JSON_OUTPUT_NAME`, line reporter behavior (HIGH confidence, official docs)
+- [Playwright Design Doc](..designs/2026-03-19-playwright-ui-testing-integration-design.md) — scaffold specification, detection logic, config template, locator priority (HIGH confidence, project design doc)
+- `get-shit-done/bin/lib/testing.cjs` — existing detectFramework, parseTestOutput, runTestCommand patterns (HIGH confidence, direct codebase inspection)
+- `tests/testing.test.cjs` — existing test patterns for integration points (HIGH confidence, direct codebase inspection)
+- `package.json` — current dependencies: zx only; devDeps: c8, esbuild (HIGH confidence, direct codebase inspection)
 
 ---
-*Stack research for: unified validation module (validation.cjs)*
-*Researched: 2026-03-15*
+*Stack research for: Playwright UI testing integration (v2.7)*
+*Researched: 2026-03-19*
