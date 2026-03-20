@@ -114,6 +114,50 @@ describe('detectFramework', () => {
   });
 });
 
+// ─── Playwright Detection ────────────────────────────────────────────────────
+
+describe('detectPlaywright', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns configured when playwright.config.ts exists', () => {
+    fs.writeFileSync(path.join(tmpDir, 'playwright.config.ts'), 'export default {}');
+    const result = testing.detectPlaywright(tmpDir);
+    assert.strictEqual(result.status, 'configured');
+    assert.ok(result.config_path.endsWith('playwright.config.ts'));
+  });
+
+  test('returns configured when playwright.config.js exists', () => {
+    fs.writeFileSync(path.join(tmpDir, 'playwright.config.js'), 'module.exports = {}');
+    const result = testing.detectPlaywright(tmpDir);
+    assert.strictEqual(result.status, 'configured');
+    assert.ok(result.config_path.endsWith('playwright.config.js'));
+  });
+
+  test('returns installed when @playwright/test in devDependencies but no config', () => {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      devDependencies: { '@playwright/test': '^1.50.0' },
+    }));
+    const result = testing.detectPlaywright(tmpDir);
+    assert.strictEqual(result.status, 'installed');
+    assert.strictEqual(result.config_path, null);
+  });
+
+  test('returns not-detected when neither config nor dependency found', () => {
+    const result = testing.detectPlaywright(tmpDir);
+    assert.strictEqual(result.status, 'not-detected');
+    assert.strictEqual(result.config_path, null);
+  });
+});
+
 // ─── Test Counting ──────────────────────────────────────────────────────────
 
 describe('countTestsInFile', () => {
@@ -220,6 +264,16 @@ describe('findTestFiles', () => {
   test('returns empty array for project with no test files', () => {
     const files = testing.findTestFiles(tmpDir);
     assert.strictEqual(files.length, 0);
+  });
+
+  test('excludes e2e directory from test discovery', () => {
+    fs.mkdirSync(path.join(tmpDir, 'e2e'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'e2e', 'login.spec.ts'), 'test("login", () => {})');
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'app.test.js'), 'test("unit", () => {})');
+    const files = testing.findTestFiles(tmpDir);
+    assert.ok(files.some(f => f.includes('app.test.js')), 'should find unit test');
+    assert.ok(!files.some(f => f.includes('login.spec.ts')), 'should exclude e2e spec');
   });
 });
 
@@ -406,6 +460,33 @@ describe('test-detect-framework CLI command', () => {
     assert.ok(result.success, `Command failed: ${result.error}`);
     const output = JSON.parse(result.output);
     assert.strictEqual(output.framework, 'node:test');
+  });
+});
+
+describe('playwright-detect CLI command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns status as JSON', () => {
+    fs.writeFileSync(path.join(tmpDir, 'playwright.config.ts'), 'export default {}');
+    const result = runGsdTools('playwright-detect', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.status, 'configured');
+    assert.ok(output.config_path);
+  });
+
+  test('returns not-detected in raw mode for empty project', () => {
+    const result = runGsdTools('playwright-detect --raw', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+    assert.strictEqual(result.output, 'not-detected');
   });
 });
 
@@ -687,6 +768,43 @@ Tests:  1 failed, 1 passed, 2 total
     const parsed = testing.parseTestOutput(stdout, '', 'mocha');
     assert.strictEqual(parsed.passed, 3);
     assert.strictEqual(parsed.failed, 1);
+  });
+
+  test('parses playwright output with passed only', () => {
+    const stdout = '  2 passed (3.1s)\n';
+    const parsed = testing.parseTestOutput(stdout, '', 'playwright');
+    assert.strictEqual(parsed.passed, 2);
+    assert.strictEqual(parsed.failed, 0);
+    assert.strictEqual(parsed.total, 2);
+  });
+
+  test('parses playwright output with passed and failed', () => {
+    const stdout = '  3 passed, 1 failed (5.2s)\n';
+    const parsed = testing.parseTestOutput(stdout, '', 'playwright');
+    assert.strictEqual(parsed.passed, 3);
+    assert.strictEqual(parsed.failed, 1);
+    assert.strictEqual(parsed.total, 4);
+  });
+
+  test('parses playwright output with passed, failed, and skipped', () => {
+    const stdout = '  5 passed, 2 failed, 1 skipped (8.1s)\n';
+    const parsed = testing.parseTestOutput(stdout, '', 'playwright');
+    assert.strictEqual(parsed.passed, 5);
+    assert.strictEqual(parsed.failed, 2);
+    assert.strictEqual(parsed.total, 8);
+  });
+
+  test('extracts playwright failed test names', () => {
+    const stdout = `  1) test-file.spec.ts:12:5 > login page > should display form
+  2) auth.spec.ts:24:3 > signup > should validate email
+
+  2 failed (4.0s)
+`;
+    const parsed = testing.parseTestOutput(stdout, '', 'playwright');
+    assert.strictEqual(parsed.failed, 2);
+    assert.strictEqual(parsed.failedTests.length, 2);
+    assert.ok(parsed.failedTests[0].includes('login page'));
+    assert.ok(parsed.failedTests[1].includes('signup'));
   });
 
   test('falls back to exit-code-only when framework unknown', () => {
