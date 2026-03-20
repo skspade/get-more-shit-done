@@ -190,7 +190,7 @@
 **Milestone Goal:** Bridge the test steward's consolidation proposals into actionable cleanup phases during milestone gap closure.
 
 - [x] **Phase 75: Schema Design and Status Routing** - Define gaps.test_consolidation schema and lock tech_debt routing for consolidation-only audits, modifying both workflow files atomically (completed 2026-03-20)
-- [ ] **Phase 76: Proposal Extraction and Task Mapping** - Parse steward proposals into structured data and map all four strategies to executable tasks with budget gating
+- [x] **Phase 76: Proposal Extraction and Task Mapping** - Parse steward proposals into structured data and map all four strategies to executable tasks with budget gating (completed 2026-03-20)
 - [ ] **Phase 77: Edge Case Hardening and Validation** - Verify graceful behavior for empty proposals, steward-disabled, consolidation-only gaps, and autopilot flow
 
 ## Phase Details
@@ -261,5 +261,5 @@ Phases execute in numeric order: 75 → 76 → 77
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75. Schema Design and Status Routing | 1/1 | Complete    | 2026-03-20 | - |
-| 76. Proposal Extraction and Task Mapping | v2.8 | 0/0 | Not started | - |
+| 76. Proposal Extraction and Task Mapping | 1/1 | Complete   | 2026-03-20 | - |
 | 77. Edge Case Hardening and Validation | v2.8 | 0/0 | Not started | - |

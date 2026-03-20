@@ -21,23 +21,23 @@ Requirements for Test Steward Consolidation Bridge. Each maps to roadmap phases.
 
 ### Gap Parsing
 
-- [ ] **PARSE-01**: plan-milestone-gaps parses `gaps.test_consolidation` from MILESTONE-AUDIT.md frontmatter alongside existing gap types
-- [ ] **PARSE-02**: When `gaps.test_consolidation` is absent or empty, plan-milestone-gaps skips test consolidation with no error
-- [ ] **PARSE-03**: Consolidation phase is created only when `test_health.budget_status` is Warning or Over Budget
+- [x] **PARSE-01**: plan-milestone-gaps parses `gaps.test_consolidation` from MILESTONE-AUDIT.md frontmatter alongside existing gap types
+- [x] **PARSE-02**: When `gaps.test_consolidation` is absent or empty, plan-milestone-gaps skips test consolidation with no error
+- [x] **PARSE-03**: Consolidation phase is created only when `test_health.budget_status` is Warning or Over Budget
 
 ### Phase Creation
 
-- [ ] **PHASE-01**: All test consolidation proposals are grouped into a single "Test Suite Consolidation" phase
-- [ ] **PHASE-02**: Consolidation phase is always the last phase in the gap closure sequence
-- [ ] **PHASE-03**: Consolidation phase appears in the gap closure plan presentation with proposals listed as tasks
+- [x] **PHASE-01**: All test consolidation proposals are grouped into a single "Test Suite Consolidation" phase
+- [x] **PHASE-02**: Consolidation phase is always the last phase in the gap closure sequence
+- [x] **PHASE-03**: Consolidation phase appears in the gap closure plan presentation with proposals listed as tasks
 
 ### Task Mapping
 
-- [ ] **TASK-01**: Prune strategy proposals map to delete tasks with source file paths and "run test suite" verification
-- [ ] **TASK-02**: Parameterize strategy proposals map to refactor tasks specifying test.each conversion with input list
-- [ ] **TASK-03**: Promote strategy proposals map to delete-and-verify tasks referencing the subsuming integration test
-- [ ] **TASK-04**: Merge strategy proposals map to reorganize tasks specifying source and target files
-- [ ] **TASK-05**: Each task description includes the steward's estimated_reduction count
+- [x] **TASK-01**: Prune strategy proposals map to delete tasks with source file paths and "run test suite" verification
+- [x] **TASK-02**: Parameterize strategy proposals map to refactor tasks specifying test.each conversion with input list
+- [x] **TASK-03**: Promote strategy proposals map to delete-and-verify tasks referencing the subsuming integration test
+- [x] **TASK-04**: Merge strategy proposals map to reorganize tasks specifying source and target files
+- [x] **TASK-05**: Each task description includes the steward's estimated_reduction count
 
 ### Edge Cases
 
@@ -76,17 +76,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROUTE-01 | Phase 75 | Complete |
 | ROUTE-02 | Phase 75 | Complete |
 | ROUTE-03 | Phase 75 | Complete |
-| PARSE-01 | Phase 76 | Pending |
-| PARSE-02 | Phase 76 | Pending |
-| PARSE-03 | Phase 76 | Pending |
-| PHASE-01 | Phase 76 | Pending |
-| PHASE-02 | Phase 76 | Pending |
-| PHASE-03 | Phase 76 | Pending |
-| TASK-01 | Phase 76 | Pending |
-| TASK-02 | Phase 76 | Pending |
-| TASK-03 | Phase 76 | Pending |
-| TASK-04 | Phase 76 | Pending |
-| TASK-05 | Phase 76 | Pending |
+| PARSE-01 | Phase 76 | Complete |
+| PARSE-02 | Phase 76 | Complete |
+| PARSE-03 | Phase 76 | Complete |
+| PHASE-01 | Phase 76 | Complete |
+| PHASE-02 | Phase 76 | Complete |
+| PHASE-03 | Phase 76 | Complete |
+| TASK-01 | Phase 76 | Complete |
+| TASK-02 | Phase 76 | Complete |
+| TASK-03 | Phase 76 | Complete |
+| TASK-04 | Phase 76 | Complete |
+| TASK-05 | Phase 76 | Complete |
 | EDGE-01 | Phase 77 | Pending |
 | EDGE-02 | Phase 77 | Pending |
 | EDGE-03 | Phase 77 | Pending |
