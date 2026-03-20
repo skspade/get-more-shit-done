@@ -16,6 +16,7 @@
 - ✅ **v2.4 Autopilot Streaming** — Phases 54-58 (shipped 2026-03-13)
 - ✅ **v2.5 New-Milestone Auto Mode** — Phases 59-63 (shipped 2026-03-14)
 - ✅ **v2.6 Unified Validation Module** — Phases 64-70 (shipped 2026-03-17)
+- 🚧 **v2.7 Playwright UI Testing Integration** — Phases 71-74 (in progress)
 
 ## Phases
 
@@ -173,7 +174,67 @@
 
 </details>
 
+### v2.7 Playwright UI Testing Integration (In Progress)
+
+**Milestone Goal:** Add on-demand Playwright E2E testing to GSD with phase-aware test generation from acceptance criteria, detection/scaffolding infrastructure, and integration into the existing add-tests workflow.
+
+- [ ] **Phase 71: Test Infrastructure and Detection Foundation** - Playwright detection, output parsing, and budget safety in testing.cjs and gsd-tools.cjs
+- [ ] **Phase 72: gsd-playwright Agent** - Full lifecycle agent for Playwright detection, scaffolding, generation, execution, and reporting
+- [ ] **Phase 73: /gsd:ui-test Command** - User-facing command that spawns gsd-playwright agent with argument parsing and flags
+- [ ] **Phase 74: add-tests Workflow Enhancement** - Surgical E2E path modification in add-tests.md with Playwright detection and RED-GREEN pattern
+
+## Phase Details
+
+### Phase 71: Test Infrastructure and Detection Foundation
+**Goal**: GSD can detect Playwright installation state, parse Playwright test output, and safely exclude E2E specs from the test budget
+**Depends on**: Nothing (first phase of v2.7)
+**Requirements**: INFRA-01, INFRA-02, INFRA-03, INFRA-04, INFRA-05
+**Success Criteria** (what must be TRUE):
+  1. Running `gsd-tools playwright-detect` in a project with Playwright configured returns "configured" status with config path
+  2. Running `gsd-tools playwright-detect` in a project without Playwright returns "not-detected" status
+  3. Playwright test output with pass/fail counts is correctly parsed into structured results by `parsePlaywrightOutput()`
+  4. Test files in `e2e/` directories are excluded from the test budget counter and hard test gate discovery
+**Plans**: TBD
+
+### Phase 72: gsd-playwright Agent
+**Goal**: A reusable agent can scaffold Playwright from scratch, generate phase-aware test specs from acceptance criteria, execute them, and report structured results
+**Depends on**: Phase 71
+**Requirements**: AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05, AGNT-06, AGNT-07, AGNT-08
+**Success Criteria** (what must be TRUE):
+  1. Agent scaffolds a working Playwright setup (config, e2e directory, example test, gitignore) in a project that has no Playwright installed
+  2. Agent generates `.spec.ts` files from CONTEXT.md acceptance criteria using the locator priority hierarchy (getByRole first, CSS last)
+  3. Agent executes tests via `npx playwright test` and returns a structured `## PLAYWRIGHT COMPLETE` block with pass/fail/skipped counts
+  4. Agent distinguishes test-level failures (locator not found) from application-level failures (timeout, connection refused) in its report
+  5. Agent surfaces screenshot and trace file paths when tests fail
+**Plans**: TBD
+
+### Phase 73: /gsd:ui-test Command
+**Goal**: Users can invoke `/gsd:ui-test` with a phase number to generate and run Playwright tests against their application
+**Depends on**: Phase 72
+**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05
+**Success Criteria** (what must be TRUE):
+  1. Running `/gsd:ui-test 71` generates and executes Playwright tests for that phase's acceptance criteria
+  2. Running `/gsd:ui-test --scaffold` forces Playwright scaffolding even when already detected
+  3. Running `/gsd:ui-test --run-only` executes existing tests without generating new ones
+  4. Running `/gsd:ui-test --headed` opens a visible browser during test execution
+  5. Command output displays structured results with the GSD banner format
+**Plans**: TBD
+
+### Phase 74: add-tests Workflow Enhancement
+**Goal**: The existing add-tests workflow detects Playwright availability and generates E2E specs alongside unit tests without breaking the TDD path
+**Depends on**: Phase 73
+**Requirements**: WKFL-01, WKFL-02, WKFL-03, WKFL-04, WKFL-05, WKFL-06
+**Success Criteria** (what must be TRUE):
+  1. When Playwright is configured, the add-tests E2E generation step produces `.spec.ts` files using gsd-playwright agent patterns
+  2. When Playwright is not detected, add-tests prompts whether to scaffold before proceeding with E2E generation
+  3. E2E test results appear in the existing add-tests summary table alongside unit test results
+  4. The TDD path (unit test generation, RED-GREEN cycle) works identically to before this change with zero behavioral differences
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 71 -> 72 -> 73 -> 74
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -191,3 +252,7 @@
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
 | 59-63 | v2.5 | 6/6 | Complete | 2026-03-14 |
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
+| 71. Infrastructure | v2.7 | 0/0 | Not started | - |
+| 72. Agent | v2.7 | 0/0 | Not started | - |
+| 73. Command | v2.7 | 0/0 | Not started | - |
+| 74. Workflow | v2.7 | 0/0 | Not started | - |

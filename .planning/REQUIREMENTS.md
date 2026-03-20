@@ -79,36 +79,36 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase TBD | Pending |
-| INFRA-02 | Phase TBD | Pending |
-| INFRA-03 | Phase TBD | Pending |
-| INFRA-04 | Phase TBD | Pending |
-| INFRA-05 | Phase TBD | Pending |
-| AGNT-01 | Phase TBD | Pending |
-| AGNT-02 | Phase TBD | Pending |
-| AGNT-03 | Phase TBD | Pending |
-| AGNT-04 | Phase TBD | Pending |
-| AGNT-05 | Phase TBD | Pending |
-| AGNT-06 | Phase TBD | Pending |
-| AGNT-07 | Phase TBD | Pending |
-| AGNT-08 | Phase TBD | Pending |
-| CMD-01 | Phase TBD | Pending |
-| CMD-02 | Phase TBD | Pending |
-| CMD-03 | Phase TBD | Pending |
-| CMD-04 | Phase TBD | Pending |
-| CMD-05 | Phase TBD | Pending |
-| WKFL-01 | Phase TBD | Pending |
-| WKFL-02 | Phase TBD | Pending |
-| WKFL-03 | Phase TBD | Pending |
-| WKFL-04 | Phase TBD | Pending |
-| WKFL-05 | Phase TBD | Pending |
-| WKFL-06 | Phase TBD | Pending |
+| INFRA-01 | Phase 71 | Pending |
+| INFRA-02 | Phase 71 | Pending |
+| INFRA-03 | Phase 71 | Pending |
+| INFRA-04 | Phase 71 | Pending |
+| INFRA-05 | Phase 71 | Pending |
+| AGNT-01 | Phase 72 | Pending |
+| AGNT-02 | Phase 72 | Pending |
+| AGNT-03 | Phase 72 | Pending |
+| AGNT-04 | Phase 72 | Pending |
+| AGNT-05 | Phase 72 | Pending |
+| AGNT-06 | Phase 72 | Pending |
+| AGNT-07 | Phase 72 | Pending |
+| AGNT-08 | Phase 72 | Pending |
+| CMD-01 | Phase 73 | Pending |
+| CMD-02 | Phase 73 | Pending |
+| CMD-03 | Phase 73 | Pending |
+| CMD-04 | Phase 73 | Pending |
+| CMD-05 | Phase 73 | Pending |
+| WKFL-01 | Phase 74 | Pending |
+| WKFL-02 | Phase 74 | Pending |
+| WKFL-03 | Phase 74 | Pending |
+| WKFL-04 | Phase 74 | Pending |
+| WKFL-05 | Phase 74 | Pending |
+| WKFL-06 | Phase 74 | Pending |
 
 **Coverage:**
 - v2.7 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after initial definition*
+*Last updated: 2026-03-20 after roadmap creation*
