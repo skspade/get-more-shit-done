@@ -104,7 +104,11 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — ready for next milestone)
+- `/gsd:ui-test` command spec with argument parsing (phase, URL, free-text), flags (--scaffold, --run-only, --headed), Playwright detection/scaffolding, test generation, and execution — v2.7
+- `gsd-playwright` agent for Playwright detection, scaffolding, test generation from phase context, execution via `npx playwright test`, and structured results reporting — v2.7
+- Enhanced `add-tests` workflow E2E path with Playwright detection, scaffolding prompt, `.spec.ts` generation, and RED-GREEN execution pattern — v2.7
+- Playwright scaffolding specification: three-tier detection, `playwright.config.ts` creation, Chromium-only defaults, example test, `.gitignore` updates — v2.7
+- Test generation patterns: acceptance test Given/When/Then → Playwright spec mapping, locator priority (getByRole > getByText > getByLabel > getByTestId), common UI test patterns — v2.7
 
 ### Out of Scope
 
@@ -204,4 +208,4 @@ Shipped v2.6 with unified validation module. 14 milestones shipped (v1.0-v2.6) a
 **Known tech debt:** Test budget at 99.5% (796/800) — 4 redundant tests, 3 consolidation proposals; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys); 10 pre-existing test failures across 4 files (not v2.6 regressions)
 
 ---
-*Last updated: 2026-03-17 after v2.6 milestone*
+*Last updated: 2026-03-19 after starting v2.7 milestone*
