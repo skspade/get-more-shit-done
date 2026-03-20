@@ -1,5 +1,21 @@
 # Milestones
 
+## v2.7 Playwright UI Testing Integration (Shipped: 2026-03-20)
+
+**Phases completed:** 4 phases, 5 plans, 16 tasks
+**Timeline:** 1 day (2026-03-20)
+**Git range:** 7a78642 → 31b1040 (33 files, +3,849/-41)
+
+**Key accomplishments:**
+- Added `detectPlaywright()` three-tier detection (configured/installed/not-detected), `parseTestOutput('playwright')` for line reporter format, and `e2e/` exclusion from test budget in testing.cjs
+- Created `gsd-playwright` agent with five-step lifecycle (detect, scaffold, generate, execute, report), failure categorization (app-level vs test-level), and structured `## PLAYWRIGHT COMPLETE` return block
+- Created `/gsd:ui-test` command with argument parsing (phase, URL, instructions), flags (`--scaffold`, `--run-only`, `--headed`), GSD banner, and gsd-playwright agent spawn
+- Enhanced `add-tests` workflow with Playwright detection gate, scaffolding prompt (scaffold/skip/cancel), inline spec generation, and RED-GREEN execution pattern
+- Added 11 infrastructure tests covering three-tier detection, CLI command, output parsing, and e2e exclusion
+- Milestone audit: 24/24 requirements satisfied, 24/24 integrations wired, 2/2 E2E flows verified (tech_debt — 4 documentation/minor items)
+
+---
+
 ## v2.6 Unified Validation Module (Shipped: 2026-03-17)
 
 **Phases completed:** 7 phases, 12 plans

@@ -593,6 +593,52 @@
 
 ---
 
+## Milestone: v2.7 — Playwright UI Testing Integration
+
+**Shipped:** 2026-03-20
+**Phases:** 4 | **Plans:** 5 | **Commits:** ~20
+
+### What Was Built
+- `detectPlaywright()` three-tier detection (configured/installed/not-detected) and `parseTestOutput('playwright')` for line reporter output in testing.cjs
+- `playwright-detect` CLI command dispatched through gsd-tools.cjs
+- `gsd-playwright` agent with five-step lifecycle (detect, scaffold, generate, execute, report) and failure categorization (app-level vs test-level)
+- `/gsd:ui-test` command with argument parsing (phase, URL, instructions), flags (--scaffold, --run-only, --headed), and structured results display
+- Playwright-aware `add-tests` workflow with detection gate, scaffolding prompt, inline spec generation, and RED-GREEN execution pattern
+- 11 infrastructure tests covering detection, CLI command, output parsing, and e2e budget exclusion
+
+### What Worked
+- Layered phase decomposition: infrastructure (71) → agent (72) → command (73) → workflow (74) created clean dependency chain
+- Reusing existing patterns: three-tier detection mirrors `detectFramework`; direct agent spawn follows `audit-tests.md` pattern; scaffolding prompt follows AskUserQuestion conventions
+- All 4 phases completed in a single day with zero gap closure phases needed
+- Milestone audit passed 24/24 requirements with only documentation-level tech debt
+- E2E budget exclusion (`e2e/` in EXCLUDE_DIRS) prevented test budget overflow — key risk mitigated early in Phase 71
+- Agent's BLOCKED status for missing acceptance_tests prevents fabricated tests — defensive design
+
+### What Was Inefficient
+- Audit found 4 tech debt items that are documentation-only but create fragility: `playwright-detect --raw` documented as JSON when it returns string, SUMMARY frontmatter names non-existent function, scaffolding omits `webServer` block flagged by research, path convention mismatch
+- Test budget now at 807/800 (over budget) — the 11 new tests pushed past the limit; consolidation proposals from audit would bring it back to ~798
+- Research flagged `webServer` block as a critical pitfall but it wasn't included in scaffolding — research insights not fully propagated to implementation
+
+### Patterns Established
+- Three-tier detection pattern: configured (config file found) > installed (package dep only) > not-detected — richer than boolean
+- Failure categorization: connection refused / timeout → app-level (infrastructure); locator / assertion → test-level (test issue)
+- Direct agent spawn command: thin argument parser spawning agent via Task() without intermediate workflow file
+- Detection gate pattern: workflow step checks tool availability before proceeding, with scaffolding prompt as fallback
+
+### Key Lessons
+1. Research insights need explicit propagation to implementation — Phase 71 research flagged `webServer` as critical, but Phase 72 and 74 scaffolding omitted it
+2. First milestone with zero gap closure phases (alongside v2.1) — well-scoped 4-phase design with clear layered dependencies
+3. Three-tier detection is better than boolean for stateful tools — enables "installed but not configured" guidance
+4. Test budget should be checked before adding tests — 807/800 was avoidable if consolidation proposals from v2.6 audit had been applied first
+5. Documentation in SUMMARY frontmatter can reference functions that don't exist — `parsePlaywrightOutput()` vs actual `parseTestOutput('playwright')` — frontmatter should be verified against actual exports
+
+### Cost Observations
+- Model mix: quality profile (opus primary, sonnet for sub-agents)
+- Sessions: 4 phase executions, 0 gap closure phases
+- Notable: smallest plan count (5) for a 4-phase milestone — each phase focused on a single deliverable artifact
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -613,12 +659,13 @@
 | v2.4 | 45 | 5 | Autopilot streaming — NDJSON real-time output, stall detection, consolidated invocations |
 | v2.5 | 30 | 5 | New-milestone auto mode — flag+config+persist pattern, 6 skip points, auto-chain, SlashCommand delegation |
 | v2.6 | ~40 | 7 | Unified validation module — check registry pattern, 3 consumer migration, auto-repair, test parameterization |
+| v2.7 | ~20 | 4 | Playwright UI testing — three-tier detection, agent lifecycle, command, workflow integration, zero gap closure |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 13 of 14 milestones (v2.1 is only clean pass)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 14 milestones; only v2.1 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 14 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 13 of 15 milestones (v2.1 and v2.7 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 15 milestones; v2.1 and v2.7 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 15 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -632,3 +679,5 @@
 14. Auto-mode flag+config+persist pattern is now battle-tested across 3 workflows (discuss, plan, new-milestone) — consistent UX for autonomous execution
 15. Check registry pattern (`{ id, category, severity, check, repair? }`) enables extensible, filterable validation — proven in v2.6 with 21 checks across 4 categories
 16. Static vs runtime test counts can diverge — always use the tooling's count, not manual assertions from execution summaries
+17. Research insights must be explicitly propagated to implementation — flagging a pitfall in research doesn't guarantee it appears in the delivered artifacts (v2.7 webServer block)
+18. Three-tier detection (configured/installed/not-detected) is superior to boolean for stateful tools — enables differentiated guidance at each tier (v2.7)
