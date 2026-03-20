@@ -233,10 +233,10 @@ Plans:
   2. The autopilot audit-fix-reaudit loop processes consolidation phases the same way it processes any other gap closure phase -- no special-casing required
   3. Steward proposals in the generated tasks use verbatim source file paths and test names from the steward report, not re-interpreted or generalized descriptions
   4. Existing gap types (requirements, integration, flows) produce identical behavior to pre-v2.8 -- no regressions
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 77-01: TBD
+- [ ] 77-01: Edge case tests for consolidation frontmatter parsing and autopilot compatibility
 
 ## Progress
 
