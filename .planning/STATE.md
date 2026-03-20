@@ -26,7 +26,7 @@ Milestone: v2.7 Playwright UI Testing Integration — SHIPPED
 Phase: 74 of 74 (all complete)
 Plans: 5 of 5
 Status: Complete
-Last activity: 2026-03-20 — v2.7 milestone archived
+Last activity: 2026-03-20 - Completed quick task 10: update our readme and user guide for milestone 2.7 features
 
 Progress: [██████████] 100%
 
