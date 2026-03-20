@@ -19,6 +19,9 @@ Parse YAML frontmatter to extract structured gaps:
 - `gaps.requirements` — unsatisfied requirements
 - `gaps.integration` — missing cross-phase connections
 - `gaps.flows` — broken E2E flows
+- `gaps.test_consolidation` — steward consolidation proposals (when present)
+
+If `gaps.test_consolidation` is absent or empty, skip test consolidation with no error. Treat as: `const consolidationGaps = gaps.test_consolidation || [];`
 
 If no audit file exists or has no gaps, error:
 ```
@@ -46,6 +49,12 @@ Cluster related gaps into logical phases:
 - Same subsystem (auth, API, UI) → combine
 - Dependency order (fix stubs before wiring)
 - Keep phases focused: 2-4 tasks each
+
+**Test consolidation grouping:**
+- All test consolidation proposals are grouped into a single phase called "Test Suite Consolidation"
+- The consolidation phase is always the last phase in the gap closure sequence
+- Each proposal appears as a task in the consolidation phase
+- If no test consolidation proposals exist, no consolidation phase is created
 
 **Example grouping:**
 ```
