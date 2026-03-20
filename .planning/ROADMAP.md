@@ -178,7 +178,7 @@
 
 **Milestone Goal:** Add on-demand Playwright E2E testing to GSD with phase-aware test generation from acceptance criteria, detection/scaffolding infrastructure, and integration into the existing add-tests workflow.
 
-- [ ] **Phase 71: Test Infrastructure and Detection Foundation** - Playwright detection, output parsing, and budget safety in testing.cjs and gsd-tools.cjs
+- [x] **Phase 71: Test Infrastructure and Detection Foundation** - Playwright detection, output parsing, and budget safety in testing.cjs and gsd-tools.cjs (completed 2026-03-20)
 - [ ] **Phase 72: gsd-playwright Agent** - Full lifecycle agent for Playwright detection, scaffolding, generation, execution, and reporting
 - [ ] **Phase 73: /gsd:ui-test Command** - User-facing command that spawns gsd-playwright agent with argument parsing and flags
 - [ ] **Phase 74: add-tests Workflow Enhancement** - Surgical E2E path modification in add-tests.md with Playwright detection and RED-GREEN pattern
@@ -252,7 +252,7 @@ Phases execute in numeric order: 71 -> 72 -> 73 -> 74
 | 54-58 | v2.4 | 6/6 | Complete | 2026-03-13 |
 | 59-63 | v2.5 | 6/6 | Complete | 2026-03-14 |
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
-| 71. Infrastructure | v2.7 | 0/0 | Not started | - |
+| 71. Infrastructure | 2/2 | Complete   | 2026-03-20 | - |
 | 72. Agent | v2.7 | 0/0 | Not started | - |
 | 73. Command | v2.7 | 0/0 | Not started | - |
 | 74. Workflow | v2.7 | 0/0 | Not started | - |
