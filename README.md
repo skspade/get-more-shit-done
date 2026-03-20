@@ -84,6 +84,8 @@ For one-off work that doesn't need full planning:
 | `/gsd:complete-milestone` | Archive milestone |
 | `/gsd:new-milestone` | Start next version |
 | `/gsd:quick` | Fast-track task with GSD guarantees |
+| `/gsd:ui-test` | Generate and run Playwright E2E tests |
+| `/gsd:add-tests` | Add unit and E2E tests to a phase |
 | `/gsd:pr-review` | Route PR review findings to quick task or milestone |
 | `/gsd:progress` | Show current status |
 | `/gsd:help` | All commands and usage |
