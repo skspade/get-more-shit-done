@@ -1,237 +1,147 @@
 # Stack Research
 
-**Domain:** Playwright UI testing integration for GSD (on-demand E2E test scaffolding and generation)
-**Researched:** 2026-03-19
-**Confidence:** HIGH (core Playwright package), MEDIUM (output parsing format — verified via official docs + community)
+**Domain:** GSD autopilot — test steward consolidation bridge (v2.8)
+**Researched:** 2026-03-20
+**Confidence:** HIGH
 
 ## Scope
 
-This research covers ONLY what is new for v2.7 (Playwright UI testing integration). The existing validated
+This research covers ONLY what is new for v2.8 (test steward consolidation bridge). The existing validated
 stack (Node.js CJS, zx/ESM, node:test suite, gsd-tools dispatcher, testing.cjs, cli.cjs, autopilot.mjs,
-validation.cjs) is NOT re-evaluated.
+validation.cjs, frontmatter.cjs) is NOT re-evaluated.
 
-## Verdict: One New DevDependency — @playwright/test
+## Verdict: No New Dependencies
 
-The target app under test installs `@playwright/test` in its own project. GSD itself only needs knowledge of
-how to detect, scaffold, and invoke Playwright in a user's project — not to have Playwright as a production
-dependency. However, GSD's own test coverage for the new `playwright-detect` logic in `testing.cjs` may
-benefit from having `@playwright/test` available in devDependencies to avoid calling `npx playwright test`
-in integration tests.
+This milestone is a pure markdown-workflow and YAML-frontmatter extension. Every parsing, writing, and
+routing capability needed already exists. The answer to "what stack additions are needed?" is: none.
 
-**Decision:** `@playwright/test` as devDependency of GSD (for testing the detector without live installs),
-plus clear documentation that user projects must install it themselves via the scaffold flow.
+The new `gaps.test_consolidation` array is structurally identical to the existing `gaps.integration` array
+(array of objects with string/number fields at two-level nesting). `extractFrontmatter()` in
+`frontmatter.cjs` already handles this structure — no parser changes, no new npm packages.
 
-## Recommended Stack
+## Recommended Stack (No Changes)
 
 ### Core Technologies
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `@playwright/test` | `^1.50.0` (current: 1.58.2) | E2E test framework that users will install in their apps; GSD detects and drives it | The only first-class Playwright integration package. Bundles test runner, browser download CLI, assertion library, and `defineConfig`. No separate `playwright` package needed for web testing. Microsoft-backed, actively maintained (releases monthly). |
-| `npx playwright install chromium` | Bundled with `@playwright/test` | Download Chromium browser binary | Chromium-only by default keeps binary footprint small (~140MB vs ~400MB for all 3 browsers). Cross-platform (macOS, Linux, Windows). |
-| Node.js | >=20.x (required by Playwright 1.50+) | Runtime for Playwright test execution | Playwright's current docs state "Node.js latest 20.x, 22.x or 24.x" as system requirements. This is a constraint on user app environments, not GSD itself (GSD requires >=16.7.0). |
-
-### TypeScript Config (for generated `playwright.config.ts`)
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `typescript` | already in user project or bundled | Type-checking for generated `.spec.ts` files | Playwright ships its own `tsconfig.json` when using TypeScript mode; no separate TS install required in the user's project — Playwright handles transpilation internally via its own ESM handling. |
+| Node.js CJS modules | >=16.7.0 (existing) | `frontmatter.cjs` parsing layer | `extractFrontmatter()` handles array-of-objects at 2-level nesting — verified against `gaps.integration` which is structurally identical to `gaps.test_consolidation`. No change. |
+| Markdown workflow files | n/a | `audit-milestone.md`, `plan-milestone-gaps.md` | Claude reads these as context — no build step, no parser, just text extension. Adding `test_consolidation` handling is a text edit. |
+| YAML frontmatter (custom parser) | n/a (in-repo, `frontmatter.cjs`) | State storage in MILESTONE-AUDIT.md | `extractFrontmatter()` + `reconstructFrontmatter()` + `spliceFrontmatter()` already provides read/write round-trip. Proven across 16 milestones. |
 
 ### Supporting Libraries
 
+No new supporting libraries required.
+
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| None beyond `@playwright/test` | — | — | Playwright bundles everything needed: `test`, `expect`, `defineConfig`, `devices`, `Page`, screenshot capture, trace viewer. No `@testing-library/playwright` needed — Playwright's built-in locators (getByRole, getByText, getByLabel, getByTestId) cover all common cases. |
+| `frontmatter.cjs` (in-repo) | n/a | YAML frontmatter read/write for MILESTONE-AUDIT.md | Only needed if programmatic frontmatter manipulation is required beyond workflow text reads. The workflows read files as Claude context — no programmatic call needed for v2.8. |
+| `gsd-tools.cjs` (in-repo) | n/a | `frontmatter merge` dispatch command | Available if a programmatic consumer of `gaps.test_consolidation` is added in the future. Not needed for v2.8. |
 
-### Development Tools (GSD-internal)
+## What Changes (File Modifications, Not New Tools)
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `node:test` (built-in) | Test suite for `testing.cjs` Playwright-detection logic | No change to existing test runner. New tests for `detectPlaywright()`, `scaffoldPlaywright()`, `parsePlaywrightOutput()` use same `createTempProject()`/`cleanup()` helpers. |
-| Existing `testing.cjs` | Where Playwright detection and output parsing land | Add `detectPlaywright(cwd)`, `parsePlaywrightOutput(stdout, stderr)`, and `getPlaywrightCommand(cwd)` alongside existing `detectFramework()`. Keep CJS module format. |
+Two workflow files get text extensions. No new files, no new modules.
 
-## Installation
+### 1. `get-shit-done/workflows/audit-milestone.md`
 
-```bash
-# In GSD itself (devDependency for testing detection logic without live Playwright installs):
-npm install -D @playwright/test
+**Change in Step 6:** Add `gaps.test_consolidation` to the YAML frontmatter template. Populate from
+`steward_report` consolidation proposals already in scope from step 3.5. Add status logic: if
+`gaps.requirements`, `gaps.integration`, and `gaps.flows` are all empty but `gaps.test_consolidation`
+is non-empty, set `status: tech_debt` instead of `passed`.
 
-# In the USER'S app project (performed by gsd-playwright agent scaffold step):
-npm install -D @playwright/test
-npx playwright install chromium
+**New frontmatter structure to emit:**
+```yaml
+gaps:
+  requirements: [...]
+  integration: [...]
+  flows: [...]
+  test_consolidation:       # NEW
+    - strategy: "prune"
+      source: "tests/foo.test.cjs"
+      action: "Remove — references deleted module"
+      reduction: 3
+    - strategy: "parameterize"
+      source: "tests/bar.test.cjs:L12-L45"
+      action: "Combine 5 near-identical tests into test.each"
+      reduction: 4
 ```
 
-**Note:** GSD never runs `npm install @playwright/test` in the user's project automatically without
-confirmation. The `gsd-playwright` agent and `add-tests` E2E path ask before scaffolding.
+**Why no parser change is needed:** `extractFrontmatter()` already parses arrays of objects. The
+`test_consolidation` items (`strategy`, `source`, `action`, `reduction`) are flat key/value pairs
+at one level below the array — identical in structure to `integration` items (`id`, `severity`,
+`description`). The parser's array-of-objects path at lines 60-82 of `frontmatter.cjs` covers this.
 
-## Config File Pattern
+### 2. `get-shit-done/workflows/plan-milestone-gaps.md`
 
-Generated `playwright.config.ts` (the canonical GSD scaffold template):
+**Changes in Step 1:** Parse `gaps.test_consolidation` alongside the existing three gap arrays.
 
-```typescript
-import { defineConfig } from '@playwright/test';
+**Changes in Step 3:** Add grouping rule — all `test_consolidation` entries go into one "Test Suite
+Consolidation" phase, always last in the gap closure sequence.
 
-export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'line',
-  use: {
-    baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-  },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-  ],
-});
-```
+**Changes in Step 5:** Include the consolidation phase in the gap closure plan presentation.
 
-**Why `reporter: 'line'`** instead of `html`: Line reporter produces parseable stdout output with a
-summary line that GSD's `parsePlaywrightOutput()` can extract pass/fail counts from. HTML reporter
-writes files but produces minimal stdout — harder to parse programmatically. GSD's design uses
-`testing.cjs`'s output parsing layer, which requires stdout.
-
-**Why `workers: 1` on CI**: Prevents flaky CI failures from parallel browser processes competing for
-resources.
-
-## Integration Points with Existing Architecture
-
-### Where Playwright hooks into `testing.cjs`
-
-The existing `testing.cjs` module (in `get-shit-done/bin/lib/testing.cjs`) is the single place where
-framework detection, output parsing, and test execution live. Playwright integration follows this pattern:
-
-```
-detectFramework(cwd)       — returns 'vitest' | 'jest' | 'mocha' | 'node:test' | null
-                           ← ADD: detectPlaywright(cwd) → boolean
-                           ← ADD: getPlaywrightCommand(cwd, opts) → string | null
-
-parseTestOutput(stdout, stderr, framework)
-                           ← ADD: 'playwright' case in switch
-
-getDefaultCommand(framework)
-                           ← ADD: 'playwright' → 'npx playwright test'
-```
-
-**Detection logic** (`detectPlaywright(cwd)`):
-1. `playwright.config.ts` or `playwright.config.js` in project root → fully detected
-2. `@playwright/test` in `package.json` devDependencies → partially detected (installed, no config)
-3. Neither → not detected
-
-**Why separate from `detectFramework()`**: Playwright is an E2E runner, not a unit test framework.
-`detectFramework()` is used by the hard test gate to run unit tests. Playwright detection is used by
-`add-tests` E2E path and `/gsd:ui-test` — different code paths, different purpose.
-
-### Playwright Output Parsing
-
-Playwright's line reporter stdout ends with a summary line. Examples from community usage:
-
-```
-  2 passed (3.1s)
-  1 failed (2.4s)
-  3 passed, 1 failed (5.2s)
-  5 passed, 2 skipped (8.1s)
-```
-
-Parsing regex for `parsePlaywrightOutput(stdout, stderr)`:
-
-```javascript
-// Match final summary: "N passed" and/or "N failed"
-const passMatch = combined.match(/(\d+)\s+passed/);
-const failMatch = combined.match(/(\d+)\s+failed/);
-const skipMatch = combined.match(/(\d+)\s+skipped/);
-```
-
-**Confidence:** MEDIUM. The line reporter format is consistent with community-reported examples and
-official Playwright reporter documentation. The JSON reporter (`--reporter=json`) would be more reliable
-for structured parsing but writes to a file (not stdout) unless `PLAYWRIGHT_JSON_OUTPUT_NAME` is unset
-and the output is piped — which complicates the `runTestCommand()` flow in `testing.cjs`. The line
-reporter stdout approach is simpler and consistent with how the existing Jest/Vitest parsers work.
-
-**Alternative (higher confidence, more complexity):** Use `--reporter=json` with
-`PLAYWRIGHT_JSON_OUTPUT_NAME=/dev/stdout` to get JSON on stdout. Deferred — adds complexity, implement
-if line reporter parsing proves fragile.
-
-### `.gitignore` additions (scaffold step)
-
-```
-test-results/
-playwright-report/
-blob-report/
-.playwright/
-```
-
-These are the Playwright-generated directories that must not be committed. The scaffold step appends
-these if not already present.
+**No changes to Steps 4, 6, 7, 8, 9, 10** — phase numbering, ROADMAP.md updates, directory creation,
+commit, and next-step routing operate generically on whatever phases get created. Adding a new phase
+type requires zero changes to the phase machinery.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| `@playwright/test` | Cypress | Never for this integration. Downstream consumer spec explicitly excludes Cypress. |
-| `@playwright/test` | Selenium/WebdriverIO | Never. Playwright is the modern standard with better DX, faster execution, and built-in auto-waiting. |
-| `@playwright/test` | Puppeteer | Only if user needs Chrome-specific automation without assertions. Playwright is strictly superior for testing. |
-| `reporter: 'line'` for parsing | `reporter: 'json'` with file | Use JSON reporter if line-format parsing proves unreliable across Playwright versions. JSON is structured and stable but requires file I/O or stdout pipe tricks. |
-| Chromium-only by default | All 3 browsers | Use all browsers when user explicitly needs cross-browser testing. Chromium is sufficient for most web apps and dramatically reduces CI time and binary size. |
-| `testDir: './e2e'` | `testDir: './tests/e2e'` | Use `tests/e2e` only if user already has `tests/` as their unit test directory AND wants co-location. `e2e/` at root is the Playwright community default. |
-| Inline scaffold in workflow | `npm init playwright@latest` | `npm init playwright@latest` prompts interactively (language, directory, CI, browser install) — unsuitable for GSD's programmatic scaffold. Manual config creation is deterministic. |
+| Custom `extractFrontmatter()` (existing) | `js-yaml` npm package | Only if YAML structure becomes deeply recursive or uses anchors/tags. Current `test_consolidation` entries are flat objects — custom parser is sufficient. Adding `js-yaml` would be a new dependency with no functional gain. |
+| Custom `extractFrontmatter()` (existing) | `gray-matter` npm package | Only if markdown file processing needs templating or custom delimiters. GSD uses raw `---` fences with no special YAML features. `gray-matter` adds weight without benefit. |
+| Workflow text extension | New `test-consolidation.cjs` module | Only if `plan-milestone-gaps` needed programmatic invocation from `autopilot.mjs`. Currently the workflow is Claude-executed text — no programmatic call site exists, and the design doc confirms autopilot handles this via the existing audit-fix-reaudit loop with no changes. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| Cypress | Explicitly out of scope per project spec; different architecture (all-JS, no multi-tab), higher npm install weight | `@playwright/test` |
-| Selenium / WebdriverIO | Legacy architecture requiring separate WebDriver server; worse DX than Playwright | `@playwright/test` |
-| `playwright` (base package) | Only needed for low-level browser automation without the test runner. `@playwright/test` includes everything. | `@playwright/test` |
-| `@playwright/browser-tools` MCP | Separate tool for Claude-driven browser inspection; not the same as `@playwright/test` for writing test specs | `@playwright/test` for test generation |
-| HTML reporter as default | Writes to files, minimal stdout, can't be parsed by `testing.cjs` output parser | `reporter: 'line'` for stdout parsing |
-| All 3 browser projects by default | 3x longer CI runs, 3x binary download size; most projects only need Chromium | Single Chromium project |
-| `npm init playwright@latest` for scaffolding | Interactive prompts — not usable from GSD's non-interactive workflow steps | Manual config + directory creation as documented in design |
+| `js-yaml` | Adds npm dependency for YAML parsing when `extractFrontmatter()` handles all structures in use. Supply-chain surface with zero functional gain. | `extractFrontmatter()` in `frontmatter.cjs` |
+| `gray-matter` | Same rationale as js-yaml. Full markdown-with-frontmatter library is overkill for structured object reads. | `extractFrontmatter()` in `frontmatter.cjs` |
+| New `gsd-tools` dispatch commands for `test_consolidation` | No programmatic consumer of `gaps.test_consolidation` exists or is planned for v2.8. Adding CLI dispatch before a caller exists is premature. | Direct file read in workflow context |
+| Schema additions to `FRONTMATTER_SCHEMAS` in `frontmatter.cjs` | `FRONTMATTER_SCHEMAS` validates plan/summary/verification files — not audit files. Audit files are read by Claude as context, not validated programmatically. | No change to `FRONTMATTER_SCHEMAS` |
+| Changes to `autopilot.mjs` | The design doc explicitly confirms the existing audit-fix-reaudit loop handles the `tech_debt` routing path without modification. `plan-milestone-gaps` is already invoked on `tech_debt` status. | No change to autopilot |
 
 ## Stack Patterns by Variant
 
-**If user project already has `playwright.config.ts`:**
-- Skip scaffold entirely
-- Read existing `testDir` from config and use it for spec generation
-- Do not overwrite user's config
-- Run `npx playwright test` using their existing setup
+**If `gaps.test_consolidation` is empty (steward ran, no proposals):**
+- Write `test_consolidation: []` to frontmatter
+- `plan-milestone-gaps` skips consolidation phase creation
+- Empty array is valid YAML and parseable by `extractFrontmatter()` — no special handling
 
-**If `@playwright/test` is in devDependencies but no config exists:**
-- "Partially detected" path: create `playwright.config.ts` only, skip `npm install`
-- Run `npx playwright install chromium` to ensure browser binaries are available
-- Create `e2e/` directory with example test
+**If steward is disabled (`test.steward: false`):**
+- `audit-milestone.md` already skips steward at step 3.5
+- `gaps.test_consolidation` key is omitted from frontmatter entirely
+- `plan-milestone-gaps` checks for key existence; if missing, treats as empty — no error
 
-**If neither config nor package exists:**
-- Full scaffold: install + config + directory + example test + `.gitignore` additions
-- Requires user confirmation before running
+**If only test consolidation gaps exist (no requirement/integration/flow gaps):**
+- This is the current dead-end scenario this milestone fixes
+- `audit-milestone.md` sets `status: tech_debt` (not `passed`)
+- `tech_debt` routing in `offer_next` already offers `/gsd:plan-milestone-gaps` as option B
+- `plan-milestone-gaps` creates only the consolidation phase — phase machinery unchanged
 
-**If user's app uses Vite (port 5173) or Angular (port 4200):**
-- Override `baseURL` in the scaffold config
-- Detected by checking `package.json` for `vite`, `@angular/core`, `next`, `nuxt` dependencies
+**If consolidation proposals don't bring budget under threshold after execution:**
+- Next audit produces new findings
+- Existing audit-fix-reaudit loop handles this — no special case needed
+- User can always `/gsd:complete-milestone` to accept remaining debt
 
 ## Version Compatibility
 
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| `@playwright/test@^1.50.0` | Node.js >=20.x | Node 16/18 dropped in Playwright 1.49+. User's app must run Node 20+. GSD itself still supports Node >=16.7.0. |
-| `@playwright/test@^1.50.0` | TypeScript 5.x | Ships its own TS transpilation; user's tsconfig is optional |
-| `@playwright/test@^1.50.0` | macOS 14+, Ubuntu 22.04+, Windows 11+ | System requirements from official docs. M1/M2/M3 Mac supported. |
-| `testing.cjs` Playwright parser | `@playwright/test@^1.50.0` | Line reporter summary format has been stable across Playwright 1.x; regex for "N passed" / "N failed" is resilient to minor format changes |
-| GSD test suite (node:test, 796 tests) | No conflict | Playwright tests live in user's project, not in GSD's test suite. GSD tests only test the detection + parsing logic. |
+| Component | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `extractFrontmatter()` | All existing MILESTONE-AUDIT.md frontmatter + new `test_consolidation` structure | `test_consolidation` items are 2-level nesting (array of flat objects) — within supported depth. Isomorphic to existing `integration` array-of-objects. |
+| `reconstructFrontmatter()` | 3-level nesting maximum | `test_consolidation` items are 1-level objects inside an array — well within limit. |
+| Existing 807-test suite | No impact | v2.8 changes are workflow text files and audit frontmatter structure. No CJS module changes means no new tests required beyond any added to cover new workflow logic. |
 
 ## Sources
 
-- [@playwright/test on npm](https://www.npmjs.com/package/@playwright/test) — version 1.58.2 current as of March 2026 (MEDIUM confidence; 403 on direct fetch, version from WebSearch result summary)
-- [Playwright Installation Docs](https://playwright.dev/docs/intro) — Node.js >=20.x requirement, `npm init playwright@latest` behavior (HIGH confidence, official docs)
-- [Playwright Configuration Docs](https://playwright.dev/docs/test-configuration) — `defineConfig` options: testDir, baseURL, retries, workers, reporter, projects (HIGH confidence, official docs)
-- [Playwright Reporters Docs](https://playwright.dev/docs/test-reporters) — Built-in reporters, JSON reporter with `PLAYWRIGHT_JSON_OUTPUT_NAME`, line reporter behavior (HIGH confidence, official docs)
-- [Playwright Design Doc](..designs/2026-03-19-playwright-ui-testing-integration-design.md) — scaffold specification, detection logic, config template, locator priority (HIGH confidence, project design doc)
-- `get-shit-done/bin/lib/testing.cjs` — existing detectFramework, parseTestOutput, runTestCommand patterns (HIGH confidence, direct codebase inspection)
-- `tests/testing.test.cjs` — existing test patterns for integration points (HIGH confidence, direct codebase inspection)
-- `package.json` — current dependencies: zx only; devDeps: c8, esbuild (HIGH confidence, direct codebase inspection)
+- `get-shit-done/bin/lib/frontmatter.cjs` — verified `extractFrontmatter()` handles array-of-objects at 2-level nesting (lines 60-82); `reconstructFrontmatter()` handles same (lines 86-148) — HIGH confidence (direct codebase inspection)
+- `get-shit-done/workflows/audit-milestone.md` — verified existing `gaps` frontmatter structure and `test_health` section; `steward_report` already in scope at step 6; `tech_debt` routing already exists in `offer_next` — HIGH confidence (direct codebase inspection)
+- `get-shit-done/workflows/plan-milestone-gaps.md` — verified steps 1-10 structure; steps 4-10 are generic over gap types; adding `test_consolidation` extends only steps 1, 3, and 5 — HIGH confidence (direct codebase inspection)
+- `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live example of audit frontmatter with `test_health.consolidation_proposals: 2`; confirmed `gaps.integration` structure is isomorphic to proposed `gaps.test_consolidation` — HIGH confidence (production artifact)
+- `.planning/designs/2026-03-20-test-steward-consolidation-bridge-design.md` — design doc specifying exact frontmatter schema, workflow extension points, and autopilot no-change confirmation — HIGH confidence (first-party design artifact)
+- `package.json` — confirmed no YAML parsing dependency exists; only non-dev dep is `zx ^8.0.0` — HIGH confidence (direct codebase inspection)
 
 ---
-*Stack research for: Playwright UI testing integration (v2.7)*
-*Researched: 2026-03-19*
+*Stack research for: GSD test steward consolidation bridge (v2.8)*
+*Researched: 2026-03-20*

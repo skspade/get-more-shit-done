@@ -1,193 +1,182 @@
 # Project Research Summary
 
-**Project:** GSD v2.7 — Playwright UI Testing Integration
-**Domain:** E2E test scaffolding, generation, and execution integration into an existing autonomous coding CLI
-**Researched:** 2026-03-19
+**Project:** GSD Test Steward Consolidation Bridge (v2.8)
+**Domain:** Autonomous gap-closure workflow extension — routing read-only analysis agent output into executable phases
+**Researched:** 2026-03-20
 **Confidence:** HIGH
 
 ## Executive Summary
 
-GSD v2.7 adds on-demand Playwright E2E testing to an existing Node.js CLI tool with an established Command/Workflow/Agent architecture. The core insight from all four research streams is that this is an additive integration, not a rewrite — three new or modified files (one command, one agent, one workflow modification) plus two small module additions in `testing.cjs` and `gsd-tools.cjs`. The single new dependency is `@playwright/test ^1.50.0`, added as a devDependency to GSD itself for testing detection logic, while user projects install it as part of the scaffold flow. The recommended approach is to follow existing architectural patterns exactly: `ui-test.md` command as a thin orchestrator, `gsd-playwright.md` as a leaf-node agent (following `gsd-test-steward` precedent), and a surgical modification to the `execute_e2e_generation` step in `add-tests.md`.
+GSD v2.8 is a targeted bridge milestone — not a new system, but a missing connection between two already-working systems. The test steward agent already analyzes the test suite and produces structured consolidation proposals. The gap-closure workflow already turns frontmatter gaps into executable phases. The gap between them is exactly one missing data route: steward proposals exist in free-text markdown but are never written into the `gaps.*` frontmatter that `plan-milestone-gaps.md` consumes. This milestone closes that route by adding `gaps.test_consolidation` as a fourth gap type alongside the existing requirements, integration, and flows arrays.
 
-The key differentiator of this integration is phase-aware test generation: GSD's existing CONTEXT.md acceptance criteria (Given/When/Then format) map directly to Playwright test blocks, producing higher-quality generated specs than raw codegen or record-and-replay tools. Detection follows a three-tier model (fully configured / installed without config / absent), and scaffolding defaults to Chromium-only, `reporter: 'line'` for stdout parsing, and a `webServer` block to support GSD's on-demand invocation model. The `gsd-playwright` agent handles the full lifecycle — detect, scaffold, generate, execute, report — and returns a structured `## PLAYWRIGHT COMPLETE` block.
+The recommended approach is minimal and additive: two workflow markdown files require targeted extensions, zero new modules or npm packages are needed, and the existing `frontmatter.cjs` parser handles the new array-of-objects structure without change. The implementation has a strict build order — the write side (`audit-milestone.md` step 6) must be completed and verified before the read side (`plan-milestone-gaps.md` step 1) can be tested end-to-end.
 
-The critical risk is the existing test budget at 796/800 (99.5%): Playwright `.spec.ts` files use the same `test()` syntax counted by the budget counter, and even a single spec would push it over the limit. The fix is mandatory before any spec generation: add `e2e/` to `EXCLUDE_DIRS` in `testing.cjs` and place all Playwright specs in `e2e/`. Secondary risks are the `baseURL`/`webServer` config gap (tests only work when dev server is running) and the hard test gate accidentally running Playwright specs as unit tests. Both are prevented by Phase 1 infrastructure changes.
+The single critical risk is autopilot status routing. If `gaps.test_consolidation` data causes the audit to return `gaps_found` instead of `tech_debt`, the autopilot will enter an infinite fix loop trying to auto-apply test modifications that the system's own policy prohibits (`auto_consolidate: false`). This must be resolved in Phase 1 before any implementation proceeds, not discovered during execution.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The entire stack addition for v2.7 is a single package: `@playwright/test ^1.50.0`. GSD does not need Playwright as a production dependency; it only needs to detect, scaffold, and invoke it in user projects. The devDependency addition allows GSD's own test suite to test the detection and output parsing logic without live installs. All other GSD infrastructure (Node.js CJS modules, zx/ESM, node:test suite, gsd-tools dispatcher, testing.cjs) is unchanged.
-
-The generated `playwright.config.ts` template uses `reporter: 'line'` for stdout parsing (enabling GSD's output parsing layer), Chromium-only projects (3x faster than all-browser), and a `webServer` block (enabling on-demand invocation without requiring a pre-running server). Output parsing uses regex for "N passed / N failed" patterns from the line reporter's summary line.
+This milestone requires no new dependencies. The existing Node.js CJS module stack — `frontmatter.cjs`, `gsd-tools.cjs`, `audit-milestone.md`, and `plan-milestone-gaps.md` — already has every capability needed. The `extractFrontmatter()` function handles arrays of flat objects at two-level nesting, which is exactly the structure of `gaps.test_consolidation` items. This was verified directly against the existing `gaps.integration` array, which is structurally identical to the proposed new type.
 
 See `.planning/research/STACK.md` for full stack details.
 
-**Core technologies:**
-- `@playwright/test ^1.50.0`: E2E test framework installed in user projects — the only Playwright package needed; bundles runner, assertion library, browser download CLI
-- `node:test` (built-in): Unchanged — GSD's own test suite; new tests for detection/parsing logic follow existing patterns in `testing.cjs`
-- `reporter: 'line'`: Playwright's stdout-focused reporter — enables output parsing by `parsePlaywrightOutput()` without file I/O complexity
+**Core technologies (all unchanged):**
+- `frontmatter.cjs` (in-repo): YAML frontmatter read/write — `extractFrontmatter()` already handles the new schema at lines 60-82; no parser changes needed
+- `audit-milestone.md`: workflow file — receives a text extension to step 6 to populate `gaps.test_consolidation` from steward proposals
+- `plan-milestone-gaps.md`: workflow file — receives text extensions to steps 1, 3, and 5 to parse and create phases from the new gap type
+
+**Explicitly avoided:**
+- `js-yaml` and `gray-matter` npm packages — adds supply-chain surface with zero functional gain over the existing custom parser
+- New `gsd-tools` dispatch commands — no programmatic consumer of `gaps.test_consolidation` exists or is planned for v2.8
+- Changes to `autopilot.mjs` — the existing audit-fix-reaudit loop handles the `tech_debt` status path without modification
 
 ### Expected Features
 
-The integration has a clear MVP boundary. All P1 items are required for v2.7 launch; P2 items are polish that fold naturally into the same implementation; P3 items are deferred.
+The feature set is well-defined because the existing system determines exactly what the bridge must do. All v2.8 features are P1 (must have for launch). Post-launch additions are informational, not functional.
 
 See `.planning/research/FEATURES.md` for the full feature analysis with priority matrix and dependency graph.
 
 **Must have (table stakes):**
-- Playwright detection (three-tier) — users expect the tool to find existing setup before scaffolding over it
-- Playwright scaffolding (install + config + directory + example test) — zero-to-running in one command
-- Test execution with pass/fail summary — the core functionality
-- `/gsd:ui-test` command with argument parsing — user entry point
-- `gsd-playwright` agent with full lifecycle — core reusable agent
-- `add-tests` E2E path enhancement — inline detection and agent delegation
-- Phase-aware test generation from CONTEXT.md acceptance criteria — the primary differentiator
+- `gaps.test_consolidation` frontmatter field in MILESTONE-AUDIT.md — structured proposal data that `plan-milestone-gaps` can consume
+- `audit-milestone` step 6 populates the new field from steward proposals when steward is enabled and proposals exist
+- `plan-milestone-gaps` parses `gaps.test_consolidation` and creates a cleanup phase with one task per proposal
+- Proposal-to-task mapping for all four strategies: prune, parameterize, promote, merge — each producing concrete, actionable task descriptions
+- Budget threshold gate: consolidation phase only created when `test_health.budget_status` is Warning or Over Budget
+- Graceful skip when steward is disabled, no proposals exist, or the field is absent
+- Correct status routing: audit with only consolidation proposals returns `tech_debt`, not `gaps_found`
 
 **Should have (competitive):**
-- Failure categorization (test issue vs app bug) — locator-not-found vs timeout heuristic
-- Trace file path surfacing on failure — low effort, high value for new users
-- Screenshot path reporting (`screenshot: 'only-on-failure'` in scaffolded config)
-- Acceptance test Verify field auto-population in CONTEXT.md after spec generation
+- Estimated reduction surfaced in task descriptions — "this removes N tests, bringing budget from 101% to 99.1%"
+- Single cleanup phase grouping all proposals (not N micro-phases) — cleaner roadmap, consistent with industry standard for batch cleanup work
 
-**Defer (v2.8+):**
-- Visual regression baseline workflow — requires running app and baseline approval process
-- Multi-browser matrix (Firefox/WebKit) — Chromium covers 95% of use cases
-- Authentication flow templates — storageState setup is too project-specific to automate
+**Defer (post-v2.8):**
+- `gsd health` reporting on pending consolidation proposals
+- Per-proposal estimated budget projection in gap plan presentation
+- Partial proposal acceptance via frontmatter flags (task-skip in execute phase is sufficient for v2.8)
+- `steward.auto_consolidate` opt-in mode (requires correctness confidence that current heuristics do not provide)
 
 ### Architecture Approach
 
-The integration follows GSD's established three-tier Command/Workflow/Agent architecture without exceptions. The `/gsd:ui-test` command is a thin orchestrator (matching `audit-tests.md` pattern — no intermediate workflow file needed). The `gsd-playwright` agent is a leaf node with full tool access (Read, Write, Edit, Bash, Glob, Grep) and returns a structured `## PLAYWRIGHT COMPLETE` block. The `add-tests.md` workflow receives a surgical modification at `execute_e2e_generation` only — all other steps including the TDD path are untouched. No new `.planning/` state files are needed since phase context already lives in `${phase_dir}/CONTEXT.md`.
+The architecture is a two-point write/read extension to an existing data pipeline. The test steward already writes free-text proposals. `audit-milestone.md` step 6 must now extract structured data from those proposals and write it into `gaps.test_consolidation`. `plan-milestone-gaps.md` step 1 must then read that field and route proposals through the existing phase-creation machinery. Steps 4-10 of `plan-milestone-gaps` are unchanged — they operate generically on whatever phases get created.
 
-See `.planning/research/ARCHITECTURE.md` for full component responsibility table, data flow diagrams, and anti-pattern list.
+See `.planning/research/ARCHITECTURE.md` for full component responsibility table, data flow diagrams, and edge case analysis.
 
 **Major components:**
-1. `commands/gsd/ui-test.md` (NEW) — parse args, call `gsd-tools init`, spawn `gsd-playwright` agent
-2. `agents/gsd-playwright.md` (NEW) — detect/scaffold/generate/execute/report; returns structured `## PLAYWRIGHT COMPLETE` block
-3. `workflows/add-tests.md` (MODIFIED) — add Playwright detection gate and agent delegation to `execute_e2e_generation` step only; TDD path untouched
-4. `bin/lib/testing.cjs` (MODIFIED) — add `detectPlaywright()` and `'playwright'` case in `parseTestOutput()`
-5. `bin/gsd-tools.cjs` (MODIFIED) — add `playwright-detect` dispatch case following `test-detect-framework` pattern
+1. `audit-milestone.md` step 6 (MODIFY) — parse steward report `#### Proposal N:` blocks, map to `gaps.test_consolidation` schema, assign priority from `budget_status`, write to YAML frontmatter
+2. `plan-milestone-gaps.md` steps 1, 3, 5 (MODIFY) — parse `gaps.test_consolidation`, apply priority filter, group by strategy into at most 2 phases, create proposal-to-task mapping using verbatim steward data
+3. All other components (NO CHANGE) — `gsd-test-steward.md`, `autopilot.mjs`, `frontmatter.cjs`, `gsd-tools.cjs`
+
+**Key data flow:**
+```
+steward report (free text) → audit-milestone step 6 (extraction + structuring)
+  → gaps.test_consolidation in MILESTONE-AUDIT.md frontmatter
+    → plan-milestone-gaps step 1 (parse) → step 3 (group) → phase creation machinery
+```
 
 ### Critical Pitfalls
 
-See `.planning/research/PITFALLS.md` for all seven critical pitfalls with full prevention strategies and phase-to-prevention mapping.
+See `.planning/research/PITFALLS.md` for all six critical pitfalls with full prevention strategies and phase-to-prevention mapping.
 
-1. **Test budget exceeded by Playwright spec counting** — `testing.cjs` counts `test()` calls in all `.spec.ts` files including Playwright specs; budget is at 796/800. Prevention: add `'e2e'` to `EXCLUDE_DIRS` in Phase 1 before any spec is generated; all Playwright specs must live in `e2e/`.
+1. **Frontmatter written in one file, parsed in another** — the schema addition to `audit-milestone.md` and the parsing update to `plan-milestone-gaps.md` must be treated as a single atomic change in Phase 1. Split them and the new gap type is silently ignored with no error.
 
-2. **Partial-install false negative in detection** — `@playwright/test` in package.json but no browser binaries causes "browser not found" failure, not a clear error. Prevention: implement four-state detection (not-installed / installed-no-config / configured-no-binaries / fully-ready) with distinct error messages for each state.
+2. **Autopilot loops on consolidation-only gaps** — if `gaps.test_consolidation` triggers `gaps_found` instead of `tech_debt`, the autopilot enters an infinite gap-closure loop attempting to auto-apply test modifications that policy prohibits. The status routing decision must be locked before any implementation.
 
-3. **baseURL / webServer absent in scaffolded config** — tests only work when dev server is already running; on-demand invocations fail with `ERR_CONNECTION_REFUSED`. Prevention: always scaffold with `webServer` block; detect dev server command from `package.json` scripts; never scaffold without it.
+3. **Confusing `test_health.consolidation_proposals` (integer count) with `gaps.test_consolidation` (structured array)** — the current `test_health` block holds a count only. The actual proposal objects exist only in the steward's free-text markdown and must be parsed from `#### Proposal N:` blocks.
 
-4. **Hard test gate runs Playwright specs as unit tests** — `.spec.ts` files discovered by `findTestFiles()` are executed with `node --test`; Playwright's ES module imports cause syntax errors. Prevention: `e2e/` in `EXCLUDE_DIRS` (same fix as pitfall 1); verify hard gate exits 0 after adding specs.
+4. **Fragile markdown extraction from steward report** — the steward is an LLM; its output format can vary. Extraction must target labeled fields (`**Strategy:**`, `**Source:**`, `**Action:**`, `**Estimated reduction:**`) within proposal blocks. Malformed proposals must be skipped with a warning, not propagated as null items.
 
-5. **Scaffolding runs in wrong project (GSD instead of user's web app)** — `cwd` during GSD development is the GSD repo, which has no UI. Prevention: agent must verify web app markers before scaffolding (framework config files, `start`/`dev` scripts); abort with clear error if absent.
+5. **Missing null guard on `test_consolidation` key in `plan-milestone-gaps`** — when steward is disabled or produced no proposals, the key is absent from frontmatter. The guard `const consolidationGaps = gaps.test_consolidation || [];` is mandatory in the first implementation pass.
+
+6. **Task descriptions must use verbatim steward data** — consolidation tasks require exact source file paths and test names from the steward. `plan-milestone-gaps` must not re-interpret or generalize them. Invented specifics cause executors to target the wrong tests.
 
 ## Implications for Roadmap
 
-All research converges on the same build order: infrastructure first, agent second, command third, workflow modification last. This order minimizes risk because each step can be independently verified before the next introduces complexity.
+The three-phase build order is driven directly by dependencies. The write side must precede the read side, and both must exist before edge cases can be validated end-to-end.
 
-### Phase 1: Test Infrastructure and Detection Foundation
+### Phase 1: Schema Design and Status Routing
 
-**Rationale:** Three of the seven critical pitfalls (budget explosion, hard gate failure, wrong-project scaffolding) must be prevented before any test generation occurs. These are pure infrastructure changes with no behavioral risk. The `playwright-detect` gsd-tools command is a dependency of both the new command and the modified workflow, so it must exist first.
+**Rationale:** Two architectural decisions must be locked before any implementation: the exact `gaps.test_consolidation` schema (shared contract between audit write and plan-gaps read) and the `tech_debt` vs `gaps_found` status routing rule. Getting either wrong after implementation requires undoing both workflow files simultaneously. Both workflow files must be modified atomically in this phase — not split across phases.
 
-**Delivers:** `detectPlaywright()` in `testing.cjs` (four-state detection), `playwright-detect` dispatch in `gsd-tools.cjs`, `'playwright'` case in `parseTestOutput()`, `'e2e'` added to `EXCLUDE_DIRS`, `@playwright/test` as devDependency in GSD's own package.json for test suite use.
+**Delivers:** Documented `gaps.test_consolidation` schema with all required fields (`id`, `strategy`, `title`, `source_files`, `action`, `estimated_reduction`, `priority`); confirmed status routing rule (`tech_debt` for consolidation-only audits); both workflow files modified atomically to write and parse the new field; basic end-to-end round-trip verified with a seeded audit file.
 
-**Addresses:** Playwright detection (table stakes), output parsing (table stakes), test budget safety (critical infrastructure guard).
+**Addresses:** `gaps.test_consolidation` frontmatter field (P1), `audit-milestone` field population (P1), `plan-milestone-gaps` parsing (P1), correct status routing (P1).
 
-**Avoids:** Test budget exceeded (Pitfall 1), hard gate failure from Playwright specs (Pitfall 6), output parsing returning zeros (Integration Gotcha).
+**Avoids:** Pitfall 1 (atomic schema + parsing), Pitfall 2 (autopilot loop), Pitfall 3 (`test_health` count vs structured array confusion).
 
-### Phase 2: gsd-playwright Agent
+### Phase 2: Proposal Extraction and Task Mapping
 
-**Rationale:** The agent is the core of the integration and a leaf node with no dependencies on the command or workflow. Building it second allows independent verification via direct `Task()` invocation before either entry point wraps it.
+**Rationale:** With the schema contract established, Phase 2 implements the harder parts: parsing steward free-text into structured objects (fragile, must be defensive) and defining the proposal-to-task translation templates for all four strategies (must be explicit before execution).
 
-**Delivers:** Full `gsd-playwright.md` agent with five-step lifecycle (detect, scaffold, generate, execute, report), `playwright.config.ts` template with Chromium-only + `webServer` block, `e2e/` directory and example spec scaffolding, phase-aware test generation from CONTEXT.md acceptance criteria, structured `## PLAYWRIGHT COMPLETE` return block.
+**Delivers:** Defensive extraction logic in `audit-milestone.md` step 6 targeting labeled steward fields; proposal-to-task mapping templates for prune, parameterize, promote, and merge strategies using verbatim steward data; budget threshold gate (Warning/Over Budget creates phases, OK defers to tech debt section); single cleanup phase grouping all proposals by strategy (at most 2 phases); null guard for missing/empty key.
 
-**Uses:** `@playwright/test`, `detectPlaywright()` from Phase 1, `parsePlaywrightOutput()` from Phase 1.
+**Addresses:** Budget threshold gate (P1), proposal-to-task mapping all four strategies (P1), single cleanup phase grouping (P1), estimated reduction in task descriptions (P2 differentiator).
 
-**Implements:** Agent Structured Return pattern, Three-Tier Detection pattern, phase-aware generation from CONTEXT.md.
+**Avoids:** Pitfall 4 (fragile markdown extraction), Pitfall 5 (null guard), Pitfall 6 (verbatim data in tasks).
 
-**Avoids:** Partial-install false negative (Pitfall 2), baseURL/webServer gap (Pitfall 5), wrong-project scaffolding (Pitfall 4), brittle CSS locators (Pitfall 3 — locator priority hierarchy `getByRole > getByLabel > getByText > getByTestId > CSS` as hard rule in agent prompt).
+### Phase 3: Edge Case Hardening and Validation
 
-### Phase 3: /gsd:ui-test Command
+**Rationale:** Edge cases cannot be validated until both workflow changes exist. Three paths must be explicitly tested because they are the ones autopilot will hit in production. Regression confirmation for existing gap types is mandatory before calling v2.8 complete.
 
-**Rationale:** The command is a thin wrapper around the agent (matches `audit-tests.md` pattern exactly). Build it third so the agent is proven before adding the command layer. This is the lowest-risk phase since it contains essentially no logic.
+**Delivers:** Verified behavior for all three edge cases: empty `test_consolidation` array (no phases, no error), absent key (no error, no phases), autopilot `--auto` path (nice-priority proposals deferred, must/should auto-created). Regression confirmation that existing gap types (requirements, integration, flows) are unaffected.
 
-**Delivers:** `commands/gsd/ui-test.md` with argument parsing (phase, URL, `--scaffold`, `--run-only`, `--headed`), `gsd-tools init phase-op` call, GSD banner display, `Task(gsd-playwright)` spawn, and structured result presentation.
+**Addresses:** Graceful skip (P1), autopilot transparency (differentiator), "only-test-gaps" audit path (P1).
 
-**Addresses:** `/gsd:ui-test` command (P1 MVP), `--headed` flag (P2), phase-aware invocation (P1).
-
-**Avoids:** No new pitfall risks introduced; the command is purely structural with no own logic.
-
-### Phase 4: add-tests Workflow Enhancement
-
-**Rationale:** This modifies existing behavior in a widely-used workflow — do it last so all three dependencies (detection, agent, command) are proven. The TDD path must remain unchanged; change is surgical and limited to `execute_e2e_generation` only.
-
-**Delivers:** Modified `add-tests.md` with Playwright detection gate at start of `execute_e2e_generation`, scaffolding prompt when Playwright absent, `Task(gsd-playwright)` delegation for E2E files, RED-GREEN execution pattern, structured result folded into existing coverage report table. All other workflow steps including TDD path completely unchanged.
-
-**Addresses:** `add-tests` E2E path enhancement (P1 MVP), RED-GREEN execution (P1), TDD path preservation (non-negotiable regression constraint).
-
-**Avoids:** TDD path regression (Integration Gotcha), workflow aborting entirely when E2E is blocked (TDD must complete even if Playwright is absent).
+**Avoids:** All six pitfalls validated via explicit test scenarios; regression against existing gap types confirmed.
 
 ### Phase Ordering Rationale
 
-- Infrastructure changes first because budget/gate pitfalls are catastrophic if hit mid-implementation and require code fixes to recover
-- Agent before command because agents are leaf nodes tested independently; the command wrapper proves nothing until the agent works
-- Command before workflow modification because `/gsd:ui-test` is a simpler entry point to validate agent behavior than modifying an existing multi-step workflow
-- Workflow modification last because it has regression risk and depends on all three prior phases being independently verified
+- Schema must be designed before either file is modified — it is the shared contract that prevents the write/read mismatch causing silent data loss
+- Write side and read side modified atomically in Phase 1 — splitting them produces a broken intermediate state with no warning
+- Status routing locked in Phase 1, not Phase 3 — the autopilot loop risk is catastrophic if discovered late; recovery requires git revert of test file changes
+- Proposal extraction and task mapping in Phase 2 — both require the schema contract from Phase 1 to be final
+- Edge case hardening last — logically requires both workflow changes to exist before they can be exercised
 
 ### Research Flags
 
-Phases with well-documented patterns where pre-phase research is not needed:
-- **Phase 1 (infrastructure):** Pure additive code following exact existing patterns in `testing.cjs` and `gsd-tools.cjs` — HIGH confidence, direct codebase precedents available
-- **Phase 3 (ui-test command):** Mirrors `audit-tests.md` exactly — copy-adapt, no new patterns introduced
+Phases with well-documented patterns (skip research-phase):
+- **Phase 1:** Standard YAML frontmatter extension with a proven existing parser — all questions resolved by direct codebase inspection with HIGH confidence; `gaps.integration` is a working structural proof-of-concept for the new type
+- **Phase 2:** Defensive labeled-field string parsing — established pattern well-documented in the steward agent spec; no new algorithmic territory
+- **Phase 3:** Null guard and empty-array handling — trivially standard JavaScript; standard edge case for any optional frontmatter field
 
-Phases that may benefit from targeted pre-phase review:
-- **Phase 2 (gsd-playwright agent):** The `webServer` detection logic (inferring dev command from `package.json` scripts for Next/Vite/Angular/CRA) needs verification against actual script naming conventions across major frameworks; also, the four-state binary detection path varies by OS (`~/.cache/ms-playwright/` on macOS/Linux vs `%LOCALAPPDATA%\ms-playwright\` on Windows) — prefer `npx playwright --version` as cross-platform check
-- **Phase 4 (add-tests modification):** The exact insertion point in `add-tests.md` requires reading the current step structure carefully before writing the modification; recommend re-reading the workflow at phase start to avoid inadvertent TDD path changes
+No phases require deeper research before planning. All architectural decisions and implementation patterns are resolved.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | `@playwright/test` is the only option; version and config template verified against official docs; line reporter format confirmed via official docs and community |
-| Features | HIGH | Official Playwright docs plus design doc coverage; MVP boundary is clear; anti-features well-justified with specific failure modes |
-| Architecture | HIGH | Based entirely on direct codebase inspection; all integration points verified against actual source files; no speculation |
-| Pitfalls | HIGH (infrastructure) / MEDIUM (Playwright-specific) | Budget/gate/detection pitfalls verified via codebase analysis; Playwright binary detection and output parsing format from official docs and community sources |
+| Stack | HIGH | Direct codebase inspection of `frontmatter.cjs`, `audit-milestone.md`, `plan-milestone-gaps.md`; no new dependencies needed; verified against `gaps.integration` as structural proof-of-concept |
+| Features | HIGH | Primary sources are existing GSD codebase and agent specs; all features directly verifiable against current behavior; post-v2.8 scope explicitly gated by design document |
+| Architecture | HIGH | Full text reads of all affected workflow files; live audit files (v2.6, v2.7 MILESTONE-AUDIT.md) confirmed current schema; `autopilot.mjs` line-level routing logic verified |
+| Pitfalls | HIGH | Every pitfall traced to a specific code location — `plan-milestone-gaps` step 1 enumeration, `autopilot.mjs` `runGapClosureLoop` status routing, steward proposal format template in agent spec |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Line reporter output format stability:** The `parsePlaywrightOutput()` regex assumes "N passed / N failed" format from the line reporter. This is consistent across community examples and official docs but not guaranteed stable across Playwright minor versions. Mitigation: implement JSON reporter fallback (`--reporter=json` with `PLAYWRIGHT_JSON_OUTPUT_NAME=/dev/stdout`) if line parsing proves fragile in Phase 2 testing.
-
-- **`webServer` dev command detection coverage:** The scaffold logic must detect `npm run dev`, `npm run start`, `npm run serve`, and framework-specific variants. Research did not exhaustively verify all common script names across major frameworks (Next.js, Vite, Angular, CRA, Remix, SvelteKit). Mitigation: implement detection with a fallback to "ask user" rather than hardcoding — do not scaffold without a resolved dev command.
-
-- **Binary cache path cross-platform:** `~/.cache/ms-playwright/` is the Linux/macOS path; Windows uses `%LOCALAPPDATA%\ms-playwright\`. The four-state detection logic in Phase 2 must handle both. Using `npx playwright --version` as the CLI check is more portable than filesystem inspection.
+- **Steward proposal format variability:** The `#### Proposal N: {strategy} -- {title}` format is specified in the steward agent prompt, but LLM output can vary. The extraction implementation must be tested against multiple real steward runs before Phase 2 is considered complete. Mitigation: use labeled field extraction (`**Strategy:**`, `**Source:**`, etc.) as primary target over heading structure; skip malformed proposals with warning rather than erroring.
+- **Warning-threshold autopilot behavior:** ARCHITECTURE.md flags a medium-likelihood risk that Warning budget status creates `should`-priority phases that autopilot executes without human review. Acceptable for v2.8 given current proposals are two known-valuable ones; revisit if Warning-status autopilot runs produce unexpected cleanup work.
 
 ## Sources
 
-### Primary (HIGH confidence — official docs and direct codebase inspection)
+### Primary (HIGH confidence — direct codebase inspection)
 
-- `get-shit-done/bin/lib/testing.cjs` — EXCLUDE_DIRS, findTestFiles, countTestsInFile, detectFramework, parseTestOutput patterns
-- `get-shit-done/bin/gsd-tools.cjs` — test-detect-framework dispatch pattern (direct precedent for playwright-detect)
-- `commands/gsd/audit-tests.md` — command-as-direct-agent-spawn pattern (precedent for ui-test command)
-- `workflows/add-tests.md` — target for modification; execute_e2e_generation step structure
-- `agents/gsd-test-steward.md` — agent structure and structured return block pattern
-- `.planning/PROJECT.md` — v2.7 requirements, test budget at 796/800
-- `.planning/designs/2026-03-19-playwright-ui-testing-integration-design.md` — design specification
-- [Playwright Installation Docs](https://playwright.dev/docs/intro) — Node.js >=20.x requirement, `npm init playwright@latest` behavior
-- [Playwright Configuration Docs](https://playwright.dev/docs/test-configuration) — defineConfig options, testDir, workers, retries
-- [Playwright Reporters Docs](https://playwright.dev/docs/test-reporters) — line reporter behavior, JSON reporter with PLAYWRIGHT_JSON_OUTPUT_NAME
-- [Playwright Best Practices](https://playwright.dev/docs/best-practices) — locator priority hierarchy
-- [Playwright webServer Docs](https://playwright.dev/docs/test-webserver) — webServer config pattern, reuseExistingServer
+- `get-shit-done/bin/lib/frontmatter.cjs` — verified `extractFrontmatter()` handles array-of-objects at 2-level nesting (lines 60-82); `reconstructFrontmatter()` within supported depth
+- `get-shit-done/workflows/audit-milestone.md` — step 3.5 steward invocation; step 6 frontmatter schema; `test_health` block structure; `offer_next` routing
+- `get-shit-done/workflows/plan-milestone-gaps.md` — step 1 explicit gap type enumeration; steps 3-10 generic phase machinery; confirmed no fourth gap type currently handled
+- `get-shit-done/scripts/autopilot.mjs` — `runMilestoneAudit()` lines 862-921; `runGapClosureLoop()` lines 924-1017; exact `gaps_found`/`tech_debt` routing logic
+- `get-shit-done/agents/gsd-test-steward.md` — proposal format: `#### Proposal N: {strategy} -- {title}` with labeled fields; four strategies (prune, parameterize, promote, merge)
+- `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live `test_health` frontmatter with `consolidation_proposals: 2` as integer count only; `gaps.integration` structure confirmed isomorphic to proposed `gaps.test_consolidation`
+- `.planning/milestones/v2.6-MILESTONE-AUDIT.md` — live example with 3 consolidation proposals
+- `.planning/PROJECT.md` — v2.8 target features; `steward.auto_consolidate: false` constraint
+- `.planning/designs/2026-03-20-test-steward-consolidation-bridge-design.md` — exact frontmatter schema; workflow extension points; autopilot no-change confirmation
 
-### Secondary (MEDIUM confidence — community sources)
+### Secondary (MEDIUM confidence — industry sources)
 
-- [@playwright/test on npm](https://www.npmjs.com/package/@playwright/test) — version 1.58.2 current as of research date
-- [BrowserStack: Playwright Best Practices 2026](https://www.browserstack.com/guide/playwright-best-practices) — community-validated patterns, CSS selector brittleness
-- [Why AI Can't Write Good Playwright Tests](https://dev.to/johnonline35/why-ai-cant-write-good-playwright-tests-and-how-to-fix-it-knn) — locator generation fundamental limitations, accessibility tree information gap
-- [Why Playwright Tests Pass Locally but Fail in CI](https://dev.to/sentinelqa/why-playwright-tests-pass-locally-but-fail-in-ci-4ph6) — baseURL and environment mismatch patterns
-- [Microsoft Developer Blog: Complete Playwright E2E Story](https://developer.microsoft.com/blog/the-complete-playwright-end-to-end-story-tools-ai-and-real-world-workflows) — AI plus MCP plus Codegen ecosystem overview
+- [Test Automation Maintenance Guide 2026](https://bugbug.io/blog/software-testing/test-automation-maintenance/) — periodic review/prune cycle is industry standard; cleanup batched in sprint cycles
+- [Test Maintenance Best Practices 2026](https://bugbug.io/blog/software-testing/best-practices-of-test-maintenance/) — parameterize, prune, and refactor as canonical maintenance strategies
+- [CI/CD Quality Gates](https://testrigor.com/blog/software-quality-gates/) — budget thresholds as natural gate for test consolidation work
 
 ---
-*Research completed: 2026-03-19*
+*Research completed: 2026-03-20*
 *Ready for roadmap: yes*

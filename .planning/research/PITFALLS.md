@@ -1,200 +1,151 @@
 # Pitfalls Research
 
-**Domain:** Adding Playwright UI testing integration to an existing CLI/workflow tool (GSD v2.7)
-**Researched:** 2026-03-19
-**Confidence:** HIGH (codebase analysis) / MEDIUM (Playwright-specific, from official docs + community)
+**Domain:** Adding a new gap type to an existing gap-closure workflow; bridging read-only analysis agent output into executable phases (GSD v2.8)
+**Researched:** 2026-03-20
+**Confidence:** HIGH (direct codebase analysis of every touchpoint)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Playwright `.spec.ts` Files Blow the Test Budget Without Warning
+### Pitfall 1: Frontmatter Schema Extended in One Place, Parsed in Another
 
 **What goes wrong:**
-GSD's `countTestsInFile()` in `testing.cjs` uses the regex `/^\s*(?:test|it)\s*\(/gm` to count test cases, and `findTestFiles()` matches any file matching `/\.(test|spec)\.(js|ts|cjs|mjs)$/`. Playwright test files use `test()` as their primary API — every `.spec.ts` written for UI testing is counted against the 800-test project budget. A single E2E spec with 20 scenarios pushes the budget from 796 to 816 and triggers the hard gate warning. Since the budget is already at 796/800 (99.5%), even a single Playwright spec file with 5 tests immediately exceeds the limit.
+`gaps.test_consolidation` is added to the YAML frontmatter written by `audit-milestone.md` but the only consumer of that frontmatter is `plan-milestone-gaps.md` (and `autopilot.mjs`, which reads `status` via `gsd-tools frontmatter get`). If the schema change is made in `audit-milestone.md` without simultaneously updating `plan-milestone-gaps.md`'s parsing step, the new gap type is silently ignored. The workflow reads `gaps.requirements`, `gaps.integration`, and `gaps.flows` by name — a new fourth key that nobody reads produces no error and no consolidation phases. The milestone passes the audit loop unchanged.
 
 **Why it happens:**
-The test budget system was designed for unit tests. Playwright tests use the same `test(...)` syntax as Jest/Vitest but live in a different context: they run against a browser, are slow to execute, and are not meant to be counted alongside unit tests. The regex-based counter cannot distinguish framework intent.
+The YAML frontmatter parsing in `plan-milestone-gaps.md` uses explicit field enumeration: "Parse YAML frontmatter to extract structured gaps: `gaps.requirements` — `gaps.integration` — `gaps.flows`." There is no generic "iterate all gap types" loop. Adding a new key to the schema at write time without touching the read side is a classic two-phase schema change mistake where tests don't catch it because the audit still exits 0.
 
 **How to avoid:**
-Exclude Playwright spec files from the budget count by convention or directory. Options:
-1. Place all Playwright specs under `e2e/` and add `'e2e'` to `EXCLUDE_DIRS` in `testing.cjs`
-2. Detect Playwright files by checking for `from '@playwright/test'` import before counting
-3. Add a `test.playwright_budget` config separate from unit test budget
-
-The simplest and safest approach for v2.7 is option 1: document that all generated `.spec.ts` files go to `e2e/` and extend `EXCLUDE_DIRS` to exclude that directory from budget counting. Do this in Phase 1 of implementation before writing any specs.
+Treat the audit-write side and the plan-gaps-read side as a single atomic change. Phase 1 of the roadmap must touch both files in the same plan, not in separate phases. Add an explicit check to the plan-milestone-gaps success criteria: verify that all four gap types are parsed, not just the original three.
 
 **Warning signs:**
-- `gsd-tools.cjs test-count` output increases by more than 4 after scaffolding Playwright
-- Test steward reports "budget exceeded" immediately after `/gsd:ui-test` runs
-- `.spec.ts` files appearing in `tests/` rather than `e2e/` directory
+- `plan-milestone-gaps` output says "N requirements, M integration, K flows gaps" but never mentions consolidation proposals even when MILESTONE-AUDIT.md has `gaps.test_consolidation` with items
+- Milestone completes without a consolidation phase being created despite `consolidation_proposals: 2` in audit frontmatter
+- `gsd-tools frontmatter get` on the audit file shows the key exists but no phase was created for it
 
 **Phase to address:**
-Phase 1 (scaffolding spec) — define the `e2e/` directory convention and the `EXCLUDE_DIRS` extension before any test generation happens.
+Phase 1 (schema extension + parsing update) — both the audit write and the plan-gaps read must be in the same implementation phase. Split them and you will merge broken.
 
 ---
 
-### Pitfall 2: Three-Tier Detection Has a Partial-Install False Negative
+### Pitfall 2: Confusing `test_health` Aggregation Key with `gaps.test_consolidation` Gap Key
 
 **What goes wrong:**
-The planned three-tier detection (package.json dep check → `playwright.config.ts` file check → `@playwright/test` import in existing files) can produce a false "not installed" result when Playwright is partially installed: `@playwright/test` is in `package.json` but browser binaries are missing. The gsd-playwright agent scaffolds a new config and tries `npx playwright test`, which fails with "browser not found" — not an application error but a missing binary error. The agent may interpret this as "Playwright is not working" and prompt for re-scaffolding again, creating a confusing loop.
+The MILESTONE-AUDIT.md frontmatter already has a `test_health` top-level key (not nested under `gaps`). The new feature adds `gaps.test_consolidation`. These are structurally different: `test_health` is informational metadata from the steward; `gaps.test_consolidation` is actionable data that triggers phase creation. If the implementation places consolidation proposals under `test_health.consolidation_proposals` (an array of proposal objects) instead of under `gaps.test_consolidation` (the new key), `plan-milestone-gaps` will not find them when it reads the `gaps` section.
 
-**Why it happens:**
-The detection checks the package registry state but not the binary cache state. `playwright.config.ts` presence means configured; binary presence means runnable. These are distinct conditions. The `npx playwright install` step is separate from `npm install @playwright/test`.
-
-**How to avoid:**
-Add a fourth detection tier: after detecting `playwright.config.ts` exists, run `npx playwright --version 2>/dev/null` to confirm the CLI is accessible, then verify at least one browser binary directory exists under `~/.cache/ms-playwright/` or the configured browsers path. If config exists but binaries are missing, emit a specific "Playwright binaries missing — run: `npx playwright install chromium`" error rather than re-scaffolding.
-
-The gsd-playwright agent prompt must explicitly distinguish these four states:
-- Not installed (no dep, no config)
-- Installed but not configured (dep exists, no config)
-- Configured but binaries missing (config exists, no binary cache)
-- Fully ready (config + binaries present)
-
-**Warning signs:**
-- `Error: browserType.launch: Executable doesn't exist` in playwright output
-- Detection returning "not installed" on a project that has `playwright.config.ts`
-- Agent creating a second `playwright.config.ts` alongside an existing one
-
-**Phase to address:**
-Phase 1 (gsd-playwright agent scaffolding logic) — define all four detection states explicitly in the agent prompt.
-
----
-
-### Pitfall 3: Generated Tests Use Brittle CSS Selectors Instead of Role-Based Locators
-
-**What goes wrong:**
-When the gsd-playwright agent generates test code from acceptance criteria (Given/When/Then format), it has no visibility into the actual DOM of the target application. Without access to the rendered page or explicit `data-testid` attributes in the source, the agent generates positional or CSS-based locators: `page.locator('.submit-btn')`, `page.locator('button:nth-child(3)')`, or `page.getByRole('button').nth(2)`. These selectors break the moment a developer changes CSS class names, reorders DOM siblings, or refactors a component.
-
-**Why it happens:**
-AI-generated Playwright tests face a fundamental information gap: the accessibility tree (what Playwright sees) omits non-semantic containers and generic div wrappers. Without running the app and inspecting the DOM, the only information available is the source code and acceptance criteria text. Source code rarely exposes locator-stable attributes explicitly.
-
-This is confirmed by [research](https://dev.to/johnonline35/why-ai-cant-write-good-playwright-tests-and-how-to-fix-it-knn): "it's information-theoretically impossible to generate `getByTestId('product-card')` when `data-testid='product-card'` is not present in the input."
-
-**How to avoid:**
-1. Instruct the gsd-playwright agent to use the locator priority hierarchy explicitly: `getByRole` > `getByLabel` > `getByText` > `getByTestId` > CSS selectors (last resort with comment)
-2. When no stable locator is inferrable from source context, generate a placeholder comment: `// TODO: add data-testid="submit-button" to the submit button and use page.getByTestId('submit-button')`
-3. Never generate `.nth()` selectors without explicit documentation in the spec that ordering is intentional and stable
-4. The generate-test step in the `add-tests` E2E path should include a post-generation quality check: scan the generated file for `.nth(`, `locator('.')`, and CSS class patterns; warn the user if found
-
-**Warning signs:**
-- Generated `.spec.ts` files containing `locator('button:nth-child` or `locator('.')`
-- Tests passing in CI but failing after a UI refactor that didn't change behavior
-- E2E tests that fail only on certain screen sizes or when element order changes
-
-**Phase to address:**
-Phase 2 (test generation patterns) — encode the locator priority hierarchy as a hard rule in the gsd-playwright agent prompt, not a suggestion.
-
----
-
-### Pitfall 4: `add-tests` E2E Path Runs Playwright in the GSD Project Instead of the Target App
-
-**What goes wrong:**
-The `add-tests` workflow currently runs in the context of the project being tested (the web app). But GSD itself is a Node.js CLI tool — it has no `playwright.config.ts`, no running server, and no UI. If the `add-tests` E2E path scaffolds Playwright in the wrong directory (`~/.claude/get-shit-done/` instead of the user's project), it will create a `playwright.config.ts` in GSD itself, install browser binaries, and attempt to run tests against a nonexistent server.
-
-**Why it happens:**
-The `add-tests` workflow uses `cwd` throughout, which in GSD's own development context is the GSD repo. When building the Playwright integration, developers will test the workflow against the GSD codebase itself. The distinction between "GSD as the tool" and "the user's web app as the target" can blur during development.
-
-**How to avoid:**
-The gsd-playwright agent must verify that the target project has UI characteristics before scaffolding: check for `package.json` with a `start` or `dev` script, look for framework markers (`next.config.js`, `vite.config.ts`, `angular.json`, etc.). If none found, emit:
-
-```
-ERROR: No web app detected in current directory.
-Playwright UI testing requires a web application project.
-Found: Node.js CLI tool (no start script, no framework config)
+The current `test_health` schema is:
+```yaml
+test_health:
+  budget_status: "Over Budget"
+  redundant_tests: 3
+  stale_tests: 0
+  consolidation_proposals: 2  # ← integer count only, not proposal objects
 ```
 
-Additionally, the `/gsd:ui-test` command spec must include explicit guard logic: if the project type detected is "cli tool" or "node library" (no HTML entry point, no dev server config), abort with explanation.
+The `consolidation_proposals` field is a count, not the proposals themselves. The actual proposals are only in the markdown body of the steward's report.
+
+**Why it happens:**
+The steward returns a markdown report as its output, not structured YAML. The `consolidation_proposals: 2` in `test_health` is a count extracted by `audit-milestone.md` when it writes the audit file. The actual proposal objects (strategy, source files, action, estimated reduction) exist only in the steward's free-form markdown. To populate `gaps.test_consolidation`, `audit-milestone.md` must parse the steward report markdown to extract structured proposal data — something it does not currently do.
+
+**How to avoid:**
+Define the `gaps.test_consolidation` schema explicitly before writing the audit step. Each item needs: `strategy`, `source_files`, `action`, `estimated_reduction`. The audit workflow must extract this from the steward's structured `#### Proposal N` sections (which have a known format per the steward agent spec). Do not rely on counting — extract the full structured data.
 
 **Warning signs:**
-- `playwright.config.ts` appearing in GSD's own repo root (`.../get-more-shit-done/`)
-- `npx playwright test` running against `localhost:3000` when no server was started
-- The test execution step producing `net::ERR_CONNECTION_REFUSED` for all tests
+- `test_health.consolidation_proposals` is `2` but `gaps.test_consolidation` is empty or missing
+- Audit file has consolidation proposals described in prose but no machine-readable list under `gaps`
+- `plan-milestone-gaps` does not create consolidation phases even when steward found proposals
 
 **Phase to address:**
-Phase 1 (command spec, detection logic) — the `/gsd:ui-test` command must reject non-web-app projects before any scaffolding occurs.
+Phase 1 (schema design and audit write) — the shape of `gaps.test_consolidation` must be fully specified before writing either `audit-milestone.md` changes or `plan-milestone-gaps.md` changes.
 
 ---
 
-### Pitfall 5: `baseURL` Not Set Causes Tests to Pass Locally, Fail in On-Demand Execution
+### Pitfall 3: Autopilot Gap Closure Loop Treats Consolidation Phases as Blocking
 
 **What goes wrong:**
-When gsd-playwright scaffolds `playwright.config.ts`, if `baseURL` is not explicitly set (or is set to a hardcoded `localhost:3000`), tests work when the developer already has their dev server running but fail when invoked fresh via `/gsd:ui-test` in a context where the server isn't running. The tests navigate to relative paths like `page.goto('/')` and silently succeed against whatever happens to be at that port, or fail with `net::ERR_CONNECTION_REFUSED`.
-
-This is specifically problematic for GSD's on-demand model: `/gsd:ui-test` is invoked episodically, not in a continuous pipeline where a server is always running.
+The autopilot gap closure loop (`runGapClosureLoop()` in `autopilot.mjs`) iterates until `auditStatus === 'passed'`. If `gaps.test_consolidation` causes the audit to return `gaps_found` rather than `tech_debt`, the autopilot will treat consolidation as a blocker and loop until it either creates and executes consolidation phases or exhausts `max_audit_fix_iterations`. Consolidation phases involve pruning, parameterizing, or merging tests — risky changes that the system's own design says "require human approval" (`auto_consolidate` is explicitly false). The autopilot cannot approve its own consolidation proposals.
 
 **Why it happens:**
-The official Playwright `reuseExistingServer: !process.env.CI` pattern assumes CI is the "cold" environment. GSD's on-demand invocation is cold even locally — no `CI` env var is set, so `reuseExistingServer: true` allows the tests to attach to an already-running server. If no server is running, tests fail with connection errors, not a clear "server not started" message.
+`runMilestoneAudit()` routes on three statuses: `passed` (exit 0), `gaps_found` (exit 10), `tech_debt` (exit 0 if `auto_accept_tech_debt=true`). If `test_consolidation` gaps force `gaps_found`, the autopilot enters the fix loop. The fix loop calls `/gsd:plan-milestone-gaps --auto`. If `plan-milestone-gaps` creates consolidation phases, the autopilot executes them. If those phases modify test files, `auto_consolidate: false` is violated.
 
 **How to avoid:**
-The scaffolded `playwright.config.ts` must include a `webServer` block:
+`gaps.test_consolidation` must map to `tech_debt` audit status, not `gaps_found`. When only consolidation proposals exist (no requirement gaps, no integration gaps, no flow gaps), the audit status must be `tech_debt`. The autopilot's `auto_accept_tech_debt: true` default then routes to completion without triggering the gap closure loop. This is the correct semantic: consolidation is recommended cleanup, not a correctness blocker.
 
-```typescript
-webServer: {
-  command: 'npm run dev',  // or 'npm start' -- detected from package.json scripts
-  url: 'http://localhost:3000',  // detected from framework defaults
-  reuseExistingServer: true,  // always reuse if already running
-  timeout: 120 * 1000,  // 2 min startup timeout
-}
-```
-
-The gsd-playwright agent should detect the dev server command by inspecting `package.json` `scripts` for `dev`, `start`, or `serve`. If ambiguous, prompt the user once and store in `playwright.config.ts`. Never scaffold without a `webServer` entry or a `baseURL` — an incomplete config is worse than no config.
+Additionally: `plan-milestone-gaps` must distinguish between consolidation phases (advisory, human-approved) and requirement/integration fix phases (mandatory). The `--auto` flag in the autopilot invocation should skip consolidation phases — they are not auto-plannable.
 
 **Warning signs:**
-- Scaffolded `playwright.config.ts` with no `webServer` block
-- Tests navigating to absolute URLs like `http://localhost:3000/` hardcoded in test files
-- `/gsd:ui-test --run-only` producing "connection refused" errors when no server context is given
+- Autopilot entering `GAP CLOSURE: Iteration N` loop when the only gaps are test consolidation proposals
+- Autopilot creating and executing consolidation phases without human review
+- `max_audit_fix_iterations` exhausted with audit still showing `gaps_found` because consolidation is circular (execute → re-audit → still gaps → loop)
 
 **Phase to address:**
-Phase 1 (scaffolding specification) — `webServer` config detection logic must be part of the scaffolding spec, not left as a user post-processing step.
+Phase 1 (schema and status routing) — the `gaps_found` vs `tech_debt` decision logic must explicitly account for consolidation-only gap states before any code is written.
 
 ---
 
-### Pitfall 6: Hard Test Gate Runs Playwright Specs in Execute-Plan Loop
+### Pitfall 4: Read-Only Agent Output Lacks Machine-Readable Structure for Phase Generation
 
 **What goes wrong:**
-GSD's `execute-plan` workflow runs the hard test gate (`gsd-tools.cjs test-run`) after every task commit during GSD's own development. If Playwright specs exist in the GSD project directory and match `TEST_FILE_PATTERNS`, the test runner attempts to run them with the unit test command (`node --test` or `npx jest`). Playwright specs cannot be run by Jest/node:test — they require `npx playwright test`. This causes every commit during v2.7 development to fail the hard gate with a confusing "SyntaxError: Cannot use import statement in a CommonJS module" or "Unknown test" error.
+The test steward produces a markdown report. The `#### Proposal N: {strategy} -- {title}` sections have a consistent format, but markdown parsing is fragile. If the steward's output deviates from the template (extra blank lines, different heading level, different capitalization), the regex or string parsing in `audit-milestone.md` produces empty or malformed proposal data. The `gaps.test_consolidation` list is populated with `null` entries or mismatched fields, and the consolidation phase created by `plan-milestone-gaps` has garbled task descriptions.
 
 **Why it happens:**
-`testing.cjs`'s `detectFramework()` returns `'node:test'` for GSD itself (it reads the test wrapper script). The `cmdTestRun()` function uses that framework to run all discovered test files, including any `.spec.ts` files. Playwright specs use ES module imports from `@playwright/test` which break when executed under Node's test runner.
+The steward agent is instructed to produce a specific markdown format but is an LLM — its output can vary between runs. The bridge between read-only analysis output and structured YAML data is a parsing step that is not tested independently. The first time it fails will be in a real milestone audit where the output is slightly different from the test case.
 
 **How to avoid:**
-Two-layer prevention:
-1. Keep all Playwright specs outside GSD's own test discovery scope (under `e2e/` with `e2e/` in EXCLUDE_DIRS)
-2. The hard gate should only run unit tests (the existing framework command) — never attempt to discover and run E2E tests as part of the gate
+Build the extraction as defensively as possible. For each proposal, extract: strategy (from "**Strategy:** {value}" line), source files (from "**Source:** {value}" line), action (from "**Action:** {value}" line), estimated reduction (from "**Estimated reduction:** N test(s)" line). If any required field is missing, skip that proposal and log a warning rather than creating a malformed phase. Add a `proposals_extracted` count to the audit frontmatter and compare it against `consolidation_proposals` count — if they differ, flag it in the audit report.
 
-The Playwright specs generated by GSD for user projects are in the user's project directory, not in GSD's codebase. Specs used to test GSD's own Playwright integration should live in `e2e/` and be excluded from the budget counter and the hard gate.
+Prefer extracting from the structured markdown body over post-processing the steward's raw return. The `STEWARD COMPLETE` block has known field names.
 
 **Warning signs:**
-- `execute-plan` hard gate failing with syntax errors after creating `.spec.ts` files
-- `test-run` command showing failed test count increasing with "import" errors
-- `gsd-tools.cjs test-detect-framework` returning `node:test` but test files include ES module imports
+- `gaps.test_consolidation` items have empty `strategy` or `action` fields
+- Consolidation phase name says "undefined -- undefined" instead of "prune -- stale test removal"
+- Count in `test_health.consolidation_proposals` differs from count of items in `gaps.test_consolidation`
 
 **Phase to address:**
-Phase 1 (test infrastructure planning) — decide where integration test specs live relative to GSD's own test suite; Phase 2 (implementation) — extend EXCLUDE_DIRS before writing any `.spec.ts` files.
+Phase 2 (audit write implementation) — the proposal extraction logic needs to be explicit and tested with a sample steward report before being wired into the audit workflow.
 
 ---
 
-### Pitfall 7: Browser Binary Download in Restricted Environments Silently Hangs
+### Pitfall 5: `plan-milestone-gaps` Proposal-to-Task Mapping Invents Implementation Details
 
 **What goes wrong:**
-`npx playwright install chromium` downloads ~150MB of browser binaries from a CDN. In corporate networks with proxy restrictions, restricted Docker containers, or air-gapped environments, the download silently hangs or fails with a network timeout — not a clear error message. The gsd-playwright agent waits for the install step, sees no output for minutes, and either times out or reports success based on the process exit code (which may be 0 even with partial download).
+When `plan-milestone-gaps` converts a consolidation proposal into a task, it must translate a steward proposal (which names test files and describes an action) into a concrete task (which names files, action, verification, done criteria). For a `parameterize` proposal, the task is "convert N test cases in `file.test.ts` to `test.each(...)` pattern." For a `prune` proposal, the task is "delete N lines from `file.test.ts` referencing `deletedFunction`." If the proposal data extracted from the steward report is vague, `plan-milestone-gaps` fills in the gaps with invented specifics — wrong line numbers, wrong function names, wrong test names — and the executor deletes the wrong tests.
 
 **Why it happens:**
-Playwright's binary installer uses `https://playwright.azureedge.net` CDN. Proxy configurations that work for `npm install` (HTTPS to npm registry) may not apply to Azure CDN URLs. The download progress is not piped to stderr in a way that GSD's streaming output would surface clearly.
+The gap-to-task mapping for consolidation is semantically richer than requirement gaps. A requirement gap says "REQ-01 unsatisfied — Dashboard doesn't fetch" and the task is "add fetch call." A consolidation proposal says "parameterize 4 near-duplicate tests in `validation.test.ts` lines 45-89" and the task is "refactor those specific tests into one `test.each` block." The specificity requirement is much higher, and the information only comes from the steward's analysis — it cannot be re-derived from scratch.
 
 **How to avoid:**
-The scaffolding step should:
-1. Run `npx playwright install chromium --dry-run 2>/dev/null` first to check if binaries already exist (exit 0 = already present)
-2. Set a 3-minute timeout on the install command (not the default 2-minute overall timeout)
-3. Surface the install command to the user with explicit messaging: "Downloading Chromium (~150MB). This may take several minutes on slow connections."
-4. If install fails, provide the `PLAYWRIGHT_BROWSERS_PATH` environment variable option for offline/restricted environments
+The `gaps.test_consolidation` items must carry the full steward proposal data verbatim: the exact source file paths and test names cited by the steward. `plan-milestone-gaps` must use this data directly when creating task descriptions, not re-interpret or paraphrase it. Add a rule to the gap-to-task mapping for consolidation: "Source and action fields come verbatim from the steward proposal. Do not modify or generalize them."
+
+For the `estimated_reduction` field: include it in the phase description so the executor knows how many tests the phase is expected to remove. Include it in the phase's success criteria ("test count decreases by N after this phase").
 
 **Warning signs:**
-- Install step taking > 5 minutes with no output
-- `npx playwright test` failing with "Executable doesn't exist" after a nominally successful install
-- `~/.cache/ms-playwright/chromium-*/chrome-linux/chrome` not present after install
+- Consolidation task descriptions reference test names not present in the source files
+- Executor reports "test not found" when trying to apply consolidation
+- Phase success criteria says "reduce tests by 5" but steward proposal estimated 2
 
 **Phase to address:**
-Phase 2 (scaffolding implementation) — the gsd-playwright agent scaffolding logic must handle install timeout and failure modes explicitly.
+Phase 2 (plan-milestone-gaps consolidation task template) — the task template for consolidation must be specified before implementation, not derived during execution.
+
+---
+
+### Pitfall 6: Steward Disabled / No Proposals — Guard Missing in Gap Parser
+
+**What goes wrong:**
+`plan-milestone-gaps` adds handling for `gaps.test_consolidation` but does not guard against the case where the field is absent (steward disabled) or is an empty list (no proposals). If the code assumes the key exists and tries to iterate it without a null check, the entire `plan-milestone-gaps` command errors out — blocking gap closure for all gap types including requirements and integration gaps that do have entries.
+
+**Why it happens:**
+YAML frontmatter parsing returns `undefined` for missing keys. JavaScript iterating `undefined` throws. This is a straightforward null guard omission, but it is easy to miss when the feature is developed against a test case where the steward always runs and always produces proposals.
+
+**How to avoid:**
+All gap type handlers in `plan-milestone-gaps` must treat missing keys as empty arrays. Add explicit guard: `const consolidationGaps = gaps.test_consolidation || [];`. Test the workflow with an audit file that has no `test_consolidation` key at all, with an empty list, and with a populated list. All three must produce valid output.
+
+**Warning signs:**
+- `plan-milestone-gaps` errors on an audit file where steward was disabled or produced no proposals
+- Error message like "Cannot read properties of undefined (reading 'forEach')" in the gap planning step
+- Autopilot halts with debug retries exhausted on a milestone where the only gaps are requirements
+
+**Phase to address:**
+Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty `test_consolidation` must be in the first implementation pass, verified with an empty-proposals test case.
 
 ---
 
@@ -202,12 +153,11 @@ Phase 2 (scaffolding implementation) — the gsd-playwright agent scaffolding lo
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Putting Playwright specs in `tests/` alongside unit tests | Single test directory | Budget counter counts them as unit tests; framework detection confusion; hard gate runs wrong runner | Never — separate directories from day one |
-| Hardcoding `localhost:3000` in scaffolded config | Simple, works most projects | Breaks for Next.js (3001), Vite (5173), Angular (4200), and projects with custom ports | Never — always detect or prompt |
-| Skipping `webServer` config in `playwright.config.ts` | Fewer moving parts | Tests only work when server is already running; fails in clean on-demand invocations | Only if user explicitly opts out with `--run-only` flag |
-| Generating tests without running them | Faster feedback loop in generation step | "Looks done but isn't" — RED gate skipped; bugs in generated locators go undetected | Never — spec says RED-GREEN pattern |
-| Using Chromium-only default forever | Simpler, less install overhead | Missing Firefox/WebKit coverage for cross-browser issues | Acceptable as default; acceptable to leave as config option for users who need it |
-| Counting Playwright `test()` calls in budget | Single counting function for all tests | Budget exhausted immediately on real E2E test suites; blocks the hard gate mechanism for unit tests | Never |
+| Putting consolidation count in `test_health` and full proposals only in prose | Simpler audit write | `plan-milestone-gaps` cannot parse proposals without fragile markdown parsing | Never — define structured `gaps.test_consolidation` from day one |
+| Letting consolidation trigger `gaps_found` instead of `tech_debt` | Simpler status logic | Autopilot loops forever; consolidation phases run without human approval | Never — consolidation is advisory, not a correctness blocker |
+| Hardcoding the three gap type names in `plan-milestone-gaps` | Simpler parser | Adding a fourth type requires editing parser code, not just schema | Acceptable short-term; acceptable for v2.8 since no fifth type is planned |
+| Skipping steward report parsing and manually writing proposals into audit | Avoids brittle markdown parsing | Proposals are stale the moment the test suite changes; removes automation value | Never — the automation value is in the live analysis |
+| Creating consolidation phases for all proposals without priority filter | Simpler planning logic | Minor consolidation proposals (1 test, low value) get full phase overhead | Acceptable for v2.8 since current proposals are 2 known-valuable ones |
 
 ---
 
@@ -215,48 +165,24 @@ Phase 2 (scaffolding implementation) — the gsd-playwright agent scaffolding lo
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| `testing.cjs` EXCLUDE_DIRS | Forgetting to add `e2e/` to exclusion set — Playwright specs counted in budget | Add `'e2e'` to the `EXCLUDE_DIRS` Set in `testing.cjs` before any spec generation |
-| `add-tests` workflow E2E path | Calling the unit test command (`node --test`) to run Playwright specs | E2E path must invoke `npx playwright test` with the detected config file, not the unit test command |
-| gsd-playwright agent + `gsd-tools.cjs` | Adding a new top-level `playwright` command instead of routing through existing test infrastructure | Route Playwright execution through `test-run` by detecting `playwright` as a framework, OR add a separate `playwright-run` subcommand with its own output parsing |
-| Playwright output parsing | Playwright output format differs from Jest/Vitest — `parseTestOutput()` returns zeros | Add a `'playwright'` case to `parseTestOutput()` in `testing.cjs` — Playwright reports `N passed (NNs)` and `N failed` format |
-| `detectFramework()` in user projects | Playwright coexisting with Vitest — `detectFramework()` returns `vitest` but there's also `playwright.config.ts` | Detection should be multi-framework aware: return the unit test framework for the gate, and separately detect Playwright for E2E |
-| Add-tests TDD path when E2E path is blocked | User runs `/gsd:add-tests` on a phase with E2E files but Playwright not installed — the TDD path should still execute | Never abort the entire `add-tests` workflow because E2E is blocked — complete TDD tests and report E2E as a blocker in the summary |
-
----
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Running all Playwright browsers in every invocation | `/gsd:ui-test` takes 5+ minutes for a single spec | Scaffold Chromium-only by default; Firefox and WebKit are opt-in via config | Any project — Chromium alone is fast, all 3 is 3x slower |
-| Not using `reuseExistingServer: true` | Dev server starts fresh for every `/gsd:ui-test` invocation, adding 30-60 second startup | Always set `reuseExistingServer: true` in scaffolded config | Every project with a non-trivial build step |
-| Playwright trace collection enabled by default | Each test writes video/trace files to `test-results/`; disk fills up quickly | Set `trace: 'on-first-retry'` not `trace: 'on'` in scaffolded config | Projects with many test runs |
-| Running Playwright in headed mode (`--headed`) during autopilot | Autopilot subprocess cannot manage a visible browser window — may hang waiting for display | Never set `headed: true` in scaffolded config; `--headed` is a user-invoked `/gsd:ui-test` flag only | Any autopilot-driven execution |
-
----
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Scaffolding Playwright without asking the target URL | User gets a `playwright.config.ts` with `baseURL: undefined`; tests fail immediately | Ask for baseURL + dev server command once, store in config, never ask again |
-| Presenting 20 generated E2E tests for approval as a flat list | User cannot evaluate quality — too much to read | Group by acceptance criterion from CONTEXT.md; one test per criterion max in initial pass |
-| Showing Playwright HTML report path when user is in a terminal-only environment | User gets a file path they cannot open | Summarize pass/fail counts in terminal first; offer HTML report as an explicit opt-in |
-| Re-scaffolding every time `/gsd:ui-test` is invoked | User's customized `playwright.config.ts` is overwritten | Detection is mandatory: if config exists, skip scaffold and go straight to test generation or execution |
-| Treating Playwright install failure as a soft warning | Tests marked as "blocked" but user doesn't understand severity | Emit a hard error with exact install command and troubleshooting steps; do not continue to test generation |
+| `audit-milestone.md` ↔ steward output | Extracting proposal count but not proposal objects; populating `test_health.consolidation_proposals` as integer only | Extract full proposal objects (strategy, source, action, estimated reduction) into `gaps.test_consolidation` array |
+| `audit-milestone.md` ↔ `plan-milestone-gaps.md` | Changing schema in one without updating the other; different field naming conventions | Define the shared schema in a comment block in both files; use exact same key names |
+| `plan-milestone-gaps.md` ↔ `autopilot.mjs` | Consolidation phases triggering the audit re-loop indefinitely | Consolidation gaps must map to `tech_debt` status; `auto_accept_tech_debt: true` handles it |
+| Steward report format ↔ extraction parser | Relying on heading level or exact spacing in free-form markdown | Extract only from labeled fields (`**Strategy:**`, `**Source:**`, `**Action:**`, `**Estimated reduction:**`) within a proposal block; skip malformed proposals |
+| `gaps.test_consolidation` presence ↔ `steward.enabled` config | Creating the key when steward disabled produces empty list that looks like "steward ran and found nothing" | Only add `gaps.test_consolidation` to the audit frontmatter when `STEWARD_ENABLED` is true and the steward report has proposals. When steward is disabled, omit the key entirely. |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **EXCLUDE_DIRS updated:** `testing.cjs` excludes `e2e/` — verify `gsd-tools.cjs test-count` does not increase after generating specs in `e2e/`
-- [ ] **Playwright output parsed:** `parseTestOutput()` handles Playwright's output format — verify it returns non-zero counts from `npx playwright test` output
-- [ ] **webServer in scaffolded config:** `playwright.config.ts` template includes `webServer` block, not just `use.baseURL` — verify generated config has `webServer.command`
-- [ ] **Add-tests TDD path unaffected:** Running `/gsd:add-tests` on a phase with no E2E files still works exactly as before — verify no regression in unit-test-only path
-- [ ] **Hard gate not triggered by Playwright specs:** GSD's own `execute-plan` hard gate does not discover `.spec.ts` files in `e2e/` — verify `gsd-tools.cjs test-run` exits 0 after adding test specs to `e2e/`
-- [ ] **Detection idempotent:** Running `/gsd:ui-test --scaffold` twice on a project with `playwright.config.ts` does not overwrite the config — verify second invocation shows "Playwright already configured" message
-- [ ] **Binary check explicit:** Scaffolding step distinguishes "not installed" from "installed but no binaries" — verify error message for each case is distinct
-- [ ] **Budget at 796/800 unchanged after implementation:** GSD's own test count is still 796 after all v2.7 code is written — verify with `gsd-tools.cjs test-count` before milestone close
+- [ ] **Schema round-trip verified:** Write a MILESTONE-AUDIT.md with `gaps.test_consolidation` entries, run `plan-milestone-gaps`, confirm consolidation phases are created with correct task descriptions pulled from proposal data
+- [ ] **Empty proposals handled:** `plan-milestone-gaps` with an audit file that has `gaps.test_consolidation: []` completes without error and creates no consolidation phases
+- [ ] **Missing key handled:** `plan-milestone-gaps` with an audit file that has no `test_consolidation` key under `gaps` completes without error
+- [ ] **Steward disabled handled:** Audit run with `test.steward: false` produces an audit file without `gaps.test_consolidation` key; `plan-milestone-gaps` treats it as zero consolidation gaps
+- [ ] **Status routing correct:** An audit with only consolidation proposals (no requirement/integration/flow gaps) produces `tech_debt` status, not `gaps_found`
+- [ ] **Autopilot does not loop on consolidation:** Running autopilot on a milestone with only consolidation proposals completes via `auto_accept_tech_debt` path without entering the gap closure loop
+- [ ] **Proposal count matches extracted items:** `test_health.consolidation_proposals` integer equals length of `gaps.test_consolidation` array in the audit frontmatter
+- [ ] **Existing gap types unaffected:** `plan-milestone-gaps` run with an audit file that has only requirement gaps behaves exactly as it did before v2.8 — no regression
 
 ---
 
@@ -264,13 +190,11 @@ Phase 2 (scaffolding implementation) — the gsd-playwright agent scaffolding lo
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Budget exceeded by Playwright spec counting | LOW | Add `e2e/` to EXCLUDE_DIRS in testing.cjs; move spec files to `e2e/`; verify count drops |
-| Overwritten `playwright.config.ts` in user project | LOW | Git restore `playwright.config.ts`; add idempotency check to scaffold step |
-| Hard gate failing with Playwright import errors | LOW | Move spec files to `e2e/`; confirm EXCLUDE_DIRS covers them; rerun |
-| baseURL wrong in scaffolded config | LOW | Edit `playwright.config.ts` directly; add detection logic to scaffolding spec |
-| Browser binaries missing in CI-like environment | MEDIUM | Document `PLAYWRIGHT_BROWSERS_PATH` option; add explicit install step to `/gsd:ui-test` help text |
-| Generated tests all use brittle CSS selectors | MEDIUM | Re-run generation with explicit `--force-role-locators` instruction; audit and update generated specs manually |
-| Playwright test count appearing in hard gate budget | HIGH (requires code change) | Fix `EXCLUDE_DIRS` in testing.cjs to exclude `e2e/`; regression test that budget stays at pre-v2.7 number |
+| Schema written in audit but not read in plan-gaps | LOW | Add parsing for `gaps.test_consolidation` to `plan-milestone-gaps`; no schema migration needed since files are generated fresh per audit |
+| Consolidation wrongly triggers `gaps_found` → autopilot loops | LOW | Change status routing in `audit-milestone.md` to emit `tech_debt` when only consolidation gaps exist; re-run audit |
+| Steward proposal extraction produces garbled tasks | MEDIUM | Run `/gsd:audit-milestone` fresh; steward re-analyzes and produces new proposals; re-extract with fixed parser |
+| Null guard missing → `plan-milestone-gaps` errors | LOW | Add `|| []` guard; re-run; no state corruption since the workflow only reads, then creates new phases |
+| Consolidation phases executed without human approval in autopilot | HIGH | Revert the test file changes via `git revert`; add the `tech_debt`-routing fix; re-run audit |
 
 ---
 
@@ -278,38 +202,25 @@ Phase 2 (scaffolding implementation) — the gsd-playwright agent scaffolding lo
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Playwright specs blow test budget | Phase 1 (scaffolding spec) | `gsd-tools.cjs test-count` unchanged after adding E2E specs to `e2e/` |
-| Partial-install false negative in detection | Phase 1 (agent detection logic) | Agent correctly identifies each of 4 install states with distinct messages |
-| Brittle CSS locators in generated tests | Phase 2 (test generation patterns) | Generated specs pass locator quality check (no `.nth()` without comment, no CSS class selectors) |
-| Scaffolding runs in wrong project | Phase 1 (command spec guard logic) | `/gsd:ui-test` on GSD's own repo emits "no web app detected" error |
-| baseURL not set / webServer missing | Phase 1 (scaffolding spec) | Scaffolded config always has `webServer` block with detected command |
-| Hard gate runs Playwright specs as unit tests | Phase 1 (test infrastructure planning) | Hard gate exits 0 after specs created; GSD budget stays at 796 |
-| Binary download hangs silently | Phase 2 (scaffolding implementation) | 3-minute timeout + explicit user messaging in install step |
-| Add-tests TDD path broken | Phase 3 (add-tests workflow extension) | `/gsd:add-tests` on unit-test-only phase completes without error; regression test passes |
+| Frontmatter written but not read | Phase 1 (atomic schema + parsing change) | `plan-milestone-gaps` creates consolidation phases from a seeded audit file |
+| `test_health` count vs `gaps.test_consolidation` array confusion | Phase 1 (schema design) | Audit frontmatter has both the integer count and the structured array; values agree |
+| Autopilot loops on consolidation-only gaps | Phase 1 (status routing) | Audit with only consolidation proposals returns `tech_debt`; autopilot exits via `auto_accept_tech_debt` |
+| Brittle markdown extraction from steward report | Phase 2 (audit write implementation) | Extraction tested with sample steward report containing all 4 strategies |
+| Consolidation tasks invented rather than verbatim | Phase 2 (task template spec) | Task file/test names match steward proposal exactly; no invented specifics |
+| Missing null guard on `test_consolidation` | Phase 2 (plan-milestone-gaps implementation) | Workflow succeeds with audit file missing the key entirely |
 
 ---
 
 ## Sources
 
 - Direct codebase analysis (HIGH confidence):
-  - `get-shit-done/bin/lib/testing.cjs` lines 86-138 — `TEST_FILE_PATTERNS`, `EXCLUDE_DIRS`, `findTestFiles()`, `countTestsInFile()` — identifies budget counting vulnerability
-  - `get-shit-done/bin/lib/testing.cjs` lines 286-349 — `parseTestOutput()` — confirms Playwright case not handled
-  - `get-shit-done/workflows/add-tests.md` steps 3-6 — E2E classification and execution path
-  - `.planning/PROJECT.md` — active v2.7 requirements, test budget status 796/800 (99.5%)
-  - `gsd-tools.cjs test-count` output — confirmed 796 tests as of research date
-
-- Official Playwright documentation (HIGH confidence):
-  - [Playwright Best Practices](https://playwright.dev/docs/best-practices) — locator priority hierarchy, flaky test prevention
-  - [Playwright CI](https://playwright.dev/docs/ci) — `npx playwright install --with-deps` requirement
-  - [Playwright Browsers](https://playwright.dev/docs/browsers) — binary management, caching behavior
-  - [Playwright webServer](https://playwright.dev/docs/test-webserver) — `webServer` config pattern, `reuseExistingServer`
-  - [Playwright Locators](https://playwright.dev/docs/locators) — role-based locator priority
-
-- Community sources (MEDIUM confidence):
-  - [Better Stack: Playwright Pitfalls](https://betterstack.com/community/guides/testing/playwright-best-practices/) — CSS selector brittleness, test interdependencies
-  - [Why AI Can't Write Good Playwright Tests](https://dev.to/johnonline35/why-ai-cant-write-good-playwright-tests-and-how-to-fix-it-knn) — AI locator generation fundamental limitations, accessibility tree information gap
-  - [Why Playwright Tests Pass Locally but Fail in CI](https://dev.to/sentinelqa/why-playwright-tests-pass-locally-but-fail-in-ci-4ph6) — baseURL and environment mismatch patterns
+  - `get-shit-done/workflows/audit-milestone.md` step 3.5, step 6 — steward spawn and frontmatter schema; confirms `test_health.consolidation_proposals` is integer count only, not proposal objects
+  - `get-shit-done/workflows/plan-milestone-gaps.md` step 1 — explicit enumeration of three gap types read; confirms new type will be silently ignored without update
+  - `get-shit-done/scripts/autopilot.mjs` lines 862-921 (`runMilestoneAudit`), lines 924-1017 (`runGapClosureLoop`) — exact status routing logic; confirms `gaps_found` triggers loop, `tech_debt` with `auto_accept_tech_debt: true` exits cleanly
+  - `agents/gsd-test-steward.md` step 5 and step 6 — proposal format template (`#### Proposal N: {strategy} -- {title}`, labeled fields) — confirms parseable but fragile
+  - `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live example of `test_health` schema with `consolidation_proposals: 2` as integer; confirms no structured proposal data exists in current frontmatter
+  - `.planning/PROJECT.md` v2.8 target features — confirms the four strategies (prune, parameterize, promote, merge) and the four edge cases (no proposals, steward disabled, only test gaps, autopilot flow)
 
 ---
-*Pitfalls research for: GSD v2.7 Playwright UI testing integration*
-*Researched: 2026-03-19*
+*Pitfalls research for: GSD v2.8 test steward consolidation bridge*
+*Researched: 2026-03-20*

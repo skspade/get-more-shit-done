@@ -1,502 +1,366 @@
 # Architecture Research
 
-**Domain:** Playwright UI Testing Integration into GSD Command/Workflow/Agent Architecture
-**Researched:** 2026-03-19
+**Domain:** Test Steward Consolidation Bridge — GSD Autopilot Gap Closure Integration
+**Researched:** 2026-03-20
 **Confidence:** HIGH
 
-## System Overview — Existing GSD Architecture
+## The Problem: Dead-End Data Flow
 
-The GSD architecture has three tiers that interact in a strict pattern:
+The test steward runs during `audit-milestone` (step 3.5) and produces consolidation proposals. Those proposals are written into `MILESTONE-AUDIT.md` as `test_health` frontmatter and a markdown report section. They go no further.
 
-```
-USER INVOCATION
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    COMMANDS  (commands/gsd/*.md)                         │
-│  User-facing entry points. Parse arguments, load context via            │
-│  gsd-tools.cjs init, then delegate to a workflow or agent directly.     │
-│                                                                         │
-│  /gsd:add-tests   /gsd:audit-tests   /gsd:linear   /gsd:pr-review      │
-└───────────────────────────┬─────────────────────────────────────────────┘
-                            │ delegates to (via @workflow or Task spawn)
-                            ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   WORKFLOWS  (~/.claude/get-shit-done/workflows/*.md)    │
-│  Multi-step logic with gates, decisions, and agent spawning.            │
-│  NOT re-entrant from within agents (subagent cannot spawn subagent).    │
-│                                                                         │
-│  add-tests.md   linear.md   pr-review.md   execute-phase.md ...        │
-└───────────────────────────┬─────────────────────────────────────────────┘
-                            │ spawns via Task()
-                            ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     AGENTS  (agents/*.md)                                │
-│  Specialized task handlers. Read-only or narrowly scoped writes.        │
-│  Cannot spawn subagents. Return structured results to caller.           │
-│                                                                         │
-│  gsd-test-steward   gsd-executor   gsd-planner   gsd-verifier ...      │
-└─────────────────────────────────────────────────────────────────────────┘
-                            │ all backed by
-                            ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│              gsd-tools.cjs  +  bin/lib/*.cjs  MODULES                   │
-│  Deterministic data: phase resolution, config, init bundles, state.     │
-│  Consumed by commands and workflows via bash subprocess calls.          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### Key Architectural Rules (must preserve for v2.7)
-
-1. **Commands are orchestrators.** They parse args, call `gsd-tools.cjs init`, then delegate.
-2. **Workflows contain multi-step logic.** They can spawn agents via `Task()` and have gates.
-3. **Agents are leaf nodes.** A spawned agent cannot spawn another agent.
-4. **Cross-session state lives in `.planning/` markdown.** No in-memory state survives between Claude sessions.
-5. **`gsd-tools.cjs` is the data layer.** All deterministic data (phase lookup, config, model resolution) goes through it.
-
-## New Components for v2.7
-
-Three new components integrate with the existing architecture. Two are new files, one is a modification:
+`plan-milestone-gaps.md` reads `MILESTONE-AUDIT.md` frontmatter but only consumes three arrays:
 
 ```
-NEW                                          MODIFIED
-─────────────────────────────────────────────────────────────────────────────
-commands/gsd/ui-test.md    (NEW command)
-agents/gsd-playwright.md   (NEW agent)
-workflows/add-tests.md     (MODIFIED — existing workflow, enhanced E2E step)
-─────────────────────────────────────────────────────────────────────────────
+gaps.requirements
+gaps.integration
+gaps.flows
 ```
 
-### Component Responsibilities
-
-| Component | Type | Responsibility | New or Modified |
-|-----------|------|----------------|-----------------|
-| `commands/gsd/ui-test.md` | Command | User-facing entry point; parse args (phase, URL, flags), call `init phase-op`, delegate to `gsd-playwright` agent | NEW |
-| `agents/gsd-playwright.md` | Agent | Detection, scaffolding, generation, execution, reporting for Playwright tests; returns structured result to caller | NEW |
-| `workflows/add-tests.md` | Workflow | Add Playwright detection and scaffolding prompt to `execute_e2e_generation` step; spawn `gsd-playwright` for E2E files | MODIFIED |
-| `bin/lib/testing.cjs` | Module | Playwright detection logic (config file presence, package.json deps); potentially add `detectPlaywright()` | MODIFIED (optional) |
-
-## Recommended Architecture — v2.7 Integration
+`test_health.consolidation_proposals` is visible to humans reading the audit file but is never routed into gap closure phases. This milestone closes that gap by adding a fourth array:
 
 ```
-                    TWO ENTRY PATHS TO gsd-playwright AGENT
-                    ──────────────────────────────────────────
+gaps.test_consolidation    ← NEW
+```
 
-PATH 1: Direct command (on-demand UI testing)
+...and teaching `plan-milestone-gaps.md` to create phases from it, exactly like it does for the existing three gap types.
 
-/gsd:ui-test <phase> [url] [--scaffold] [--run-only] [--headed]
+## Existing Architecture (What We're Extending)
+
+```
+audit-milestone.md (step 3.5)
     │
-    ▼ parse args + gsd-tools init phase-op
+    ├── Task(gsd-test-steward) → steward_report
     │
-    ▼ Task(gsd-playwright, mode=ui-test, phase_dir, url, flags)
+    └── Step 6: Write MILESTONE-AUDIT.md
+        ├── YAML frontmatter:
+        │   ├── gaps.requirements: [...]
+        │   ├── gaps.integration: [...]
+        │   ├── gaps.flows: [...]
+        │   └── test_health:           ← proposals recorded here (summary only)
+        │       ├── budget_status
+        │       ├── redundant_tests: N
+        │       ├── stale_tests: N
+        │       └── consolidation_proposals: N    ← count only, no detail
+        └── Markdown body:
+            └── ## Test Suite Health        ← full steward report (free text)
+
+plan-milestone-gaps.md (step 1)
     │
-    ▼ Playwright detection → scaffold if needed → generate → execute → report
+    └── Parse YAML frontmatter:
+        ├── gaps.requirements → phases
+        ├── gaps.integration → phases
+        ├── gaps.flows → phases
+        └── test_health → (IGNORED — not consumed)
+```
 
-PATH 2: Via add-tests workflow (test generation for a phase)
+The bridge requires two coordinated changes — one write-side (audit-milestone produces structured proposals) and one read-side (plan-milestone-gaps consumes them).
 
-/gsd:add-tests <phase>
+## New Architecture: v2.8 Changes
+
+```
+audit-milestone.md (step 3.5) — MODIFIED
     │
-    ▼ add-tests.md workflow: analyze_implementation → classify files
+    ├── Task(gsd-test-steward) → steward_report
     │
-    │ (files classified as E2E)
-    ▼
-    execute_e2e_generation step (MODIFIED):
-        detect Playwright → prompt if not found → scaffold
-        │
-        ▼ Task(gsd-playwright, mode=generate, files[], phase_dir)
-        │
-        ▼ Generate .spec.ts → execute → RED-GREEN report
-```
+    └── Step 6: Write MILESTONE-AUDIT.md — MODIFIED
+        ├── YAML frontmatter:
+        │   ├── gaps.requirements: [...]
+        │   ├── gaps.integration: [...]
+        │   ├── gaps.flows: [...]
+        │   ├── gaps.test_consolidation: [...]    ← NEW: structured proposals
+        │   └── test_health:
+        │       ├── budget_status
+        │       ├── redundant_tests: N
+        │       ├── stale_tests: N
+        │       └── consolidation_proposals: N
+        └── Markdown body: (unchanged)
 
-### New Component: /gsd:ui-test Command
-
-Follows the same pattern as `/gsd:pr-review` and `/gsd:linear`:
-
-```
-1. Parse $ARGUMENTS:
-   - Phase number (optional) → $PHASE_ARG
-   - URL (optional) → $BASE_URL
-   - --scaffold flag → $FORCE_SCAFFOLD
-   - --run-only flag → $RUN_ONLY
-   - --headed flag → $HEADED_MODE
-
-2. Call gsd-tools init:
-   INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init phase-op "${PHASE_ARG}")
-
-3. Gather Playwright status:
-   PW_STATUS=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" playwright-detect)
-
-4. Display banner:
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    GSD ► UI TEST — Phase ${phase_number}: ${phase_name}
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-5. Spawn gsd-playwright agent via Task()
-```
-
-The command is a thin wrapper. All logic lives in the agent (consistent with `audit-tests.md` which is also a direct agent spawn with no separate workflow file).
-
-### New Component: gsd-playwright Agent
-
-The agent handles the full Playwright lifecycle in a single execution context. It follows the same read-then-act structure as `gsd-test-steward`:
-
-```
-INPUT RECEIVED (from Task() call):
-  mode: 'ui-test' | 'generate' | 'run-only'
-  phase_dir: string | null
-  base_url: string | null
-  e2e_files: string[] | null  (mode=generate only, from add-tests)
-  flags: { scaffold, run_only, headed }
-
-STEP 1: Playwright Detection (three-tier)
-  Tier 1: playwright.config.ts exists → configured
-  Tier 2: @playwright/test in package.json deps → installed, not configured
-  Tier 3: neither → not present
-
-STEP 2: Scaffolding (if not configured and not --run-only)
-  Create playwright.config.ts (Chromium-only, baseURL from input or prompt)
-  Create tests/e2e/ directory
-  Create tests/e2e/example.spec.ts (hello-world smoke test)
-  Add tests/e2e/ pattern to .gitignore or extend existing entry
-
-STEP 3: Test Generation (if not --run-only)
-  Read phase context: CONTEXT.md acceptance criteria → Given/When/Then → spec
-  Locator priority: getByRole > getByText > getByLabel > getByTestId
-  Output: tests/e2e/{phase-slug}.spec.ts
-
-STEP 4: Execution
-  npx playwright test [--headed] [--project=chromium]
-  Parse output: passed/failed/skipped counts + failure details
-
-STEP 5: Structured Return
-  ## PLAYWRIGHT COMPLETE
-  Status: GREEN | RED | BLOCKED
-  Tests: N passed, M failed, K skipped
-  {failure details if RED}
-  {blocker reason if BLOCKED}
-```
-
-### Modified Component: add-tests Workflow (execute_e2e_generation step)
-
-The existing `execute_e2e_generation` step in `add-tests.md` currently:
-1. Checks for existing tests covering the scenario
-2. Creates a test file
-3. Runs the E2E command
-4. Evaluates result
-
-The modification adds a **detection + scaffolding gate before step 2**:
-
-```
-execute_e2e_generation (MODIFIED):
-
-  [NEW] Detect Playwright:
-    PW_STATUS=$(node gsd-tools.cjs playwright-detect)
-    if PW_STATUS == 'not_present':
-      AskUserQuestion("Playwright not found. Scaffold it now?")
-      if yes: spawn gsd-playwright(mode=scaffold)
-      if no: mark E2E tests as BLOCKED, continue to TDD tests
-
-  [NEW] Delegate to gsd-playwright agent:
-    For E2E-classified files, spawn:
-    Task(gsd-playwright, mode=generate,
-         e2e_files=[...], phase_dir, base_url)
-    Rather than inline generation logic
-
-  [EXISTING] Evaluate result from agent:
-    GREEN → record success
-    RED → flag as potential application bug
-    BLOCKED → report blocker (unchanged behavior)
-```
-
-This is a minimal modification — the existing `execute_tdd_generation` step is untouched. The change is surgical: add detection at the start of the E2E step and delegate generation to the agent instead of doing it inline.
-
-## Data Flow
-
-### Full ui-test Flow (PATH 1 — direct command)
-
-```
-User: /gsd:ui-test 12 https://localhost:3000 --headed
+plan-milestone-gaps.md (step 1) — MODIFIED
     │
-    ▼
-commands/gsd/ui-test.md
-    │ parse args: phase=12, url=localhost:3000, headed=true
-    ├── node gsd-tools.cjs init phase-op 12
-    │   └── returns: { phase_dir, phase_number, phase_name }
-    ├── node gsd-tools.cjs playwright-detect
-    │   └── returns: { status: 'configured'|'installed'|'not_present', config_path? }
-    │
-    ▼ Task(gsd-playwright)
-        │
-        ├── STEP 1: Read phase artifacts
-        │   └── CONTEXT.md acceptance criteria → extract Given/When/Then scenarios
-        │
-        ├── STEP 2: Detection result = 'not_present' AND no --run-only?
-        │   └── Scaffold: create playwright.config.ts, tests/e2e/, example.spec.ts
-        │
-        ├── STEP 3: Generate tests/e2e/phase-12-<slug>.spec.ts
-        │   └── Map each acceptance criterion to a Playwright test
-        │
-        ├── STEP 4: Execute
-        │   └── npx playwright test --project=chromium [--headed]
-        │       → parse NDJSON or text output
-        │
-        └── STEP 5: Return structured result to ui-test command
-            → command formats and displays to user
+    └── Parse YAML frontmatter:
+        ├── gaps.requirements → phases (unchanged)
+        ├── gaps.integration → phases (unchanged)
+        ├── gaps.flows → phases (unchanged)
+        └── gaps.test_consolidation → phases    ← NEW: consumed
 ```
 
-### add-tests E2E Flow (PATH 2 — via workflow)
+## Component Boundaries: New vs Modified
 
-```
-/gsd:add-tests 12
-    │
-    ▼ add-tests workflow: classify files
-    │   Files: [auth.tsx → E2E, pricing.ts → TDD, config.ts → Skip]
-    │
-    ├── execute_tdd_generation (unchanged)
-    │   └── pricing.ts → unit tests → run → pass/fail
-    │
-    └── execute_e2e_generation (MODIFIED)
-        │
-        ├── node gsd-tools.cjs playwright-detect
-        │   └── not_present → AskUserQuestion → user approves scaffold
-        │       → Task(gsd-playwright, mode=scaffold)
-        │
-        ├── Task(gsd-playwright, mode=generate, files=[auth.tsx])
-        │   └── → tests/e2e/phase-12-auth.spec.ts generated + executed
-        │
-        └── Return result → add-tests formats coverage report + commits
-```
+| Component | Action | Why |
+|-----------|--------|-----|
+| `workflows/audit-milestone.md` | **MODIFY** | Step 6 must map steward proposals into `gaps.test_consolidation` array. New extraction logic + schema addition. |
+| `workflows/plan-milestone-gaps.md` | **MODIFY** | Step 1 must parse `gaps.test_consolidation`. Step 3 must group proposals into phases. Steps 6-10 are unchanged (they handle any gap type). |
+| `agents/gsd-test-steward.md` | **NO CHANGE** | Read-only agent; output format is already structured markdown. Audit-milestone extracts from it. |
+| `scripts/autopilot.mjs` | **NO CHANGE** | Calls `plan-milestone-gaps --auto` generically; the workflow handles the new gap type transparently. |
+| `bin/gsd-tools.cjs` | **NO CHANGE** | Frontmatter parsing via `frontmatter get` already handles arbitrary fields. No new dispatch cases needed. |
+| `bin/lib/frontmatter.cjs` | **NO CHANGE** | General-purpose YAML frontmatter; `gaps.test_consolidation` is just another array. |
 
-### gsd-tools.cjs Playwright Detection Data Flow
+## New Schema: gaps.test_consolidation
 
-```
-node gsd-tools.cjs playwright-detect
-    │
-    ▼ testing.detectPlaywright(cwd)
-        ├── fs.existsSync('playwright.config.ts') → 'configured'
-        ├── fs.existsSync('playwright.config.js') → 'configured'
-        ├── package.json deps has '@playwright/test' → 'installed'
-        └── none → 'not_present'
+The steward report (free text markdown) must be parsed by audit-milestone into structured objects. Each object maps one consolidation proposal to the schema that plan-milestone-gaps can consume:
 
-Returns JSON:
-{
-  status: 'configured' | 'installed' | 'not_present',
-  config_path: string | null,
-  install_command: 'npx playwright install' | null
-}
+```yaml
+gaps:
+  test_consolidation:
+    - id: "TC-01"
+      strategy: "parameterize"          # parameterize | promote | prune | merge
+      title: "Parameterize validation checks in phase.test.cjs"
+      source_files:
+        - "tests/phase.test.cjs"
+      action: "Combine 4 near-duplicate tests into test.each array"
+      rationale: "Tests differ only in input values; parameterize reduces 4→1 plus data array"
+      estimated_reduction: 3
+      priority: "should"               # must | should | nice
 ```
 
-## New vs Modified: Explicit Component Table
+**Priority mapping from steward findings:**
 
-| Component | Action | Justification |
-|-----------|--------|---------------|
-| `commands/gsd/ui-test.md` | **CREATE** | New user-facing command follows existing command pattern; no existing command handles Playwright lifecycle |
-| `agents/gsd-playwright.md` | **CREATE** | Playwright lifecycle (detect, scaffold, generate, execute, report) is agent scope; test-steward precedent for read/execute agents |
-| `workflows/add-tests.md` | **MODIFY** | The `execute_e2e_generation` step explicitly needs enhancement per PROJECT.md v2.7 requirements; minimal surgical change |
-| `bin/lib/testing.cjs` | **MODIFY** | Add `detectPlaywright()` function and `cmdPlaywrightDetect` command; follows existing `detectFramework()` pattern |
-| `bin/gsd-tools.cjs` | **MODIFY** | Add `playwright-detect` dispatch case; follows existing `test-detect-framework` pattern |
-| `agents/gsd-test-steward.md` | **NO CHANGE** | Unit test budget/health analysis; Playwright is E2E scope, separate concern |
-| `workflows/execute-plan.md` | **NO CHANGE** | Hard test gate uses unit test runner; Playwright execution is on-demand, not part of the commit gate |
-| `commands/gsd/add-tests.md` | **NO CHANGE** | Command file just delegates to workflow; workflow modification is sufficient |
+| Steward Condition | Priority |
+|-------------------|----------|
+| Project budget Over Budget | `must` |
+| Project budget Warning AND consolidation triggered | `should` |
+| Individual finding, no budget pressure | `nice` |
 
-## Architectural Patterns
+The `priority` field lets plan-milestone-gaps apply its existing prioritization logic (step 2) to test consolidation just like requirement gaps.
 
-### Pattern 1: Command as Thin Orchestrator
-
-**What:** Command files parse arguments and call `gsd-tools.cjs init` to gather context, then spawn one agent directly — no inline logic.
-**When to use:** When the entire operation fits within a single agent execution context (no multi-step workflow gates needed).
-**Trade-offs:** Simple, consistent. Use when the operation doesn't need user interaction mid-flight.
-**Precedent:** `audit-tests.md` command spawns `gsd-test-steward` directly without a separate workflow.
+## Data Flow: Proposal-to-Phase Mapping
 
 ```
-# ui-test.md follows audit-tests.md pattern exactly:
-1. Check prerequisites (playwright installed?)
-2. Gather init data (gsd-tools init phase-op)
-3. Display banner
-4. Spawn gsd-playwright agent
-5. Present agent report
+gsd-test-steward output (free text):
+
+    #### Proposal 1: parameterize — Consolidate phase navigation tests
+    - Strategy: parameterize
+    - Source: tests/phase.test.cjs lines 45-89
+    - Action: Combine 4 near-duplicate describe blocks into test.each
+    - Estimated reduction: 3 tests
+
+audit-milestone.md step 6 (extraction):
+
+    Parse steward_report for "#### Proposal N:" blocks
+    → map each to gaps.test_consolidation[] item
+    → assign id: "TC-{N}"
+    → assign priority based on budget_status
+
+MILESTONE-AUDIT.md frontmatter:
+
+    gaps:
+      test_consolidation:
+        - id: "TC-01"
+          strategy: parameterize
+          title: "Consolidate phase navigation tests"
+          source_files: ["tests/phase.test.cjs"]
+          action: "Combine 4 near-duplicate describe blocks into test.each"
+          estimated_reduction: 3
+          priority: "must"             # Over Budget → must
+
+plan-milestone-gaps.md step 1 (consumption):
+
+    Parse gaps.test_consolidation array
+    → each item is a gap with strategy, source, action
+
+plan-milestone-gaps.md step 3 (grouping):
+
+    Group test_consolidation gaps by strategy or affected file area:
+    - All prune gaps → one phase "Prune Stale Tests"
+    - All parameterize + merge gaps → one phase "Consolidate Test Parameterization"
+    - promote gaps → one phase "Promote Unit Tests to Integration Coverage"
+    (Override: if only 1-2 proposals total, put them all in one phase)
+
+plan-milestone-gaps.md steps 4-10 (unchanged):
+
+    Create phases, update ROADMAP.md, create directories, commit
 ```
 
-### Pattern 2: Agent Structured Return
+## Proposal-to-Task Mapping by Strategy
 
-**What:** Agents return a fixed markdown header block so the calling workflow can parse success/failure deterministically.
-**When to use:** Every agent that can be spawned via `Task()`.
-**Trade-offs:** Slight verbosity in agent output, but enables reliable caller parsing.
-**Precedent:** `gsd-test-steward` returns `## STEWARD COMPLETE` or `## STEWARD SKIPPED`.
+This is the core translation logic. Plan-milestone-gaps uses this mapping to create specific, actionable tasks from each proposal:
+
+### Strategy: prune
 
 ```
-## PLAYWRIGHT COMPLETE
-Status: GREEN | RED | BLOCKED
-Scaffolded: yes | no
-Generated: N tests in M files
-Passed: N | Failed: M | Skipped: K
-{failure details table if RED}
-{blocker reason if BLOCKED}
+gap: prune stale test referencing deleted function
+→ phase: "Remove Stale Tests"
+   task: "Remove stale test block"
+     files: [source_files[0]]
+     action: "Delete it('...') block at line N that references <missing module>"
 ```
 
-### Pattern 3: Surgical Workflow Enhancement
+One task per file containing stale tests. Group multiple stale tests in the same file into one task.
 
-**What:** When modifying an existing workflow, add the new capability at the exact integration point, preserving all existing behavior.
-**When to use:** Adding Playwright support to `execute_e2e_generation` step — TDD path must not change.
-**Trade-offs:** Requires careful reading of existing workflow logic to find the right insertion point.
-**Implementation:** Add detection + scaffolding gate at the START of `execute_e2e_generation`. Wrap the E2E generation in a `Task(gsd-playwright)` call instead of inline logic. All other steps (classification, test plan presentation, TDD generation, summary/commit) remain identical.
+### Strategy: parameterize
 
-### Pattern 4: Three-Tier Detection
-
-**What:** Check for Playwright in three states — fully configured (config file exists), installed but not configured (package.json dep), or absent.
-**When to use:** Any time a tool's absence requires different handling (prompt to scaffold vs. error vs. proceed).
-**Trade-offs:** More nuanced than binary present/absent, enables appropriate guidance.
-
-```javascript
-// testing.cjs addition — mirrors detectFramework() pattern
-function detectPlaywright(cwd) {
-  // Tier 1: config file present → fully configured
-  if (fs.existsSync(path.join(cwd, 'playwright.config.ts'))) {
-    return { status: 'configured', config_path: 'playwright.config.ts' };
-  }
-  if (fs.existsSync(path.join(cwd, 'playwright.config.js'))) {
-    return { status: 'configured', config_path: 'playwright.config.js' };
-  }
-  // Tier 2: dep in package.json → installed, needs config
-  const pkg = safeReadPackageJson(cwd);
-  const deps = { ...(pkg?.dependencies || {}), ...(pkg?.devDependencies || {}) };
-  if (deps['@playwright/test']) {
-    return { status: 'installed', config_path: null, install_command: 'npx playwright install' };
-  }
-  // Tier 3: not present
-  return { status: 'not_present', config_path: null, install_command: 'npm install -D @playwright/test && npx playwright install chromium' };
-}
 ```
+gap: parameterize near-duplicate tests
+→ phase: "Parameterize Redundant Tests"
+   task: "Convert to test.each"
+     files: [source_files[0]]
+     action: "Replace N test(...) blocks with single test.each([...cases]) pattern"
+```
+
+One task per test file. If multiple parameterize proposals in one file, merge into one task.
+
+### Strategy: promote
+
+```
+gap: unit tests subsumed by integration test
+→ phase: "Remove Redundant Unit Tests"
+   task: "Remove unit tests covered by integration test"
+     files: [source_files[0]]
+     action: "Delete N unit test blocks — coverage provided by integration test at <source_files[1]>"
+```
+
+### Strategy: merge
+
+```
+gap: >5 test files for related functionality
+→ phase: "Consolidate Test Files"
+   task: "Merge related test files"
+     files: [source_files...]
+     action: "Consolidate N files into <target file> organized by feature"
+```
+
+Merge generates zero estimated_reduction (no test removal, just reorganization). One task per consolidation group.
+
+## Edge Cases
+
+### No consolidation proposals
+
+If steward produces no proposals (all metrics within thresholds):
+
+- `gaps.test_consolidation` is an empty array `[]`
+- `plan-milestone-gaps.md` detects empty array — no phases created, no user prompt about test consolidation
+- Behavior is identical to a milestone with no integration gaps
+
+### Steward skipped (disabled or no test files)
+
+If steward was skipped:
+
+- `test_health` frontmatter is absent from MILESTONE-AUDIT.md
+- `gaps.test_consolidation` key is absent (not present, not empty array)
+- `plan-milestone-gaps.md` treats absent key same as empty array — skip silently
+
+Implementation: `const testConsolidation = gaps.test_consolidation || [];`
+
+### Only test consolidation gaps (no requirement/integration/flow gaps)
+
+If the audit passes on requirements but has test consolidation gaps:
+
+- Audit status remains `tech_debt` (not `gaps_found`) — consolidation is cleanup, not a blocker
+- `plan-milestone-gaps.md` is invoked via the `tech_debt` path (option B in offer_next)
+- The workflow reads `test_consolidation` and creates cleanup phases
+- This path is reachable both manually and via autopilot (autopilot already handles `tech_debt` status)
+
+### Autopilot flow
+
+Autopilot calls `plan-milestone-gaps --auto`. The `--auto` flag suppresses the "Create these N phases? (yes / adjust / defer all optional)" prompt in step 5. The new test consolidation phases are created without human confirmation — same behavior as requirement gap phases.
+
+However: test consolidation proposals with priority `nice` should be **skipped in autopilot mode** (deferred). Only `must` and `should` proposals auto-create phases. This mirrors the existing nice-to-have deferral logic for requirement gaps.
 
 ## Integration Points
 
-### New gsd-tools.cjs Dispatch Entry
+### audit-milestone.md: Two Changes
 
-```
-playwright-detect → testing.detectPlaywright(cwd)
-```
+**Change 1 — Step 3.5 (spawn steward):** No change to the Task() call. The steward already produces proposal blocks. The caller just needs to extract them.
 
-Follows the exact pattern of `test-detect-framework → testing.cmdTestDetectFramework(cwd, raw)` already in `gsd-tools.cjs`.
-
-### add-tests.md Modification Boundary
-
-The modification is scoped to `execute_e2e_generation` step only. The change surface is:
-
-| Location in add-tests.md | Change |
-|--------------------------|--------|
-| `execute_e2e_generation` step start | Add: call `playwright-detect`, gate on result |
-| `execute_e2e_generation` step body | Change: delegate to `Task(gsd-playwright)` instead of inline generation |
-| `execute_e2e_generation` step result handling | Change: parse structured return from agent instead of direct test run |
-| All other steps | **NO CHANGE** |
-
-### Agent Tool Access
-
-The `gsd-playwright` agent needs broader tool access than `gsd-test-steward` (which is read-only) because it writes scaffold files and executes tests:
+**Change 2 — Step 6 (frontmatter schema):** Add `gaps.test_consolidation` to the YAML template. The extraction logic parses `steward_report` for `#### Proposal N:` blocks and maps them to the structured schema. Location: the section that already writes `test_health` fields.
 
 ```yaml
-tools: Read, Write, Edit, Bash, Glob, Grep
+# Existing schema (unchanged)
+test_health:
+  budget_status: "{OK | Warning | Over Budget}"
+  redundant_tests: N
+  stale_tests: N
+  consolidation_proposals: N
+
+# New: add to gaps block
+gaps:
+  requirements: [...]
+  integration: [...]
+  flows: [...]
+  test_consolidation:    # ← ADD THIS
+    - id: "TC-01"
+      strategy: "..."
+      title: "..."
+      source_files: [...]
+      action: "..."
+      estimated_reduction: N
+      priority: "..."
 ```
 
-The `Bash` tool is required for `npx playwright test` execution. Write is required for scaffold file creation.
+### plan-milestone-gaps.md: Three Changes
 
-### No New .planning/ State Files Required
+**Change 1 — Step 1 (load audit results):** Add `gaps.test_consolidation` to the frontmatter extraction. Same frontmatter parse, one more field.
 
-Unlike `linear.md` (which uses `linear-context.md`) or `pr-review.md` (which uses `review-context.md`), the Playwright workflow does not need a temporary state file. The phase context already lives in `${phase_dir}/CONTEXT.md`. The agent reads it directly. Generated test files live in the project's test directory, not in `.planning/`.
+**Change 2 — Step 2 (prioritize):** Apply existing priority logic (`must`/`should`/`nice`) to `test_consolidation` items — the `priority` field is already populated by audit-milestone, no inference needed.
+
+**Change 3 — Step 3 (grouping):** Add grouping rule for test consolidation: cluster by strategy type into at most 2 phases (prune/promote together, parameterize/merge together). If ≤2 total proposals, combine into one phase.
+
+Steps 4 through 10 of plan-milestone-gaps require no changes — they work on "phases with goals and tasks" regardless of gap source.
+
+### No New Files Required
+
+This milestone adds no new commands, agents, workflow files, or CJS modules. Both changes are in-place modifications to existing workflow markdown files.
 
 ## Suggested Build Order
 
-Dependencies drive this order. Each step can be verified independently before proceeding.
+Dependencies drive the order. The write-side (audit) must be built and validated before the read-side (plan-gaps) can be tested end-to-end.
 
-### Step 1: gsd-tools.cjs Playwright Detection
+### Phase 1: audit-milestone.md Schema and Extraction
 
-**Files:** `bin/lib/testing.cjs` (add `detectPlaywright()`), `bin/gsd-tools.cjs` (add `playwright-detect` case)
+**What:** Modify step 6 of `audit-milestone.md` to:
+1. Parse `steward_report` for `#### Proposal N:` blocks
+2. Map each block to a `gaps.test_consolidation` item with the defined schema
+3. Assign priority based on `test_health.budget_status`
+4. Write to YAML frontmatter
 
-**Why first:** Both the new command and the modified workflow depend on `playwright-detect`. This is pure additive code with no breaking changes. Add `detectPlaywright()` alongside existing `detectFramework()`. Add `playwright-detect` dispatch case alongside existing `test-detect-framework` case.
+**Why first:** The MILESTONE-AUDIT.md with `gaps.test_consolidation` populated is the required input for plan-milestone-gaps. Build and validate the output schema before building the consumer.
 
-**Verification:** `node gsd-tools.cjs playwright-detect` returns correct JSON in a project with and without Playwright configured.
+**Verification:** Run `/gsd:audit-milestone` on this project (currently Over Budget, 2 steward proposals). Confirm `v2.8-MILESTONE-AUDIT.md` frontmatter contains a populated `gaps.test_consolidation` array with correctly mapped TC-01, TC-02 items.
 
-### Step 2: gsd-playwright Agent
+### Phase 2: plan-milestone-gaps.md Consumption
 
-**Files:** `agents/gsd-playwright.md`
+**What:** Modify `plan-milestone-gaps.md` to:
+1. Parse `gaps.test_consolidation` from frontmatter (step 1)
+2. Apply priority filtering (step 2)
+3. Group by strategy into phases (step 3, new grouping rule)
+4. Create proposal-to-task mapping for all four strategies
 
-**Why second:** The agent is a leaf node — it has no dependencies on the command or workflow changes. Write it once `playwright-detect` exists so the agent can call the detection tool programmatically.
+**Why second:** Depends on Phase 1 producing well-formed `gaps.test_consolidation` data. The workflow change is purely additive — existing requirement/integration/flow gap handling is untouched.
 
-**Verification:** Agent can be spawned directly via Task() with a phase dir, runs detection, scaffolds in a test project, generates a spec from a CONTEXT.md file, and returns the structured `## PLAYWRIGHT COMPLETE` block.
+**Verification:** With the updated audit file from Phase 1, run `/gsd:plan-milestone-gaps`. Confirm test consolidation phases are created in ROADMAP.md with correct tasks (parameterize/prune/promote/merge as applicable).
 
-**Note on subagent constraint:** The agent uses `Bash` to run `npx playwright test` directly. It does NOT spawn another agent. This complies with the "subagents cannot spawn subagents" constraint.
+### Phase 3: Edge Case Hardening and Tests
 
-### Step 3: /gsd:ui-test Command
+**What:** Validate the three edge cases:
+1. Empty `test_consolidation` array → no phases created
+2. Absent `test_consolidation` key (steward skipped) → no error, no phases
+3. Autopilot `--auto` path → nice-priority proposals deferred, must/should auto-created
 
-**Files:** `commands/gsd/ui-test.md`
+**Why third:** Edge case paths cannot be tested until both workflow changes exist. Run against a synthetic audit file with each edge case condition.
 
-**Why third:** The command is just a wrapper around the agent. Build the agent first, then wrap it.
+**Verification:** Unit tests in `tests/plan-milestone-gaps.test.cjs` (if test file exists) or manual flow validation. Autopilot dry-run with `--dry-run` flag against a milestone with only test consolidation gaps.
 
-**Verification:** `/gsd:ui-test 12 https://localhost:3000` invokes the agent correctly, displays the result.
+## Risks
 
-### Step 4: add-tests Workflow Enhancement
-
-**Files:** `~/.claude/get-shit-done/workflows/add-tests.md` (modify `execute_e2e_generation` step)
-
-**Why fourth (last):** This modifies existing behavior. All three new dependencies (detection, agent, command) must be proven before modifying the existing workflow. The risk here is regressions in the TDD path — do this last so the riskier new components are validated first.
-
-**Verification:** `/gsd:add-tests` on a phase with E2E-classified files correctly detects Playwright state, scaffolds if needed, spawns the agent, and integrates the structured result into the existing coverage report.
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Inlining Playwright Logic in the Workflow
-
-**What people do:** Add Playwright detection, scaffolding, and test generation code directly into `add-tests.md` without creating a separate agent.
-**Why it's wrong:** The workflow already has 7 steps. Adding inline Playwright logic duplicates what the `gsd-playwright` agent does, and it can't be reused by `/gsd:ui-test` without copy-paste. Agents exist precisely to encapsulate reusable behavior.
-**Do this instead:** Create `gsd-playwright.md` agent. Both paths (`/gsd:ui-test` and the modified `add-tests.md`) spawn it via `Task()`.
-
-### Anti-Pattern 2: Creating a Separate Playwright Workflow File
-
-**What people do:** Create `workflows/playwright.md` for the Playwright logic, then have both the command and `add-tests.md` delegate to it.
-**Why it's wrong:** Workflows cannot be spawned from within other workflows (subagent constraint). An agent is the correct primitive for reusable leaf-node logic.
-**Do this instead:** `gsd-playwright.md` in `agents/`, not `workflows/`.
-
-### Anti-Pattern 3: Skipping the Detection Step
-
-**What people do:** Have the agent assume Playwright is installed and immediately try `npx playwright test`.
-**Why it's wrong:** The command is used on web app projects that may not have Playwright at all. A hard failure mid-execution is worse UX than a pre-flight check and scaffolding prompt.
-**Do this instead:** Three-tier detection at agent start. Gate scaffolding on detection result. `--run-only` flag bypasses generation for projects that already have specs.
-
-### Anti-Pattern 4: Modifying execute-plan.md's Hard Test Gate
-
-**What people do:** Add `npx playwright test` to the hard test gate that runs after every task commit in `execute-plan.md`.
-**Why it's wrong:** E2E tests take seconds to minutes per run. Running them on every commit during execute-phase would make the phase loop unbearably slow. UI tests are on-demand, not CI gates in this tool.
-**Do this instead:** Playwright runs only when explicitly invoked via `/gsd:ui-test` or `/gsd:add-tests`. The hard test gate stays unit-test only.
-
-### Anti-Pattern 5: Using a Temporary .planning/ File for Playwright Context
-
-**What people do:** Write `playwright-context.md` to `.planning/` to pass state between the command and the agent, following the `linear-context.md` pattern.
-**Why it's wrong:** The agent receives all needed context in the `Task()` prompt (mode, phase_dir, url, flags). The phase context it needs (CONTEXT.md) already exists. There's no inter-session state to preserve — the operation is atomic.
-**Do this instead:** Pass all context in the `Task()` prompt directly. Keep `.planning/` clean.
-
-## Scaling Considerations
-
-This is a local CLI tool. Scaling in the traditional sense doesn't apply. The relevant scaling question is: **how does this hold up as the user's project grows?**
-
-| Concern | Approach |
-|---------|----------|
-| Large number of acceptance criteria per phase | Agent generates one spec file per phase; test count scales with criteria count. No architectural limit. |
-| Multiple web pages to test | `BASE_URL` passed to agent; agent generates one `describe` block per acceptance criterion. Multi-page tests are naturally handled. |
-| Slow Playwright runs in CI | Out of scope per PROJECT.md (visual reports, CI integration deferred). On-demand execution only. |
-| Test budget pressure (currently 796/800) | Playwright `.spec.ts` files are detected by `findTestFiles()` regex `\.(test|spec)\.(js|ts)`. Budget counter will include them. This is intentional — E2E specs count toward the budget. |
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Steward report format varies (proposals not always in `#### Proposal N:` format) | MEDIUM | Extraction fails silently | Extraction falls back to empty array; audit still succeeds |
+| Frontmatter YAML write corrupts existing gaps fields | LOW | Breaks plan-milestone-gaps entirely | Test full roundtrip on MILESTONE-AUDIT.md after write |
+| plan-milestone-gaps with mixed gap types creates duplicate phases | LOW | User sees redundant phases | Grouping rules explicitly handle test_consolidation separately from other gap types |
+| Autopilot creates cleanup phases when budget is only at Warning | MEDIUM | Unnecessary work injected into autonomous pipeline | Priority mapping: Warning = `should` (creates phases) vs `nice` (deferred). Consider making Warning → nice for autopilot path. |
 
 ## Sources
 
-All findings are HIGH confidence — based on direct codebase inspection with no external dependencies.
+All findings are HIGH confidence based on direct codebase inspection.
 
-- `commands/gsd/audit-tests.md` — precedent for command-as-direct-agent-spawn pattern (no intermediate workflow)
-- `commands/gsd/linear.md` + `~/.claude/get-shit-done/workflows/linear.md` — precedent for command argument parsing + workflow delegation pattern
-- `~/.claude/get-shit-done/workflows/add-tests.md` — target for modification; `execute_e2e_generation` step analyzed in full
-- `agents/gsd-test-steward.md` — agent structure precedent: `<input>`, `<process>`, `<output>` with structured return block
-- `bin/lib/testing.cjs` `detectFramework()` — direct pattern for `detectPlaywright()` three-tier detection
-- `bin/gsd-tools.cjs` lines 648-656 — `test-detect-framework` dispatch case; direct pattern for `playwright-detect`
-- `bin/lib/init.cjs` — init bundle pattern for phase-op (returns phase_dir, phase_number, phase_name)
-- `.planning/PROJECT.md` lines 107-111 — v2.7 active requirements defining exact scope
+- `workflows/audit-milestone.md` — current step 3.5 and step 6 schema (full text read)
+- `workflows/plan-milestone-gaps.md` — current step 1 frontmatter parsing and step 3 grouping logic (full text read)
+- `agents/gsd-test-steward.md` — proposal output format: `#### Proposal N: {strategy} -- {title}` (full text read)
+- `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live example of current `test_health` frontmatter with 2 proposals (read)
+- `.planning/milestones/v2.6-MILESTONE-AUDIT.md` — live example with 3 proposals (read)
+- `.planning/PROJECT.md` — v2.8 target features and constraints (read)
+- `scripts/autopilot.mjs` — `runGapClosureLoop()` confirms `/gsd:plan-milestone-gaps --auto` is the autopilot call path (line 941)
 
 ---
-*Architecture research for: GSD Playwright UI Testing Integration (v2.7)*
-*Researched: 2026-03-19*
+*Architecture research for: Test Steward Consolidation Bridge (v2.8)*
+*Researched: 2026-03-20*
