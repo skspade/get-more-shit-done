@@ -174,6 +174,16 @@ For each REQ-ID, determine status using all three sources:
 
 **Orphan detection:** Requirements present in REQUIREMENTS.md traceability table but absent from ALL phase VERIFICATION.md files MUST be flagged as orphaned. Orphaned requirements are treated as `unsatisfied` — they were assigned but never verified by any phase.
 
+### 5f. Consolidation-Aware Status Routing
+
+After determining requirements coverage, apply consolidation-aware status routing:
+
+- If all requirements are satisfied AND no integration/flow gaps exist AND `consolidation_proposals > 0` (from steward report in step 3.5): set status to `tech_debt`
+- If consolidation proposals exist AND other gaps also exist: status remains `gaps_found` (other gaps take precedence)
+- If no consolidation proposals (steward disabled or no findings): no change to status determination — behaves identically to pre-v2.8
+
+This ensures consolidation-only audits route to the `tech_debt` path (which offers `/gsd:plan-milestone-gaps`), rather than silently returning `passed` when cleanup work exists.
+
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 
 Create `.planning/v{version}-v{version}-MILESTONE-AUDIT.md` with:
@@ -199,6 +209,11 @@ gaps:  # Critical blockers
       evidence: "{specific evidence or lack thereof}"
   integration: [...]
   flows: [...]
+  test_consolidation:   # From steward proposals (when steward enabled and proposals exist)
+    - strategy: "{parameterize | promote | prune | merge}"
+      source: "{verbatim file path and location from steward report}"
+      action: "{verbatim action description from steward report}"
+      estimated_reduction: "{integer count of tests removed}"
 tech_debt:  # Non-critical, deferred
   - phase: 01-auth
     items:
@@ -226,6 +241,14 @@ Plus full markdown report with tables for requirements, phases, integration, tec
 
 {If steward ran: include the steward's full report here}
 ```
+
+**Populating `gaps.test_consolidation` (when steward enabled and proposals exist):**
+
+When `STEWARD_ENABLED` is true and the steward report contains `#### Proposal N:` heading blocks, parse each proposal to extract the four labeled fields: `**Strategy:**`, `**Source:**`, `**Action:**`, and `**Estimated reduction:**`. Build a `gaps.test_consolidation` array entry for each valid proposal with all four fields mapped to `strategy`, `source`, `action`, and `estimated_reduction`.
+
+- Skip malformed proposals (missing any required field) with a warning — do not propagate incomplete entries
+- When steward is disabled or produces no proposals, omit `gaps.test_consolidation` from the frontmatter entirely (do not write an empty array)
+- The existing `test_health.consolidation_proposals` integer count remains unchanged — it is informational metadata, not the structured data
 
 **Status values:**
 - `passed` — all requirements met, no critical gaps, minimal tech debt
