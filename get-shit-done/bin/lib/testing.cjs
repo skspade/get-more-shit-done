@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { output, error, loadConfig, findPhaseInternal } = require('./core.cjs');
+const { output, loadConfig, findPhaseInternal } = require('./core.cjs');
 
 // ─── Framework Detection ────────────────────────────────────────────────────
 
