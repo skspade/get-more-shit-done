@@ -1,5 +1,21 @@
 # Milestones
 
+## v2.9 Test Review Command (Shipped: 2026-03-21)
+
+**Phases completed:** 6 phases, 7 plans
+**Timeline:** 1 day (2026-03-21, ~1 hour)
+**Git range:** 9a9fc6b → 72c5092 (34 files, +2,962/-52)
+
+**Key accomplishments:**
+- Created `/gsd:test-review` command with init function, diff gathering (three-dot merge-base semantics), banner display, large-diff size gate at 2000 lines, and report persistence to `.planning/reviews/`
+- Built `gsd-test-reviewer` read-only analysis agent with dual-signal source-to-test mapping (naming conventions + import tracing), coverage gap detection, staleness detection, and consolidation recommendations
+- Added user-choice routing after report display: quick task (directory + planner + executor), milestone (MILESTONE-CONTEXT.md + new-milestone --auto), or done — with zero-recommendation skip and --report-only bypass
+- Updated help.md, USER-GUIDE.md, and README.md with test-review command reference, usage guide, and command table entry
+- Fixed agent file deployment to `~/.claude/agents/`, registered model profile in `core.cjs`, removed unused init fields (gap closure)
+- Completed Phase 80 verification and traceability — all 23/23 requirements satisfied across 6 phases with 3-source cross-reference (audit status: tech_debt — 5 documentation items)
+
+---
+
 ## v2.8 Test Steward Consolidation Bridge (Shipped: 2026-03-20)
 
 **Phases completed:** 3 phases, 3 plans, 6 tasks

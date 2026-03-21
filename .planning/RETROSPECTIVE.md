@@ -681,6 +681,45 @@
 
 ---
 
+## Milestone: v2.9 — Test Review Command
+
+**Shipped:** 2026-03-21
+**Phases:** 6 | **Plans:** 7 | **Commits:** 28
+
+### What Was Built
+- `/gsd:test-review` command with init function, diff gathering (three-dot merge-base), banner display, large-diff size gate, and report persistence
+- `gsd-test-reviewer` read-only analysis agent with dual-signal source-to-test mapping (naming + import tracing), coverage gap/staleness/consolidation detection
+- User-choice routing: quick task (directory + planner + executor), milestone (MILESTONE-CONTEXT.md + new-milestone --auto), or done — with zero-recommendation skip
+- Documentation updates to help.md, USER-GUIDE.md, and README.md
+- Gap closure: agent file path fix, model profile registration, Phase 80 verification and traceability
+
+### What Worked
+- Direct agent spawn pattern (no workflow file) — command IS the orchestrator, follows audit-tests.md pattern; kept things simple
+- Phase decomposition by concern (infra, agent, routing, docs) — each phase independently verifiable
+- Audit-driven gap closure: audit found Phase 82 (agent path) and Phase 83 (verification artifacts) needs, both addressed in ~10 minutes
+- Reuse of PR review routing pattern for quick task/milestone paths — same planner/executor delegation, different input formatting
+
+### What Was Inefficient
+- Phase 82 lacks SUMMARY.md and VERIFICATION.md — functionally complete but documentation gap persists as tech debt
+- REQUIREMENTS.md checklist (`[ ]`) was not updated in sync with traceability table during execution — Phase 83 had to fix 20/23 unchecked items
+- RTE-01–06 attributed to Phase 83 in traceability table instead of Phase 80 — Phase 83 only verified, Phase 80 implemented
+
+### Patterns Established
+- User-choice routing over auto-scoring: test findings too subjective for numeric heuristics — quick/milestone/done choice works better
+- Dual-signal test mapping (naming + imports): naming conventions alone miss aliased imports
+- `## REVIEWER COMPLETE` / `## REVIEWER SKIPPED` structured return blocks for downstream parsing (mirrors steward's `## STEWARD COMPLETE`)
+
+### Key Lessons
+- Always update REQUIREMENTS.md checklist simultaneously with traceability table during execution — post-hoc fixing wastes a gap closure phase
+- Agent deployment path matters: `agents/` (repo) vs `~/.claude/agents/` (runtime) must be explicit in phase planning
+- Verification artifacts should be created during phase execution, not deferred — Phase 82's missing docs became audit tech debt
+
+### Cost Observations
+- Sessions: 1 (autopilot run)
+- Notable: fastest milestone yet (~1 hour for 6 phases, 7 plans) — smallest code volume but clean pattern reuse from v2.2/v2.8
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -703,12 +742,13 @@
 | v2.6 | ~40 | 7 | Unified validation module — check registry pattern, 3 consumer migration, auto-repair, test parameterization |
 | v2.7 | ~20 | 4 | Playwright UI testing — three-tier detection, agent lifecycle, command, workflow integration, zero gap closure |
 | v2.8 | 11 | 3 | Test steward consolidation bridge — workflow-only milestone, gap type addition, budget gating, zero gap closure |
+| v2.9 | 28 | 6 | Test review command — direct agent spawn pattern, user-choice routing, dual-signal test mapping |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 13 of 16 milestones (v2.1, v2.7, v2.8 are clean passes)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 12 of 16 milestones; v2.1, v2.7, v2.8 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 12 of 16 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 14 of 17 milestones (v2.1, v2.7, v2.8 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 13 of 17 milestones; v2.1, v2.7, v2.8 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 13 of 17 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
