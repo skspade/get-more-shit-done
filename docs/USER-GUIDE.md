@@ -364,6 +364,7 @@ When you run `/gsd:add-tests [phase]`, GSD classifies implementation files into 
 | `/gsd:ui-test [phase] [url]` | Generate and run Playwright E2E tests | After UI is deployed or running locally |
 | `/gsd:add-tests [phase]` | Add unit and E2E tests to a phase | After execution, to boost test coverage |
 | `/gsd:pr-review [flags] [aspects...]` | Route PR review findings to quick task or milestone | Have PR review feedback to act on |
+| `/gsd:test-review [--report-only]` | Analyze diff for test coverage gaps and route findings | After code changes, to check test health |
 
 ---
 
@@ -680,6 +681,48 @@ When no flag override is provided, GSD scores findings: +2 per critical, +1 per 
 ```
 
 After completion, GSD displays a banner with route taken, report path, and artifacts created. The permanent review report at `.planning/reviews/YYYY-MM-DD-pr-review.md` serves as an audit trail.
+
+### Test Review
+
+Analyze your branch diff for test coverage gaps, stale tests, and consolidation opportunities. Unlike PR review (which auto-scores and routes), test review lets you choose how to handle findings.
+
+#### Pipeline
+
+```
+  /gsd:test-review
+         |
+         +-- Gather diff vs main (summarized if >2000 lines)
+         |
+         +-- Spawn gsd-test-reviewer agent
+         |     Map changed files to tests, detect gaps
+         |
+         +-- Write report to .planning/reviews/
+         |
+         +-- Route (user choice)
+               |
+               +-- Quick task --> fix findings now
+               +-- Milestone --> comprehensive test improvement
+               +-- Done --> keep report, no action
+```
+
+#### Flags
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Full analysis with user-choice routing |
+| `--report-only` | Write report and exit, skip routing |
+
+#### Examples
+
+```
+# Run test review with routing options
+/gsd:test-review
+
+# Generate report only, no routing
+/gsd:test-review --report-only
+```
+
+After completion, GSD displays a banner with route taken (if any), report path, and artifacts created. The permanent report at `.planning/reviews/YYYY-MM-DD-test-review.md` serves as an audit trail.
 
 ---
 
