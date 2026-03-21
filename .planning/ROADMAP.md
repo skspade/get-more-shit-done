@@ -203,9 +203,7 @@
 - [x] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations (completed 2026-03-21)
 - [x] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done (completed 2026-03-21)
 - [x] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command (completed 2026-03-21)
-- [ ] **Phase 82: Fix Agent Path and Model Profile** - Fix critical integration issues: agent file path, model profile entry, unused init fields (Gap Closure)
-- [ ] **Phase 83: Phase 80 Verification and Traceability** - Verify Phase 80 routing work and update traceability table (Gap Closure)
-- [ ] **Phase 82: Fix Agent Path and Model Profile** - Fix critical integration issues: agent file path, model profile entry, unused init fields (Gap Closure)
+- [x] **Phase 82: Fix Agent Path and Model Profile** - Fix critical integration issues: agent file path, model profile entry, unused init fields (Gap Closure) (completed 2026-03-21)
 - [ ] **Phase 83: Phase 80 Verification and Traceability** - Verify Phase 80 routing work and update traceability table (Gap Closure)
 
 ## Phase Details
@@ -277,10 +275,10 @@ Plans:
   1. `gsd-test-reviewer` agent file exists at `~/.claude/agents/gsd-test-reviewer.md`
   2. `MODEL_PROFILES` in `core.cjs` includes `gsd-test-reviewer` entry matching `gsd-test-steward` profile
   3. `cmdInitTestReview` no longer returns unused `checker_model` / `verifier_model` fields
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 82-01: TBD
+- [x] 82-01: Deploy agent file, register model profile, remove unused init fields
 
 ### Phase 83: Phase 80 Verification and Traceability
 **Goal**: Phase 80 routing work is independently verified and all traceability artifacts are complete
