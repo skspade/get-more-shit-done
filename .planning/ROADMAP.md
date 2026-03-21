@@ -215,10 +215,11 @@
   2. Running `/gsd:test-review` when no diff exists vs main exits gracefully with a clear message
   3. Running `/gsd:test-review --report-only` produces a report file at `.planning/reviews/YYYY-MM-DD-test-review.md`, commits it, and exits without routing prompts
   4. Large diffs (>2000 lines) switch to summarized mode automatically instead of passing the full diff to the agent
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 78-01: TBD
+- [ ] 78-01-PLAN.md — Init function and gsd-tools dispatch for test-review
+- [ ] 78-02-PLAN.md — test-review.md command file with diff gathering, banner, agent spawn, report persistence
 
 ### Phase 79: Analysis Agent
 **Goal**: The agent accurately identifies test coverage gaps, stale tests, missing test files, and consolidation opportunities scoped to the current diff
