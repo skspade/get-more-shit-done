@@ -285,6 +285,6 @@ Plans:
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78. Command Spec and Infrastructure | 2/2 | Complete    | 2026-03-21 | - |
-| 79. Analysis Agent | 1/1 | Complete   | 2026-03-21 | - |
+| 79. Analysis Agent | 1/1 | Complete    | 2026-03-21 | - |
 | 80. Routing | v2.9 | 0/0 | Not started | - |
 | 81. Documentation | v2.9 | 0/0 | Not started | - |
