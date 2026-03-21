@@ -201,7 +201,7 @@
 
 - [x] **Phase 78: Command Spec and Infrastructure** - Command orchestrator, init function, diff gathering, report persistence, and edge case handling (completed 2026-03-21)
 - [x] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations (completed 2026-03-21)
-- [ ] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done
+- [x] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done (completed 2026-03-21)
 - [ ] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command
 
 ## Phase Details
@@ -246,10 +246,10 @@ Plans:
   3. Milestone route writes MILESTONE-CONTEXT.md from findings and delegates to `/gsd:new-milestone --auto`
   4. When no issues are found (zero recommendations), routing is skipped and "no issues found" is displayed
   5. Routing is skipped entirely when `--report-only` flag was set
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 80-01: TBD
+- [x] 80-01-PLAN.md — Add routing logic to test-review command (completed 2026-03-21)
 
 ### Phase 81: Documentation
 **Goal**: Users can discover and learn how to use `/gsd:test-review` from project documentation
@@ -286,5 +286,5 @@ Plans:
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78. Command Spec and Infrastructure | 2/2 | Complete    | 2026-03-21 | - |
 | 79. Analysis Agent | 1/1 | Complete    | 2026-03-21 | - |
-| 80. Routing | v2.9 | 0/0 | Not started | - |
+| 80. Routing | v2.9 | 1/1 | Complete | 2026-03-21 |
 | 81. Documentation | v2.9 | 0/0 | Not started | - |
