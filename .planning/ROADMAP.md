@@ -18,7 +18,7 @@
 - ✅ **v2.6 Unified Validation Module** — Phases 64-70 (shipped 2026-03-17)
 - ✅ **v2.7 Playwright UI Testing Integration** — Phases 71-74 (shipped 2026-03-20)
 - ✅ **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (shipped 2026-03-20)
-- 🚧 **v2.9 Test Review Command** — Phases 78-81 (in progress)
+- 🚧 **v2.9 Test Review Command** — Phases 78-83 (in progress)
 
 ## Phases
 
@@ -203,6 +203,10 @@
 - [x] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations (completed 2026-03-21)
 - [x] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done (completed 2026-03-21)
 - [x] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command (completed 2026-03-21)
+- [ ] **Phase 82: Fix Agent Path and Model Profile** - Fix critical integration issues: agent file path, model profile entry, unused init fields (Gap Closure)
+- [ ] **Phase 83: Phase 80 Verification and Traceability** - Verify Phase 80 routing work and update traceability table (Gap Closure)
+- [ ] **Phase 82: Fix Agent Path and Model Profile** - Fix critical integration issues: agent file path, model profile entry, unused init fields (Gap Closure)
+- [ ] **Phase 83: Phase 80 Verification and Traceability** - Verify Phase 80 routing work and update traceability table (Gap Closure)
 
 ## Phase Details
 
@@ -264,6 +268,34 @@ Plans:
 Plans:
 - [ ] 81-01: TBD
 
+### Phase 82: Fix Agent Path and Model Profile
+**Goal**: Agent file is deployed to the correct runtime path and model profile is registered so the test-review command works end-to-end
+**Depends on**: Phase 79
+**Requirements**: CMD-01 (agent spawn), AGT-01–AGT-08 (agent functionality depends on correct path)
+**Gap Closure:** Closes integration gaps and E2E flow break from v2.9 audit
+**Success Criteria** (what must be TRUE):
+  1. `gsd-test-reviewer` agent file exists at `~/.claude/agents/gsd-test-reviewer.md`
+  2. `MODEL_PROFILES` in `core.cjs` includes `gsd-test-reviewer` entry matching `gsd-test-steward` profile
+  3. `cmdInitTestReview` no longer returns unused `checker_model` / `verifier_model` fields
+**Plans**: TBD
+
+Plans:
+- [ ] 82-01: TBD
+
+### Phase 83: Phase 80 Verification and Traceability
+**Goal**: Phase 80 routing work is independently verified and all traceability artifacts are complete
+**Depends on**: Phase 80, Phase 82
+**Requirements**: RTE-01, RTE-02, RTE-03, RTE-04, RTE-05, RTE-06
+**Gap Closure:** Closes 6 unsatisfied requirements from v2.9 audit
+**Success Criteria** (what must be TRUE):
+  1. VERIFICATION.md exists for Phase 80 confirming RTE-01 through RTE-06
+  2. REQUIREMENTS.md traceability table shows RTE-01–RTE-06 as Done
+  3. SUMMARY frontmatter for phases 78, 79, 80 includes `requirements-completed`
+**Plans**: TBD
+
+Plans:
+- [ ] 83-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -288,3 +320,5 @@ Plans:
 | 79. Analysis Agent | 1/1 | Complete    | 2026-03-21 | - |
 | 80. Routing | v2.9 | 1/1 | Complete | 2026-03-21 |
 | 81. Documentation | 1/1 | Complete    | 2026-03-21 | - |
+| 82. Fix Agent Path and Model Profile | v2.9 | 0/0 | Not Started | — |
+| 83. Phase 80 Verification and Traceability | v2.9 | 0/0 | Not Started | — |
