@@ -87,6 +87,7 @@ For one-off work that doesn't need full planning:
 | `/gsd:ui-test` | Generate and run Playwright E2E tests |
 | `/gsd:add-tests` | Add unit and E2E tests to a phase |
 | `/gsd:pr-review` | Route PR review findings to quick task or milestone |
+| `/gsd:test-review` | Analyze test coverage gaps for current branch diff |
 | `/gsd:progress` | Show current status |
 | `/gsd:help` | All commands and usage |
 
