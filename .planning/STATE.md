@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Test Review Command
-status: executing
+status: ready_to_plan
 last_updated: "2026-03-21"
 progress:
   total_phases: 4
