@@ -38,9 +38,9 @@ Requirements for `/gsd:test-review` — PR diff-aware test review command.
 
 ### Documentation
 
-- [ ] **DOC-01**: help.md updated with `/gsd:test-review` command reference
-- [ ] **DOC-02**: USER-GUIDE.md updated with test review usage guide and examples
-- [ ] **DOC-03**: README.md updated with test-review in command table
+- [x] **DOC-01**: help.md updated with `/gsd:test-review` command reference
+- [x] **DOC-02**: USER-GUIDE.md updated with test review usage guide and examples
+- [x] **DOC-03**: README.md updated with test-review in command table
 
 ## Future Requirements
 
@@ -87,9 +87,9 @@ Requirements for `/gsd:test-review` — PR diff-aware test review command.
 | RTE-04 | Phase 80 | Pending |
 | RTE-05 | Phase 80 | Pending |
 | RTE-06 | Phase 80 | Pending |
-| DOC-01 | Phase 81 | Pending |
-| DOC-02 | Phase 81 | Pending |
-| DOC-03 | Phase 81 | Pending |
+| DOC-01 | Phase 81 | Complete |
+| DOC-02 | Phase 81 | Complete |
+| DOC-03 | Phase 81 | Complete |
 
 **Coverage:**
 - v2.9 requirements: 23 total

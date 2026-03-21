@@ -202,7 +202,7 @@
 - [x] **Phase 78: Command Spec and Infrastructure** - Command orchestrator, init function, diff gathering, report persistence, and edge case handling (completed 2026-03-21)
 - [x] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations (completed 2026-03-21)
 - [x] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done (completed 2026-03-21)
-- [ ] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command
+- [x] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command (completed 2026-03-21)
 
 ## Phase Details
 
@@ -287,4 +287,4 @@ Plans:
 | 78. Command Spec and Infrastructure | 2/2 | Complete    | 2026-03-21 | - |
 | 79. Analysis Agent | 1/1 | Complete    | 2026-03-21 | - |
 | 80. Routing | v2.9 | 1/1 | Complete | 2026-03-21 |
-| 81. Documentation | v2.9 | 0/0 | Not started | - |
+| 81. Documentation | 1/1 | Complete    | 2026-03-21 | - |
