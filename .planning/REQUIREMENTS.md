@@ -67,35 +67,35 @@ Requirements for `/gsd:test-review` — PR diff-aware test review command.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | — | Pending |
-| CMD-02 | — | Pending |
-| CMD-03 | — | Pending |
-| CMD-04 | — | Pending |
-| CMD-05 | — | Pending |
-| CMD-06 | — | Pending |
-| AGT-01 | — | Pending |
-| AGT-02 | — | Pending |
-| AGT-03 | — | Pending |
-| AGT-04 | — | Pending |
-| AGT-05 | — | Pending |
-| AGT-06 | — | Pending |
-| AGT-07 | — | Pending |
-| AGT-08 | — | Pending |
-| RTE-01 | — | Pending |
-| RTE-02 | — | Pending |
-| RTE-03 | — | Pending |
-| RTE-04 | — | Pending |
-| RTE-05 | — | Pending |
-| RTE-06 | — | Pending |
-| DOC-01 | — | Pending |
-| DOC-02 | — | Pending |
-| DOC-03 | — | Pending |
+| CMD-01 | Phase 78 | Pending |
+| CMD-02 | Phase 78 | Pending |
+| CMD-03 | Phase 78 | Pending |
+| CMD-04 | Phase 78 | Pending |
+| CMD-05 | Phase 78 | Pending |
+| CMD-06 | Phase 78 | Pending |
+| AGT-01 | Phase 79 | Pending |
+| AGT-02 | Phase 79 | Pending |
+| AGT-03 | Phase 79 | Pending |
+| AGT-04 | Phase 79 | Pending |
+| AGT-05 | Phase 79 | Pending |
+| AGT-06 | Phase 79 | Pending |
+| AGT-07 | Phase 79 | Pending |
+| AGT-08 | Phase 79 | Pending |
+| RTE-01 | Phase 80 | Pending |
+| RTE-02 | Phase 80 | Pending |
+| RTE-03 | Phase 80 | Pending |
+| RTE-04 | Phase 80 | Pending |
+| RTE-05 | Phase 80 | Pending |
+| RTE-06 | Phase 80 | Pending |
+| DOC-01 | Phase 81 | Pending |
+| DOC-02 | Phase 81 | Pending |
+| DOC-03 | Phase 81 | Pending |
 
 **Coverage:**
 - v2.9 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after initial definition*
+*Last updated: 2026-03-21 after roadmap creation*

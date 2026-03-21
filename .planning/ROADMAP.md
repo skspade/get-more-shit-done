@@ -18,6 +18,7 @@
 - ✅ **v2.6 Unified Validation Module** — Phases 64-70 (shipped 2026-03-17)
 - ✅ **v2.7 Playwright UI Testing Integration** — Phases 71-74 (shipped 2026-03-20)
 - ✅ **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (shipped 2026-03-20)
+- 🚧 **v2.9 Test Review Command** — Phases 78-81 (in progress)
 
 ## Phases
 
@@ -194,6 +195,74 @@
 
 </details>
 
+### v2.9 Test Review Command (In Progress)
+
+**Milestone Goal:** Add `/gsd:test-review` command for PR diff-aware test analysis with structured reporting and user-choice routing
+
+- [ ] **Phase 78: Command Spec and Infrastructure** - Command orchestrator, init function, diff gathering, report persistence, and edge case handling
+- [ ] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations
+- [ ] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done
+- [ ] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command
+
+## Phase Details
+
+### Phase 78: Command Spec and Infrastructure
+**Goal**: User can invoke `/gsd:test-review` and receive a structured analysis report written to disk
+**Depends on**: Nothing (first phase in v2.9)
+**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06
+**Success Criteria** (what must be TRUE):
+  1. User can run `/gsd:test-review` and see a banner with changed file count, test count, and budget status
+  2. Running `/gsd:test-review` when no diff exists vs main exits gracefully with a clear message
+  3. Running `/gsd:test-review --report-only` produces a report file at `.planning/reviews/YYYY-MM-DD-test-review.md`, commits it, and exits without routing prompts
+  4. Large diffs (>2000 lines) switch to summarized mode automatically instead of passing the full diff to the agent
+**Plans**: TBD
+
+Plans:
+- [ ] 78-01: TBD
+
+### Phase 79: Analysis Agent
+**Goal**: The agent accurately identifies test coverage gaps, stale tests, missing test files, and consolidation opportunities scoped to the current diff
+**Depends on**: Phase 78
+**Requirements**: AGT-01, AGT-02, AGT-03, AGT-04, AGT-05, AGT-06, AGT-07, AGT-08
+**Success Criteria** (what must be TRUE):
+  1. Agent maps changed source files to related test files using naming conventions and import tracing — not naming alone
+  2. Agent report lists coverage gaps (new/modified exports without tests), missing test files, stale tests (referencing removed/renamed functions), and consolidation opportunities in categorized sections with priority-ordered actions
+  3. Agent never modifies any source or test files during analysis
+  4. Agent report includes current test count, budget status, and estimated impact of recommendations
+  5. Report is structured markdown with summary stats usable by downstream routing
+**Plans**: TBD
+
+Plans:
+- [ ] 79-01: TBD
+
+### Phase 80: Routing
+**Goal**: User can act on test review findings by choosing quick task, milestone, or done
+**Depends on**: Phase 78, Phase 79
+**Requirements**: RTE-01, RTE-02, RTE-03, RTE-04, RTE-05, RTE-06
+**Success Criteria** (what must be TRUE):
+  1. After report display, user is prompted to choose between quick task, milestone, or done
+  2. Quick task route creates a task directory with test recommendations as structured context for the planner
+  3. Milestone route writes MILESTONE-CONTEXT.md from findings and delegates to `/gsd:new-milestone --auto`
+  4. When no issues are found (zero recommendations), routing is skipped and "no issues found" is displayed
+  5. Routing is skipped entirely when `--report-only` flag was set
+**Plans**: TBD
+
+Plans:
+- [ ] 80-01: TBD
+
+### Phase 81: Documentation
+**Goal**: Users can discover and learn how to use `/gsd:test-review` from project documentation
+**Depends on**: Phase 78, Phase 79, Phase 80
+**Requirements**: DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. help.md contains `/gsd:test-review` command reference with flags and usage
+  2. USER-GUIDE.md contains a test review usage guide with examples
+  3. README.md command table includes test-review entry
+**Plans**: TBD
+
+Plans:
+- [ ] 81-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -214,3 +283,7 @@
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
+| 78. Command Spec and Infrastructure | v2.9 | 0/0 | Not started | - |
+| 79. Analysis Agent | v2.9 | 0/0 | Not started | - |
+| 80. Routing | v2.9 | 0/0 | Not started | - |
+| 81. Documentation | v2.9 | 0/0 | Not started | - |
