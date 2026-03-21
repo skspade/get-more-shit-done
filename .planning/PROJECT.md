@@ -114,6 +114,12 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
+- [ ] `/gsd:test-review` command spec with argument parsing and `--report-only` flag — v2.9
+- [ ] `gsd-test-reviewer` read-only agent with 6-step diff-aware analysis (coverage gaps, staleness, consolidation) — v2.9
+- [ ] Structured markdown report output to `.planning/reviews/YYYY-MM-DD-test-review.md` — v2.9
+- [ ] User-choice routing after report: quick task, milestone, or done — v2.9
+- [ ] Documentation in help.md, USER-GUIDE.md, README.md — v2.9
+
 ### Out of Scope
 
 - Claude Agent SDK harness — native-first approach, SDK is a future option
@@ -218,7 +224,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v2.8 with test steward consolidation bridge. 16 milestones shipped (v1.0-v2.8) across 77 phases, 113 plans. 826 tests (budget at 103.25% — over budget, 3 consolidation proposals pending with estimated reduction to 809). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete works without human input. Test steward consolidation proposals now wire into actionable gap closure phases during milestone audit.
+Shipped v2.8 with test steward consolidation bridge. 16 milestones shipped (v1.0-v2.8) across 77 phases, 113 plans. 826 tests (budget at 103.25% — over budget, 3 consolidation proposals pending with estimated reduction to 809). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete works without human input. Test steward consolidation proposals now wire into actionable gap closure phases during milestone audit. Starting v2.9: `/gsd:test-review` command for PR diff-aware test recommendations.
 
 **Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. Unified `validation.cjs` with 21 checks across 4 categories (structure, state, navigation, readiness), auto-repair, and 3 consumer paths (CLI, autopilot, gsd-tools). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-route to `/gsd:new-milestone --auto`. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation). Test steward consolidation bridge: `gaps.test_consolidation` schema → budget gating → strategy-to-task mapping → gap closure phase creation. `/gsd:ui-test` for on-demand Playwright E2E testing with `gsd-playwright` agent lifecycle.
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP, Playwright (E2E)
@@ -226,4 +232,4 @@ Shipped v2.8 with test steward consolidation bridge. 16 milestones shipped (v1.0
 **Known tech debt:** Test budget at 103.25% (826/800) — 3 consolidation proposals pending (estimated reduction to 809); `extractFrontmatter` does not parse nested YAML array-of-objects (gaps.test_consolidation entries parsed as strings, not objects — LLM path unaffected); `playwright-detect --raw` documented as JSON in 3 consumers but returns plain string; SUMMARY frontmatter references non-existent `parsePlaywrightOutput()` (actual: `parseTestOutput` with 'playwright' arg); scaffolding templates omit `webServer` block; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys)
 
 ---
-*Last updated: 2026-03-20 after v2.8 milestone*
+*Last updated: 2026-03-21 after v2.9 milestone started*
