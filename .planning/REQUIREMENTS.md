@@ -67,12 +67,12 @@ Requirements for `/gsd:test-review` — PR diff-aware test review command.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 78 | Pending |
-| CMD-02 | Phase 78 | Pending |
-| CMD-03 | Phase 78 | Pending |
-| CMD-04 | Phase 78 | Pending |
-| CMD-05 | Phase 78 | Pending |
-| CMD-06 | Phase 78 | Pending |
+| CMD-01 | Phase 78 | Done |
+| CMD-02 | Phase 78 | Done |
+| CMD-03 | Phase 78 | Done |
+| CMD-04 | Phase 78 | Done |
+| CMD-05 | Phase 78 | Done |
+| CMD-06 | Phase 78 | Done |
 | AGT-01 | Phase 79 | Pending |
 | AGT-02 | Phase 79 | Pending |
 | AGT-03 | Phase 79 | Pending |

@@ -199,7 +199,7 @@
 
 **Milestone Goal:** Add `/gsd:test-review` command for PR diff-aware test analysis with structured reporting and user-choice routing
 
-- [ ] **Phase 78: Command Spec and Infrastructure** - Command orchestrator, init function, diff gathering, report persistence, and edge case handling
+- [x] **Phase 78: Command Spec and Infrastructure** - Command orchestrator, init function, diff gathering, report persistence, and edge case handling (completed 2026-03-21)
 - [ ] **Phase 79: Analysis Agent** - Read-only agent with diff-aware test mapping, coverage gap detection, staleness detection, and consolidation recommendations
 - [ ] **Phase 80: Routing** - User-choice routing after report display: quick task, milestone, or done
 - [ ] **Phase 81: Documentation** - help.md, USER-GUIDE.md, and README.md updates for test-review command
@@ -284,7 +284,7 @@ Plans:
 | 64-70 | v2.6 | 12/12 | Complete | 2026-03-17 |
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
-| 78. Command Spec and Infrastructure | v2.9 | 0/0 | Not started | - |
+| 78. Command Spec and Infrastructure | 2/2 | Complete   | 2026-03-21 | - |
 | 79. Analysis Agent | v2.9 | 0/0 | Not started | - |
 | 80. Routing | v2.9 | 0/0 | Not started | - |
 | 81. Documentation | v2.9 | 0/0 | Not started | - |
