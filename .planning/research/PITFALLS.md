@@ -1,151 +1,142 @@
 # Pitfalls Research
 
-**Domain:** Adding a new gap type to an existing gap-closure workflow; bridging read-only analysis agent output into executable phases (GSD v2.8)
-**Researched:** 2026-03-20
-**Confidence:** HIGH (direct codebase analysis of every touchpoint)
+**Domain:** Diff-aware test review command (`/gsd:test-review`) — git diff parsing, test file mapping, LLM-based analysis, and routing integration in GSD v2.9
+**Researched:** 2026-03-21
+**Confidence:** HIGH (direct codebase analysis of design doc, existing patterns, and all integration points)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Frontmatter Schema Extended in One Place, Parsed in Another
+### Pitfall 1: Git Diff Exceeds LLM Context Window on Large Branches
 
 **What goes wrong:**
-`gaps.test_consolidation` is added to the YAML frontmatter written by `audit-milestone.md` but the only consumer of that frontmatter is `plan-milestone-gaps.md` (and `autopilot.mjs`, which reads `status` via `gsd-tools frontmatter get`). If the schema change is made in `audit-milestone.md` without simultaneously updating `plan-milestone-gaps.md`'s parsing step, the new gap type is silently ignored. The workflow reads `gaps.requirements`, `gaps.integration`, and `gaps.flows` by name — a new fourth key that nobody reads produces no error and no consolidation phases. The milestone passes the audit loop unchanged.
+The command runs `git diff main...HEAD` and passes the full diff as part of the `<test-review-input>` XML block to the `gsd-test-reviewer` agent. Long-lived branches or branches touching many files produce diffs of 10,000+ lines. Combined with the changed file list, test file list, test config, and the agent's own prompt, the input exceeds the agent's effective context window. The agent either truncates analysis (silently dropping late-in-diff files), hallucinates coverage gaps for files it cannot see fully, or fails outright with a context error.
 
 **Why it happens:**
-The YAML frontmatter parsing in `plan-milestone-gaps.md` uses explicit field enumeration: "Parse YAML frontmatter to extract structured gaps: `gaps.requirements` — `gaps.integration` — `gaps.flows`." There is no generic "iterate all gap types" loop. Adding a new key to the schema at write time without touching the read side is a classic two-phase schema change mistake where tests don't catch it because the audit still exits 0.
+The design passes `{full git diff main...HEAD}` without any size gate. The pr-review command avoids this by running a toolkit that processes incrementally, but test-review sends the raw diff as a single blob. There is no precedent in the existing GSD commands for passing large git diffs directly to an agent — the pr-review toolkit handles its own diff reading internally.
 
 **How to avoid:**
-Treat the audit-write side and the plan-gaps-read side as a single atomic change. Phase 1 of the roadmap must touch both files in the same plan, not in separate phases. Add an explicit check to the plan-milestone-gaps success criteria: verify that all four gap types are parsed, not just the original three.
+Add a diff size gate in the command spec before spawning the agent. Measure the diff in lines (`git diff main...HEAD | wc -l`). If above a threshold (suggested: 2,000 lines), switch to a summarized mode: pass only the `--stat` output and changed file list instead of the full diff, and instruct the agent to read specific files via its Read/Grep tools as needed during analysis. The agent already has Read, Bash, Grep, and Glob tools — let it pull details on demand rather than receiving everything upfront.
 
 **Warning signs:**
-- `plan-milestone-gaps` output says "N requirements, M integration, K flows gaps" but never mentions consolidation proposals even when MILESTONE-AUDIT.md has `gaps.test_consolidation` with items
-- Milestone completes without a consolidation phase being created despite `consolidation_proposals: 2` in audit frontmatter
-- `gsd-tools frontmatter get` on the audit file shows the key exists but no phase was created for it
+- Agent report covers only files early in the diff alphabetically and ignores later files
+- Agent produces recommendations for files not actually in the diff (hallucination from context overflow)
+- Agent Task() call fails or returns truncated output on branches with many changes
 
 **Phase to address:**
-Phase 1 (schema extension + parsing update) — both the audit write and the plan-gaps read must be in the same implementation phase. Split them and you will merge broken.
+Phase 1 (command spec) — the diff size gate and fallback strategy must be defined in the command spec before implementation. Retrofitting it means changing both the command and the agent prompt.
 
 ---
 
-### Pitfall 2: Confusing `test_health` Aggregation Key with `gaps.test_consolidation` Gap Key
+### Pitfall 2: Test File Mapping Uses Only Naming Convention, Misses Non-Standard Patterns
 
 **What goes wrong:**
-The MILESTONE-AUDIT.md frontmatter already has a `test_health` top-level key (not nested under `gaps`). The new feature adds `gaps.test_consolidation`. These are structurally different: `test_health` is informational metadata from the steward; `gaps.test_consolidation` is actionable data that triggers phase creation. If the implementation places consolidation proposals under `test_health.consolidation_proposals` (an array of proposal objects) instead of under `gaps.test_consolidation` (the new key), `plan-milestone-gaps` will not find them when it reads the `gaps` section.
-
-The current `test_health` schema is:
-```yaml
-test_health:
-  budget_status: "Over Budget"
-  redundant_tests: 3
-  stale_tests: 0
-  consolidation_proposals: 2  # ← integer count only, not proposal objects
-```
-
-The `consolidation_proposals` field is a count, not the proposals themselves. The actual proposals are only in the markdown body of the steward's report.
+The agent's step 2 (Coverage Gap Analysis) maps source files to test files using naming conventions: `foo.ts` maps to `foo.test.ts` or `foo.spec.ts`. This misses projects (including this one) where test files live in a `__tests__/` directory, where test file names don't match source file names, or where a single test file covers multiple source modules. The agent flags "missing test coverage" for files that are actually well-tested under a different naming scheme, producing false positive recommendations that waste developer time.
 
 **Why it happens:**
-The steward returns a markdown report as its output, not structured YAML. The `consolidation_proposals: 2` in `test_health` is a count extracted by `audit-milestone.md` when it writes the audit file. The actual proposal objects (strategy, source files, action, estimated reduction) exist only in the steward's free-form markdown. To populate `gaps.test_consolidation`, `audit-milestone.md` must parse the steward report markdown to extract structured proposal data — something it does not currently do.
+The design doc says "check if a corresponding test file exists (naming conventions: `foo.ts` -> `foo.test.ts`, `foo.spec.ts`)" — a 1:1 name-based mapping. In this codebase, test files like `testing.test.cjs` cover `testing.cjs`, but `validation.test.cjs` covers both `validation.cjs` and parts of `phase.cjs`. The naming convention heuristic has no way to discover that `phase.cjs` functions are tested in `validation.test.cjs`.
 
 **How to avoid:**
-Define the `gaps.test_consolidation` schema explicitly before writing the audit step. Each item needs: `strategy`, `source_files`, `action`, `estimated_reduction`. The audit workflow must extract this from the steward's structured `#### Proposal N` sections (which have a known format per the steward agent spec). Do not rely on counting — extract the full structured data.
+The agent prompt must instruct it to go beyond naming conventions: after the naming-convention check, the agent should grep test files for import/require statements referencing the changed source file. If `validation.test.cjs` does `require('./validation.cjs')` or `require('./phase.cjs')`, it covers both. This import-graph check catches the common case where test files import source files regardless of naming. The agent has Grep and Read tools — it can do this during analysis without any new infrastructure.
+
+Additionally, the agent should check whether changed functions/exports are referenced by name in any test file, not just the conventionally-named one.
 
 **Warning signs:**
-- `test_health.consolidation_proposals` is `2` but `gaps.test_consolidation` is empty or missing
-- Audit file has consolidation proposals described in prose but no machine-readable list under `gaps`
-- `plan-milestone-gaps` does not create consolidation phases even when steward found proposals
+- Report flags "missing test coverage" for files that have test imports in non-matching test files
+- High count of "missing coverage" recommendations that are false positives
+- Users learn to ignore the report because it cries wolf
 
 **Phase to address:**
-Phase 1 (schema design and audit write) — the shape of `gaps.test_consolidation` must be fully specified before writing either `audit-milestone.md` changes or `plan-milestone-gaps.md` changes.
+Phase 2 (agent definition) — the agent's step 2 instructions must include import-graph checking alongside naming conventions. This is prompt engineering, not infrastructure work.
 
 ---
 
-### Pitfall 3: Autopilot Gap Closure Loop Treats Consolidation Phases as Blocking
+### Pitfall 3: Staleness Detection Produces False Positives for Refactored But Functionally Unchanged Code
 
 **What goes wrong:**
-The autopilot gap closure loop (`runGapClosureLoop()` in `autopilot.mjs`) iterates until `auditStatus === 'passed'`. If `gaps.test_consolidation` causes the audit to return `gaps_found` rather than `tech_debt`, the autopilot will treat consolidation as a blocker and loop until it either creates and executes consolidation phases or exhausts `max_audit_fix_iterations`. Consolidation phases involve pruning, parameterizing, or merging tests — risky changes that the system's own design says "require human approval" (`auto_consolidate` is explicitly false). The autopilot cannot approve its own consolidation proposals.
+The agent's step 3 (Staleness Detection) flags tests as stale when they "reference renamed/removed functions, changed signatures, or deleted modules." But many diffs rename internal variables, refactor implementation details, or change non-public functions — the tests still pass and still test the correct behavior. The agent sees "function `computePhaseStatus` had parameter `opts` renamed to `options`" in the diff and flags every test referencing `computePhaseStatus` as potentially stale, even though the function's public API and behavior are unchanged. The result is a report full of false stale-test warnings.
 
 **Why it happens:**
-`runMilestoneAudit()` routes on three statuses: `passed` (exit 0), `gaps_found` (exit 10), `tech_debt` (exit 0 if `auto_accept_tech_debt=true`). If `test_consolidation` gaps force `gaps_found`, the autopilot enters the fix loop. The fix loop calls `/gsd:plan-milestone-gaps --auto`. If `plan-milestone-gaps` creates consolidation phases, the autopilot executes them. If those phases modify test files, `auto_consolidate: false` is violated.
+The agent analyzes the diff textually — it sees what lines changed but cannot run the tests to verify they still pass. It cannot distinguish between a breaking change (function removed, signature changed incompatibly) and a cosmetic change (internal rename, comment edit, whitespace). Without execution context, any change near a tested function looks potentially stale.
 
 **How to avoid:**
-`gaps.test_consolidation` must map to `tech_debt` audit status, not `gaps_found`. When only consolidation proposals exist (no requirement gaps, no integration gaps, no flow gaps), the audit status must be `tech_debt`. The autopilot's `auto_accept_tech_debt: true` default then routes to completion without triggering the gap closure loop. This is the correct semantic: consolidation is recommended cleanup, not a correctness blocker.
+Instruct the agent to differentiate between exported/public API changes and internal implementation changes. The staleness check should focus on: (1) removed or renamed exports, (2) changed function signatures (parameter count, parameter types if TypeScript), (3) deleted files. Internal refactors within a function body should be flagged as LOW priority at most, not as stale tests. Add a priority field to stale test recommendations: HIGH for removed exports, MEDIUM for signature changes, LOW for internal refactors.
 
-Additionally: `plan-milestone-gaps` must distinguish between consolidation phases (advisory, human-approved) and requirement/integration fix phases (mandatory). The `--auto` flag in the autopilot invocation should skip consolidation phases — they are not auto-plannable.
+Also: the command already has access to `gsd-tools test-run` — consider running the test suite before analysis and including pass/fail status in the agent input. A test that passes is by definition not stale in a breaking way.
 
 **Warning signs:**
-- Autopilot entering `GAP CLOSURE: Iteration N` loop when the only gaps are test consolidation proposals
-- Autopilot creating and executing consolidation phases without human review
-- `max_audit_fix_iterations` exhausted with audit still showing `gaps_found` because consolidation is circular (execute → re-audit → still gaps → loop)
+- Stale test count is high (>5) on a branch with minor refactors
+- All "stale" tests actually pass when run
+- Users stop trusting staleness detection and skip the section
 
 **Phase to address:**
-Phase 1 (schema and status routing) — the `gaps_found` vs `tech_debt` decision logic must explicitly account for consolidation-only gap states before any code is written.
+Phase 2 (agent definition) — staleness detection priority levels must be in the agent prompt. Optionally, Phase 1 could add a pre-analysis test run to the command, but that adds execution time and is not strictly necessary.
 
 ---
 
-### Pitfall 4: Read-Only Agent Output Lacks Machine-Readable Structure for Phase Generation
+### Pitfall 4: Routing Integration Misaligns with Existing Quick Task Infrastructure
 
 **What goes wrong:**
-The test steward produces a markdown report. The `#### Proposal N: {strategy} -- {title}` sections have a consistent format, but markdown parsing is fragile. If the steward's output deviates from the template (extra blank lines, different heading level, different capitalization), the regex or string parsing in `audit-milestone.md` produces empty or malformed proposal data. The `gaps.test_consolidation` list is populated with `null` entries or mismatched fields, and the consolidation phase created by `plan-milestone-gaps` has garbled task descriptions.
+The design says routing after the report follows "existing quick task or milestone patterns" from pr-review. But the quick task pattern in pr-review creates file-region groups with severity, agent, file, line, and fix_suggestion fields. Test-review findings have a different structure: missing tests have file + function + reason + priority; stale tests have test_file + test_name + issue + action; consolidation has strategy + source + action + reduction. If the test-review command tries to reuse pr-review's XML format (`<test-review-findings>` with `<group>` elements), it loses the structural detail. If it invents its own format, the planner that receives it needs to understand a new context schema.
 
 **Why it happens:**
-The steward agent is instructed to produce a specific markdown format but is an LLM — its output can vary between runs. The bridge between read-only analysis output and structured YAML data is a parsing step that is not tested independently. The first time it fails will be in a real milestone audit where the output is slightly different from the test case.
+The design doc's routing section shows an XML format that is simpler than pr-review's format. It groups by type (missing/stale/consolidation) with a single file and action. But a single "missing test" recommendation might involve multiple functions in one file, or one function tested across multiple files. Flattening this into one `<group>` per recommendation loses the nuance that makes the planner's task descriptions accurate.
 
 **How to avoid:**
-Build the extraction as defensively as possible. For each proposal, extract: strategy (from "**Strategy:** {value}" line), source files (from "**Source:** {value}" line), action (from "**Action:** {value}" line), estimated reduction (from "**Estimated reduction:** N test(s)" line). If any required field is missing, skip that proposal and log a warning rather than creating a malformed phase. Add a `proposals_extracted` count to the audit frontmatter and compare it against `consolidation_proposals` count — if they differ, flag it in the audit report.
+Define the quick task context format to match the recommendation structure exactly. Each recommendation type should have its own XML element structure matching its fields from step 5 of the agent. Do not try to unify missing/stale/consolidation into a single generic `<group>` format — they have different fields and different task shapes.
 
-Prefer extracting from the structured markdown body over post-processing the steward's raw return. The `STEWARD COMPLETE` block has known field names.
+For the planner: include the full report path (`.planning/reviews/YYYY-MM-DD-test-review.md`) as a `<files_to_read>` directive so the planner can reference the detailed report, not just the summary XML. The XML provides structure for task creation; the report provides context for task descriptions.
 
 **Warning signs:**
-- `gaps.test_consolidation` items have empty `strategy` or `action` fields
-- Consolidation phase name says "undefined -- undefined" instead of "prune -- stale test removal"
-- Count in `test_health.consolidation_proposals` differs from count of items in `gaps.test_consolidation`
+- Quick task plan has tasks that say "fix test" without specifying which test or what the fix is
+- Planner creates one giant task instead of per-recommendation tasks
+- Milestone context lacks enough detail for discuss-phase to understand the scope
 
 **Phase to address:**
-Phase 2 (audit write implementation) — the proposal extraction logic needs to be explicit and tested with a sample steward report before being wired into the audit workflow.
+Phase 3 (routing implementation) — the context format for quick task and milestone routing must be defined alongside the report format, not as an afterthought.
 
 ---
 
-### Pitfall 5: `plan-milestone-gaps` Proposal-to-Task Mapping Invents Implementation Details
+### Pitfall 5: Agent Recommends Tests That Would Violate Budget
 
 **What goes wrong:**
-When `plan-milestone-gaps` converts a consolidation proposal into a task, it must translate a steward proposal (which names test files and describes an action) into a concrete task (which names files, action, verification, done criteria). For a `parameterize` proposal, the task is "convert N test cases in `file.test.ts` to `test.each(...)` pattern." For a `prune` proposal, the task is "delete N lines from `file.test.ts` referencing `deletedFunction`." If the proposal data extracted from the steward report is vague, `plan-milestone-gaps` fills in the gaps with invented specifics — wrong line numbers, wrong function names, wrong test names — and the executor deletes the wrong tests.
+The agent's step 2 (Coverage Gap Analysis) recommends writing new tests for uncovered functions. But the project has a test budget (800 project-wide, currently at 826/800 or 103.25%). Every "write a test for X" recommendation is a net addition. If the user routes to quick task and the executor writes all recommended tests, the budget goes further over. The test steward then flags the new tests for consolidation in the next milestone audit. The test-review command has created work that the steward immediately wants to undo.
 
 **Why it happens:**
-The gap-to-task mapping for consolidation is semantically richer than requirement gaps. A requirement gap says "REQ-01 unsatisfied — Dashboard doesn't fetch" and the task is "add fetch call." A consolidation proposal says "parameterize 4 near-duplicate tests in `validation.test.ts` lines 45-89" and the task is "refactor those specific tests into one `test.each` block." The specificity requirement is much higher, and the information only comes from the steward's analysis — it cannot be re-derived from scratch.
+The agent receives `test_count` and `test_config` (which includes budget thresholds) in its input, but the design doc does not instruct the agent to factor budget into its recommendations. The agent is told to find gaps and recommend tests — it does not weigh those recommendations against budget constraints.
 
 **How to avoid:**
-The `gaps.test_consolidation` items must carry the full steward proposal data verbatim: the exact source file paths and test names cited by the steward. `plan-milestone-gaps` must use this data directly when creating task descriptions, not re-interpret or paraphrase it. Add a rule to the gap-to-task mapping for consolidation: "Source and action fields come verbatim from the steward proposal. Do not modify or generalize them."
+Include budget status in the agent's analysis. The agent prompt should say: "If test count exceeds or is within 5% of the project budget, note the budget status in the report summary and prioritize consolidation recommendations over new test recommendations. For each 'missing test' recommendation, note whether it would push the budget further over." This lets the human make informed decisions rather than blindly adding tests.
 
-For the `estimated_reduction` field: include it in the phase description so the executor knows how many tests the phase is expected to remove. Include it in the phase's success criteria ("test count decreases by N after this phase").
+The report's "Recommended Actions" section should order recommendations with budget awareness: consolidation first (reduces count), stale test updates second (neutral), new tests last (increases count).
 
 **Warning signs:**
-- Consolidation task descriptions reference test names not present in the source files
-- Executor reports "test not found" when trying to apply consolidation
-- Phase success criteria says "reduce tests by 5" but steward proposal estimated 2
+- Report recommends 10 new tests when budget is already over
+- Quick task execution increases test count, immediately triggering steward warnings
+- User cycle: test-review says "add tests" -> steward says "remove tests" -> repeat
 
 **Phase to address:**
-Phase 2 (plan-milestone-gaps consolidation task template) — the task template for consolidation must be specified before implementation, not derived during execution.
+Phase 2 (agent definition) — budget awareness must be in the agent prompt, not retrofitted after users report the add/remove cycle.
 
 ---
 
-### Pitfall 6: Steward Disabled / No Proposals — Guard Missing in Gap Parser
+### Pitfall 6: `git diff main...HEAD` Fails When Main Is Not Checked Out Locally
 
 **What goes wrong:**
-`plan-milestone-gaps` adds handling for `gaps.test_consolidation` but does not guard against the case where the field is absent (steward disabled) or is an empty list (no proposals). If the code assumes the key exists and tries to iterate it without a null check, the entire `plan-milestone-gaps` command errors out — blocking gap closure for all gap types including requirements and integration gaps that do have entries.
+The command runs `git diff main...HEAD --name-only` as its first step. If the local `main` branch is stale (behind remote) or does not exist (shallow clone, CI environment, or renamed default branch like `master`), the command either diffs against an old main (producing a diff that includes commits already merged) or fails outright with `fatal: ambiguous argument 'main...HEAD'`.
 
 **Why it happens:**
-YAML frontmatter parsing returns `undefined` for missing keys. JavaScript iterating `undefined` throws. This is a straightforward null guard omission, but it is easy to miss when the feature is developed against a test case where the steward always runs and always produces proposals.
+The design hardcodes `main` as the comparison base. Most local development environments have `main` checked out, but it may be behind `origin/main` by weeks. The diff then includes changes already merged to main by other work, producing a bloated diff and recommendations for code the developer did not touch.
 
 **How to avoid:**
-All gap type handlers in `plan-milestone-gaps` must treat missing keys as empty arrays. Add explicit guard: `const consolidationGaps = gaps.test_consolidation || [];`. Test the workflow with an audit file that has no `test_consolidation` key at all, with an empty list, and with a populated list. All three must produce valid output.
+Use `origin/main` instead of `main` as the diff base, with a fallback chain: `origin/main` -> `origin/master` -> `main` -> `master`. Before diffing, run `git fetch origin main --quiet` to ensure the ref is current. If all bases fail, display an error: "Could not determine base branch. Ensure origin/main exists." This mirrors how most CI/CD tools resolve the comparison base.
 
 **Warning signs:**
-- `plan-milestone-gaps` errors on an audit file where steward was disabled or produced no proposals
-- Error message like "Cannot read properties of undefined (reading 'forEach')" in the gap planning step
-- Autopilot halts with debug retries exhausted on a milestone where the only gaps are requirements
+- Report includes recommendations for files the developer did not change on this branch
+- Diff file count is much higher than expected (includes previously merged work)
+- Command fails in CI with "ambiguous argument" error
 
 **Phase to address:**
-Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty `test_consolidation` must be in the first implementation pass, verified with an empty-proposals test case.
+Phase 1 (command spec) — the base branch resolution must be defined before implementation. Changing it later means updating both the command and tests.
 
 ---
 
@@ -153,11 +144,11 @@ Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty 
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Putting consolidation count in `test_health` and full proposals only in prose | Simpler audit write | `plan-milestone-gaps` cannot parse proposals without fragile markdown parsing | Never — define structured `gaps.test_consolidation` from day one |
-| Letting consolidation trigger `gaps_found` instead of `tech_debt` | Simpler status logic | Autopilot loops forever; consolidation phases run without human approval | Never — consolidation is advisory, not a correctness blocker |
-| Hardcoding the three gap type names in `plan-milestone-gaps` | Simpler parser | Adding a fourth type requires editing parser code, not just schema | Acceptable short-term; acceptable for v2.8 since no fifth type is planned |
-| Skipping steward report parsing and manually writing proposals into audit | Avoids brittle markdown parsing | Proposals are stale the moment the test suite changes; removes automation value | Never — the automation value is in the live analysis |
-| Creating consolidation phases for all proposals without priority filter | Simpler planning logic | Minor consolidation proposals (1 test, low value) get full phase overhead | Acceptable for v2.8 since current proposals are 2 known-valuable ones |
+| Passing full diff as a single blob without size gate | Simpler command implementation | Agent hallucinates or truncates on large branches | Never — large diffs are the norm in real work |
+| Name-only test file mapping without import checking | Simpler agent prompt | False positive "missing coverage" erodes trust | Never — import-graph check is one Grep call per file |
+| Hardcoding `main` as diff base | Simpler command | Fails in repos with `master`, CI, or stale local main | Never — fallback chain is trivial to implement |
+| Ignoring budget in agent recommendations | Simpler agent prompt | Creates add/remove cycle with test steward | Acceptable for first iteration if budget status is shown in report summary |
+| Single `<group>` XML format for all recommendation types | Simpler routing template | Planner loses structural detail, tasks are vague | Never — each type has different fields that matter for task accuracy |
 
 ---
 
@@ -165,24 +156,48 @@ Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty 
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| `audit-milestone.md` ↔ steward output | Extracting proposal count but not proposal objects; populating `test_health.consolidation_proposals` as integer only | Extract full proposal objects (strategy, source, action, estimated reduction) into `gaps.test_consolidation` array |
-| `audit-milestone.md` ↔ `plan-milestone-gaps.md` | Changing schema in one without updating the other; different field naming conventions | Define the shared schema in a comment block in both files; use exact same key names |
-| `plan-milestone-gaps.md` ↔ `autopilot.mjs` | Consolidation phases triggering the audit re-loop indefinitely | Consolidation gaps must map to `tech_debt` status; `auto_accept_tech_debt: true` handles it |
-| Steward report format ↔ extraction parser | Relying on heading level or exact spacing in free-form markdown | Extract only from labeled fields (`**Strategy:**`, `**Source:**`, `**Action:**`, `**Estimated reduction:**`) within a proposal block; skip malformed proposals |
-| `gaps.test_consolidation` presence ↔ `steward.enabled` config | Creating the key when steward disabled produces empty list that looks like "steward ran and found nothing" | Only add `gaps.test_consolidation` to the audit frontmatter when `STEWARD_ENABLED` is true and the steward report has proposals. When steward is disabled, omit the key entirely. |
+| `test-review.md` command -> `gsd-test-reviewer` agent | Passing too much data upfront (full diff + all test files) instead of letting agent pull on demand | Pass file list and stats; let agent Read/Grep specific files as needed for large diffs |
+| Agent output -> report file | Writing the raw agent output as the report instead of structuring it | Agent produces structured markdown per the output format template; command writes it directly since the agent's output IS the report |
+| Report -> quick task routing | Using pr-review's `<group>` format which loses test-review-specific fields | Define test-review-specific XML context format matching the three recommendation types |
+| `findTestFiles()` in testing.cjs -> agent input | Passing absolute paths which confuse the agent (it expects project-relative) | Convert to relative paths before including in agent input: `path.relative(cwd, filePath)` |
+| `gsd-tools commit` for report persistence | Committing the report before the user has chosen routing — routing then modifies state on top of report commit | Commit the report as a separate commit before routing begins, matching pr-review's pattern |
+| `--report-only` flag -> routing skip | Flag parsed but routing code still prompts the user due to missing early return | Place the `--report-only` exit point immediately after report write, before any routing code |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Running `git diff main...HEAD` twice (once for `--name-only`, once for full) | 2x git overhead on large repos | Capture full diff once, extract file names from it | Repos with >1000 changed files |
+| Agent grepping every test file for imports of every changed file | O(changed * tests) Grep calls, agent runs for 10+ minutes | Limit import-graph check to files without a naming-convention match | Branches touching >20 source files in a repo with >100 test files |
+| `findTestFiles()` walking entire directory tree for every invocation | Slow on large monorepos | Already handled — `EXCLUDE_DIRS` skips `node_modules`, `.git`, etc. | Not a concern for this project's size |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Report recommends tests for generated or vendored files in the diff | User confused by recommendations for files they should not test | Filter out common non-testable patterns: `*.d.ts`, `*.json`, `*.md`, files in `dist/`, `build/`, `vendor/` |
+| No indication of analysis progress on large branches | User waits 2+ minutes with no feedback, thinks command is stuck | Display a banner with file count and estimated scope before spawning agent; agent Task() call will show streaming output via Claude's tool indicators |
+| Report has 30+ recommendations with no prioritization | User overwhelmed, does nothing | Cap "Recommended Actions" at top 10, ordered by priority; full details remain in the categorized sections above |
+| Routing prompt appears after a long report scroll | User loses context of what the recommendations were | Repeat the summary counts (N missing, N stale, N consolidation) inline with the routing prompt |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Schema round-trip verified:** Write a MILESTONE-AUDIT.md with `gaps.test_consolidation` entries, run `plan-milestone-gaps`, confirm consolidation phases are created with correct task descriptions pulled from proposal data
-- [ ] **Empty proposals handled:** `plan-milestone-gaps` with an audit file that has `gaps.test_consolidation: []` completes without error and creates no consolidation phases
-- [ ] **Missing key handled:** `plan-milestone-gaps` with an audit file that has no `test_consolidation` key under `gaps` completes without error
-- [ ] **Steward disabled handled:** Audit run with `test.steward: false` produces an audit file without `gaps.test_consolidation` key; `plan-milestone-gaps` treats it as zero consolidation gaps
-- [ ] **Status routing correct:** An audit with only consolidation proposals (no requirement/integration/flow gaps) produces `tech_debt` status, not `gaps_found`
-- [ ] **Autopilot does not loop on consolidation:** Running autopilot on a milestone with only consolidation proposals completes via `auto_accept_tech_debt` path without entering the gap closure loop
-- [ ] **Proposal count matches extracted items:** `test_health.consolidation_proposals` integer equals length of `gaps.test_consolidation` array in the audit frontmatter
-- [ ] **Existing gap types unaffected:** `plan-milestone-gaps` run with an audit file that has only requirement gaps behaves exactly as it did before v2.8 — no regression
+- [ ] **Large diff handling:** Run the command on a branch with 3000+ lines of diff changes — verify the agent does not hallucinate or truncate
+- [ ] **Stale local main:** Delete local `main` branch, verify command falls back to `origin/main` or `origin/master`
+- [ ] **No diff scenario:** Run on `main` branch itself — verify clean "No changes found vs main" exit
+- [ ] **Budget-over reporting:** Run on a project already over budget — verify report mentions budget status and orders recommendations appropriately
+- [ ] **False positive check:** For each "missing test" recommendation in the report, manually verify the function is actually untested (not tested under a different file name)
+- [ ] **Report persistence:** Verify report is committed to git and appears in `.planning/reviews/`
+- [ ] **`--report-only` flag:** Verify no routing prompt appears and command exits after report write
+- [ ] **Quick task routing:** Verify the planner receives enough context to create specific tasks (not generic "fix tests")
+- [ ] **Milestone routing:** Verify MILESTONE-CONTEXT.md is written with categorized recommendations
+- [ ] **Empty recommendations:** Agent finds no issues — verify report says "no recommendations" and routing prompt is skipped (nothing to route)
 
 ---
 
@@ -190,11 +205,12 @@ Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty 
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Schema written in audit but not read in plan-gaps | LOW | Add parsing for `gaps.test_consolidation` to `plan-milestone-gaps`; no schema migration needed since files are generated fresh per audit |
-| Consolidation wrongly triggers `gaps_found` → autopilot loops | LOW | Change status routing in `audit-milestone.md` to emit `tech_debt` when only consolidation gaps exist; re-run audit |
-| Steward proposal extraction produces garbled tasks | MEDIUM | Run `/gsd:audit-milestone` fresh; steward re-analyzes and produces new proposals; re-extract with fixed parser |
-| Null guard missing → `plan-milestone-gaps` errors | LOW | Add `|| []` guard; re-run; no state corruption since the workflow only reads, then creates new phases |
-| Consolidation phases executed without human approval in autopilot | HIGH | Revert the test file changes via `git revert`; add the `tech_debt`-routing fix; re-run audit |
+| Context overflow on large diff | LOW | Add size gate to command spec; re-run with summarized mode |
+| False positive test mapping | LOW | Update agent prompt to include import-graph check; re-run analysis |
+| Stale base branch | LOW | Switch to `origin/main` with fallback chain; re-run |
+| Budget-unaware recommendations cause test inflation | MEDIUM | Run test steward to identify consolidation targets; manually reconcile; update agent prompt for future runs |
+| Quick task routing loses detail | LOW | Redefine XML context format; re-run routing; existing report is unchanged |
+| Agent produces garbled report format | LOW | Agent prompt defines exact output format — fix prompt, re-run; report is overwritten |
 
 ---
 
@@ -202,25 +218,25 @@ Phase 2 (plan-milestone-gaps implementation) — guard clause for missing/empty 
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Frontmatter written but not read | Phase 1 (atomic schema + parsing change) | `plan-milestone-gaps` creates consolidation phases from a seeded audit file |
-| `test_health` count vs `gaps.test_consolidation` array confusion | Phase 1 (schema design) | Audit frontmatter has both the integer count and the structured array; values agree |
-| Autopilot loops on consolidation-only gaps | Phase 1 (status routing) | Audit with only consolidation proposals returns `tech_debt`; autopilot exits via `auto_accept_tech_debt` |
-| Brittle markdown extraction from steward report | Phase 2 (audit write implementation) | Extraction tested with sample steward report containing all 4 strategies |
-| Consolidation tasks invented rather than verbatim | Phase 2 (task template spec) | Task file/test names match steward proposal exactly; no invented specifics |
-| Missing null guard on `test_consolidation` | Phase 2 (plan-milestone-gaps implementation) | Workflow succeeds with audit file missing the key entirely |
+| Large diff context overflow | Phase 1 (command spec with size gate) | Command on a 3000-line diff uses summarized mode; agent report covers all changed files |
+| Stale/missing `main` branch | Phase 1 (command spec with base branch resolution) | Command succeeds with no local `main` branch; uses `origin/main` fallback |
+| Name-only test mapping false positives | Phase 2 (agent definition with import-graph check) | Agent report for a file tested under non-matching name shows "covered" not "missing" |
+| Staleness false positives from internal refactors | Phase 2 (agent definition with priority levels) | Internal-only refactor produces LOW priority staleness, not HIGH |
+| Budget-unaware recommendations | Phase 2 (agent definition with budget awareness) | Report on over-budget project mentions budget and prioritizes consolidation |
+| Quick task context format mismatch | Phase 3 (routing implementation) | Planner creates per-recommendation tasks with correct specificity from XML context |
+| Routing prompt for empty recommendations | Phase 3 (routing implementation) | Zero-recommendation report skips routing, exits cleanly |
 
 ---
 
 ## Sources
 
 - Direct codebase analysis (HIGH confidence):
-  - `get-shit-done/workflows/audit-milestone.md` step 3.5, step 6 — steward spawn and frontmatter schema; confirms `test_health.consolidation_proposals` is integer count only, not proposal objects
-  - `get-shit-done/workflows/plan-milestone-gaps.md` step 1 — explicit enumeration of three gap types read; confirms new type will be silently ignored without update
-  - `get-shit-done/scripts/autopilot.mjs` lines 862-921 (`runMilestoneAudit`), lines 924-1017 (`runGapClosureLoop`) — exact status routing logic; confirms `gaps_found` triggers loop, `tech_debt` with `auto_accept_tech_debt: true` exits cleanly
-  - `agents/gsd-test-steward.md` step 5 and step 6 — proposal format template (`#### Proposal N: {strategy} -- {title}`, labeled fields) — confirms parseable but fragile
-  - `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live example of `test_health` schema with `consolidation_proposals: 2` as integer; confirms no structured proposal data exists in current frontmatter
-  - `.planning/PROJECT.md` v2.8 target features — confirms the four strategies (prune, parameterize, promote, merge) and the four edge cases (no proposals, steward disabled, only test gaps, autopilot flow)
+  - `.planning/designs/2026-03-20-pr-test-review-command-design.md` — full design doc specifying command flow, agent steps, report format, and routing
+  - `commands/gsd/pr-review.md` and `get-shit-done/workflows/pr-review.md` — existing routing pattern for quick task and milestone delegation; XML context format precedent
+  - `commands/gsd/audit-tests.md` — existing agent-spawn pattern for test analysis; direct spawn without workflow file
+  - `get-shit-done/bin/lib/testing.cjs` — `findTestFiles()` implementation (EXCLUDE_DIRS, TEST_FILE_PATTERNS), `countTestsInProject()`, `getTestConfig()` including budget thresholds
+  - `.planning/PROJECT.md` — v2.9 active requirements, test budget at 826/800 (103.25%), architecture constraints, existing tech debt items
 
 ---
-*Pitfalls research for: GSD v2.8 test steward consolidation bridge*
-*Researched: 2026-03-20*
+*Pitfalls research for: GSD v2.9 diff-aware test review command*
+*Researched: 2026-03-21*

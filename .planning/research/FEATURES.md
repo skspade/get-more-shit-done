@@ -1,157 +1,192 @@
-# Feature Research
+# Feature Landscape
 
-**Domain:** Test steward consolidation bridge — extending GSD autonomous gap closure to cover test suite cleanup
-**Researched:** 2026-03-20
-**Confidence:** HIGH (primary sources are existing GSD codebase, agent specs, workflow files — all directly readable)
+**Domain:** PR diff-aware test review command for autonomous development framework
+**Researched:** 2026-03-21
+**Confidence:** HIGH (primary sources are existing GSD codebase patterns, active PROJECT.md requirements, and domain research)
 
 ## Context: What Already Exists
 
-This milestone adds to an already-complete system. The following are NOT being built:
+This milestone adds a NEW command to an established system. The following are already built and available as dependencies:
 
-- Test steward agent (`gsd-test-steward.md`) — reads test files, produces health report with consolidation proposals (4 strategies: prune, parameterize, promote, merge)
-- `audit-milestone` workflow step 3.5 — spawns steward, stores `steward_report`
-- MILESTONE-AUDIT.md frontmatter `test_health` block — captures `budget_status`, `redundant_tests`, `stale_tests`, `consolidation_proposals` count
-- `plan-milestone-gaps` workflow — parses `gaps.requirements`, `gaps.integration`, `gaps.flows` from audit frontmatter, creates fix phases
+- **Test steward agent** (`gsd-test-steward.md`) — redundancy detection, staleness detection, budget enforcement, consolidation proposals (4 strategies). Read-only analysis agent.
+- **`/gsd:audit-tests` command** — on-demand steward spawning with banner/report presentation pattern.
+- **`/gsd:pr-review` command** — PR diff capture, finding parsing, deduplication, scoring, routing to quick task or milestone. Report written to `.planning/reviews/`.
+- **`testing.cjs`** — `findTestFiles`, `countTestsInProject`, `getTestConfig`, `detectFramework`, `parseTestOutput`. Test file discovery with `EXCLUDE_DIRS` set.
+- **Quick task and milestone routing infrastructure** — `gsd-tools.cjs init`, slug generation, STATE.md updates, executor/planner spawning.
+- **Consolidation bridge** (v2.8) — `gaps.test_consolidation` schema, budget gating, strategy-to-task mapping.
 
-The **gap**: steward proposals are recorded in the audit report body but not in `gaps.*` frontmatter, so `plan-milestone-gaps` currently ignores them entirely. Users who want to act on proposals must do so manually.
+The NEW `/gsd:test-review` command is specifically about **diff-aware** test analysis: given code changes (from a PR or recent commits), what tests need attention?
 
-## Feature Landscape
+## Table Stakes
 
-### Table Stakes (Users Expect These)
-
-Features the consolidation bridge must deliver for the workflow to feel complete.
+Features users expect. Missing = command feels incomplete or broken.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| `gaps.test_consolidation` frontmatter field in MILESTONE-AUDIT.md | The three existing gap types (requirements, integration, flows) all live in structured frontmatter so `plan-milestone-gaps` can parse them. Test consolidation proposals need the same treatment — otherwise they're invisible to the automated gap closure loop. | LOW | New YAML block parallel to `gaps.requirements`. Each entry maps one steward proposal: strategy, source files, action, estimated reduction. `audit-milestone` step 6 must populate this when steward proposals exist. |
-| `plan-milestone-gaps` parses `gaps.test_consolidation` | If the field exists in frontmatter, the gap planner must read it. Missing this means proposals are structured but still silently skipped — the bridge is unfinished. | MEDIUM | Parse proposal list from frontmatter. Each proposal becomes one task in a consolidation cleanup phase. Depends on `gaps.test_consolidation` being present in frontmatter. |
-| Proposal-to-task mapping for all four strategies | Steward produces four strategy types: prune, parameterize, promote, merge. Each maps to a different concrete task action. The planner must know what a "prune" task says vs a "parameterize" task says. Undifferentiated tasks ("do consolidation") are not actionable. | MEDIUM | Prune → "Remove stale test file/function and verify suite passes." Parameterize → "Replace N individual tests with one test.each block, reduce count by N-1." Promote → "Delete unit tests subsumed by integration test." Merge → "Move tests from files A, B into C organized by feature." Each task includes source file paths from the proposal. |
-| Skip gracefully when steward is disabled or no proposals exist | The steward is opt-in (`test.steward` config). When disabled, there are no proposals. `plan-milestone-gaps` must not error or produce empty phases when `gaps.test_consolidation` is absent or empty. | LOW | If field is absent or empty array, continue gap closure as today. No phases created, no error surfaced. |
-| Consolidation phases only created when budget is at or over warning threshold | Test consolidation is a nice-to-have unless there's actual budget pressure. If budget is OK (< 80%), proposals are informational — creating mandatory cleanup phases adds friction without value. | LOW | Gate phase creation on `test_health.budget_status` from frontmatter. `Warning` or `Over Budget` → create phases. `OK` → include proposals in tech debt section, do not create phases. Surfaced to user in the gap plan presentation. |
-| Consolidation phase created as a single phase grouping all proposals | Industry standard: cleanup work is batched rather than scattered across N micro-phases. One "Test Suite Cleanup" phase with N tasks (one per proposal) is easier to track and review than N separate phases. | LOW | Same grouping logic that already applies to related requirement gaps. All consolidation proposals belong to one phase. Phase name: "Test Suite Cleanup" or "Consolidate Test Suite." |
+| Map changed source files to related test files | The core value proposition. If the command cannot connect `src/foo.js` to `tests/foo.test.js`, it provides nothing beyond what `audit-tests` already does. Users invoke this command because they changed code and want to know which tests are affected. | MEDIUM | Heuristic-based: naming convention matching (foo.js -> foo.test.js, foo.spec.js), import/require tracing (which test files `require('./foo')`), directory structure convention. No instrumentation needed — LLM agent reads the files. Depends on: `findTestFiles` from `testing.cjs`. |
+| Detect coverage gaps in changed code | Changed or added functions that have no corresponding test assertions. The most common question after a code change: "did I write tests for what I changed?" | MEDIUM | Agent reads diff hunks, identifies new/modified exported functions, checks if related test files exercise them. Not line-level coverage (that requires instrumentation) — function/export-level gap detection via static analysis by the agent. |
+| Detect stale tests from changed code | When code changes rename, remove, or refactor functions, existing tests may reference deleted exports. Must flag tests that will fail or silently pass with wrong assertions. | LOW | Steward already does staleness detection globally. The diff-aware twist: scope staleness checks to only test files related to changed source files, making it faster and more relevant. |
+| Structured markdown report output | Every GSD analysis command produces a persistent report. Users expect to find it at `.planning/reviews/YYYY-MM-DD-test-review.md` following the `pr-review` pattern. | LOW | Follows `pr-review` report pattern: YAML frontmatter with counts + markdown body with sections. Depends on: `.planning/reviews/` directory (already created by pr-review). |
+| `--report-only` flag for analysis without routing | Not every test review needs to create tasks. Users may want to see the report, decide themselves, then optionally route later. The command must support "just tell me" mode. | LOW | When `--report-only` is set, skip routing step entirely. Display report, write file, exit. Follows the pattern of `--ingest` in pr-review (mode flags alter flow). |
+| User-choice routing after report | Unlike pr-review (which auto-scores and routes), test review findings are more nuanced. Let the user decide: create a quick task, start a milestone, or just take the report and go. | LOW | AskUserQuestion with 3 options: (1) Quick task, (2) Milestone, (3) Done. Depends on: quick task infrastructure, milestone infrastructure (both exist from pr-review). |
+| Read-only analysis (no file modifications) | Established pattern from steward and pr-review: analysis agents never modify source or test files. Users trust the command because it cannot break anything. | LOW | Agent constraint in spec: "You NEVER modify test files, source files, or create new tests." Same constraint as `gsd-test-steward`. |
 
-### Differentiators (Competitive Advantage)
+## Differentiators
 
-What makes this better than "just tell the user to run the steward manually."
+Features that set this command apart from just running `audit-tests`.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Autopilot-transparent bridge | Today, autopilot drives audit → plan-milestone-gaps → execute → re-audit automatically. Without this bridge, autopilot silently skips test debt even when the project is over budget. With it, consolidation proposals enter the same autonomous loop — no human has to remember to run `audit-tests` after a milestone. | LOW | The bridging mechanism (frontmatter field + parser extension) is the entire value. No new agent or tool required — the data already exists in the steward report. |
-| Estimated reduction in task descriptions | Each consolidation task includes the steward's `estimated_reduction` (number of tests removed). Developers can see "this removes 7 tests, bringing budget from 101% to 99.1%" before executing. Makes the tradeoff visible. | LOW | Pull `estimated_reduction` from proposal into task description. Requires no additional analysis — steward already computes this. |
-| Only-test-gaps path | When an audit produces no requirement/integration/flow gaps but does have consolidation proposals above threshold, the current flow routes to `plan-milestone-gaps` for gap closure. The new fourth gap type ensures this case doesn't silently pass. Budget overage becomes a recognized gap type that gets planned. | LOW | Logic: if `gaps.requirements`, `gaps.integration`, `gaps.flows` all empty but `gaps.test_consolidation` is non-empty AND budget is Warning/Over — status remains `gaps_found` rather than `passed` or `tech_debt`. |
+| Diff-scoped analysis (not whole-suite) | `audit-tests` analyzes the entire test suite. For a 826-test project, that is slow and noisy. `/gsd:test-review` analyzes only tests related to what changed, making results immediately actionable. The diff is the scope filter. | MEDIUM | Agent receives list of changed files (from git diff or PR diff), maps to related test files, analyzes only those. Report sections are organized by changed file, not by test file. |
+| Consolidation recommendations scoped to changed area | When you touch a module, you might notice its tests are redundant or bloated. Surfacing consolidation opportunities in the area you are already working is more actionable than a global report. | LOW | Reuse steward's 4-strategy framework (prune, parameterize, promote, merge) but scoped to test files related to the diff. Not a full steward run — just the intersection. |
+| Missing test file detection | Beyond coverage gaps within existing tests: detect when a changed source file has NO corresponding test file at all. "You modified `lib/parser.cjs` but `tests/parser.test.cjs` does not exist." | LOW | Check naming conventions and import patterns. If no test file maps to a changed source file, flag it as a gap. Simple but high-signal finding. |
+| Integration with existing test infrastructure data | Report includes budget context: "Project is at 103% budget. Adding tests for these gaps would increase count by ~N." Helps users make informed decisions about whether to add tests or consolidate first. | LOW | Pull budget data from `getTestConfig` and `countTestsInProject` (both exist in `testing.cjs`). Include as context section in report, not as a gate. |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+## Anti-Features
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Auto-apply consolidation without human approval | Full autonomy — why pause for test cleanup if autopilot handles everything else? | Consolidation modifies or deletes test files. A wrong prune removes real coverage silently. Parameterization can change test semantics if done incorrectly. The existing decision in PROJECT.md is explicit: `steward.auto_consolidate` remains false. Human must approve. | Create the task and the cleanup phase. Let the autopilot execute phase handle it — the execute phase pauses at verification, giving a natural review point. |
-| Per-proposal phases | Fine-grained phases give maximum flexibility in approving some consolidations and deferring others. | N=5 proposals → 5 phases → 5 plan cycles → 5 executions. Massive overhead for cleanup work that is inherently related. Wastes phase budget and makes the roadmap noisy. | One cleanup phase, one task per proposal. Within the execute phase, tasks can be individually skipped or deferred by the developer. |
-| Consolidation proposals blocking `passed` status when budget is OK | Makes the bridge comprehensive — all proposals get actioned regardless. | Budget-OK means the test suite is healthy. Forcing consolidation phases when there's no pressure creates busy-work. Developers will route around the workflow if cleanup is mandatory when nothing is wrong. | Gate on budget threshold. OK status → proposals appear in tech debt section only. Warning/Over Budget → proposals generate a cleanup phase. |
-| Re-spawning the steward during gap closure execution | Confirms that consolidation tasks actually reduced the count as expected. | The steward is an analysis agent spawned by `audit-milestone`. Gap closure phases run inside `execute-phase`. Spawning analysis agents during execution violates the single-responsibility design — execute phases execute, audit phases audit. | The re-audit loop (autopilot's audit-fix-reaudit) already handles verification: after gap closure phases complete, `audit-milestone` runs again, which spawns the steward again, which produces an updated count. |
-| Tracking per-proposal approval state in frontmatter | Allows partial acceptance (approve some proposals, defer others). | Adds a new state machine to MILESTONE-AUDIT.md that no existing consumer reads. Over-engineering for a cleanup workflow where the task description is the unit of approval. | One task per proposal in the cleanup phase. Developer can skip individual tasks during execute phase. Unapproved proposals appear in the next audit's tech debt. |
+Features to explicitly NOT build.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Automatic test generation from diff | Generating test code requires understanding business logic, edge cases, and assertion semantics. AI-generated tests tend to be repetitive happy-path tests that inflate coverage without catching regressions. The `add-tests` workflow already handles test generation with human-guided acceptance criteria. | Report gaps with enough context (function signature, expected behavior hints) that the user or `add-tests` workflow can write meaningful tests. |
+| Line-level coverage analysis (Istanbul/c8 integration) | Requires instrumentation, build tooling integration, and coverage report parsing. Adds a hard dependency on the project having coverage tooling configured. The GSD approach is agent-driven static analysis, not tooling-driven dynamic analysis. | Function/export-level gap detection via LLM reading source and test files. Good enough for "did you test this?" without requiring coverage infrastructure. |
+| Auto-scoring and routing (like pr-review) | PR review findings have clear severity (critical/important/suggestion) that maps to a score. Test review findings are more subjective — a missing test for a utility function is different from a missing test for a critical auth module. Auto-routing would make wrong decisions. | Present findings, let user choose: quick task, milestone, or done. User has context about which gaps matter. |
+| Git blame / change frequency analysis | "Files that change often should have more tests" is true but adds complexity (git log parsing, frequency thresholds) for marginal value in a single review session. | Focus on the current diff. Historical analysis is a future consideration. |
+| Running tests as part of the review | The review command is analysis-only. Running tests conflates "what should be tested?" with "do tests pass?" — different questions with different workflows. Test execution belongs in the hard gate (execute-plan) and `ui-test`. | Report identifies gaps and staleness. User runs tests separately via the existing hard gate or manual invocation. |
+| Cross-repository test mapping | Some monorepos have tests in separate packages. Supporting arbitrary test-to-source mappings across package boundaries adds significant complexity. | Support single-repo conventions. If test files are in a `tests/` or `__tests__/` directory following naming conventions, that covers the common case. |
+| Watching for file changes (daemon mode) | A persistent watcher that re-runs test review on every save. Adds process management complexity and continuous resource usage. | On-demand invocation via `/gsd:test-review`. User runs it when they want a review, not continuously. |
 
 ## Feature Dependencies
 
 ```
-gaps.test_consolidation frontmatter field (audit-milestone step 6)
-    └──required by──> plan-milestone-gaps parser extension
-                          └──required by──> Consolidation phase creation
-                                                └──required by──> Task-per-proposal generation
-
-test_health.budget_status (already in frontmatter — existing)
-    └──gates──> Phase creation decision (Warning/Over → create, OK → tech debt only)
-
-steward consolidation proposals (existing — in steward report body)
-    └──structured into──> gaps.test_consolidation (new frontmatter field)
-    └──currently only in──> MILESTONE-AUDIT.md report body (not parseable by plan-milestone-gaps)
-
-gaps.test_consolidation (new)
-    └──parallel to──> gaps.requirements (existing)
-    └──parallel to──> gaps.integration (existing)
-    └──parallel to──> gaps.flows (existing)
-
-Proposal-to-task mapping (new — per strategy)
-    └──used by──> plan-milestone-gaps when creating tasks
-    └──strategies: prune | parameterize | promote | merge
+Git diff / changed files list (input)
+    |
+    v
+Source-to-test file mapping (heuristic)
+    |-- naming convention: foo.cjs -> foo.test.cjs
+    |-- import tracing: which test files require('./foo')
+    |-- directory convention: src/foo -> tests/foo.test
+    |
+    +---> Coverage gap detection (per changed file)
+    |         |-- reads changed functions/exports
+    |         |-- checks if test file exercises them
+    |         |-- reports missing coverage
+    |
+    +---> Staleness detection (scoped to related tests)
+    |         |-- checks test references against current source
+    |         |-- flags deleted/renamed exports
+    |
+    +---> Consolidation opportunities (scoped)
+    |         |-- redundancy in related test files
+    |         |-- parameterization candidates
+    |
+    +---> Missing test file detection
+              |-- changed source file with no test file at all
+    |
+    v
+Structured report (.planning/reviews/YYYY-MM-DD-test-review.md)
+    |
+    v
+User routing choice (--report-only skips this)
+    |-- Quick task -> existing quick task infrastructure
+    |-- Milestone -> existing milestone infrastructure
+    |-- Done -> exit
 ```
 
-### Dependency Notes
+### Dependency on Existing Infrastructure
 
-- **`gaps.test_consolidation` must be written by `audit-milestone` step 6:** The field cannot be parsed by `plan-milestone-gaps` if `audit-milestone` does not populate it. Both files need coordinated changes.
-- **Steward must have run for proposals to exist:** `gaps.test_consolidation` is only populated when the steward ran and produced proposals. When steward is disabled or produced no proposals, the field is empty or absent — `plan-milestone-gaps` handles this as a no-op.
-- **Budget status is the gate, not the proposal count:** Even if 10 proposals exist, if budget is OK (< 80%), no cleanup phase is created. This prevents autopilot from forcing cleanup on healthy suites.
-- **Does not conflict with existing gap types:** Test consolidation phases are additive. Existing requirement/integration/flow gap phases are created first, then the consolidation phase is appended at the end. No ordering dependency between them.
+| Dependency | Module | What It Provides |
+|------------|--------|-----------------|
+| `findTestFiles` | `testing.cjs` | Discovers all test files in project |
+| `countTestsInProject` | `testing.cjs` | Budget context for report |
+| `getTestConfig` | `testing.cjs` | Budget thresholds, steward enabled flag |
+| `detectFramework` | `testing.cjs` | Framework identification for report context |
+| `gsd-tools.cjs init` | `gsd-tools.cjs` | Quick task / milestone initialization |
+| `gsd-tools.cjs resolve-model` | `gsd-tools.cjs` | Agent model resolution |
+| `gsd-tools.cjs generate-slug` | `gsd-tools.cjs` | Directory slug for quick tasks |
+| `.planning/reviews/` | pr-review workflow | Report output directory (already exists) |
+| Quick task creation pattern | pr-review workflow | STATE.md update, directory creation, executor spawning |
 
-## MVP Definition
+### New Components Required
 
-### Launch With (v2.8)
+| Component | Type | Purpose |
+|-----------|------|---------|
+| `gsd-test-reviewer` agent | Agent spec (`.md`) | 6-step diff-aware analysis agent, read-only |
+| `/gsd:test-review` command | Command spec (`.md`) | Argument parsing, data gathering, agent spawning, routing |
+| Report template | Within agent spec | Structured markdown output format |
 
-Minimum to make the bridge functional end-to-end.
+## MVP Recommendation
 
-- [ ] `gaps.test_consolidation` YAML field added to MILESTONE-AUDIT.md frontmatter schema — carries structured proposal data from steward report
-- [ ] `audit-milestone` step 6 updated to populate `gaps.test_consolidation` when steward proposals exist
-- [ ] `plan-milestone-gaps` step 1 extended to parse `gaps.test_consolidation` alongside existing gap types
-- [ ] Proposal-to-task mapping defined for all four strategies (prune, parameterize, promote, merge) — produces concrete, actionable task descriptions
-- [ ] Budget threshold gate: only create consolidation phase when `test_health.budget_status` is Warning or Over Budget
-- [ ] Single cleanup phase grouping all proposals (not N phases)
-- [ ] Graceful skip when steward is disabled, no proposals exist, or `gaps.test_consolidation` absent
-- [ ] `only-test-gaps` path: audit result remains `gaps_found` (not `passed`) when consolidation proposals exist above threshold but no other gaps
+### Launch With (v2.9)
 
-### Add After Validation (post-v2.8)
+Prioritize in this order:
 
-- [ ] `gsd health` reporting on pending consolidation proposals — surfaces test debt in health check output. Trigger: users ask "why isn't gsd health showing my test debt?"
-- [ ] Per-proposal estimated budget projection in gap plan presentation — "Implementing all proposals would reduce budget from 101% to 97%." Trigger: useful feedback once the bridge is running.
+1. **`/gsd:test-review` command spec** — argument parsing (`--report-only` flag), diff capture (git diff or user-provided), agent spawning, report presentation, user routing choice. Follows `audit-tests` pattern (command is thin orchestrator).
+2. **`gsd-test-reviewer` agent** — 6-step read-only analysis:
+   - Step 1: Receive diff / changed files list
+   - Step 2: Map changed source files to test files (naming + import heuristics)
+   - Step 3: Detect coverage gaps (new/changed exports without test assertions)
+   - Step 4: Detect stale tests (references to deleted/renamed exports in related test files)
+   - Step 5: Identify consolidation opportunities (scoped redundancy, parameterization candidates)
+   - Step 6: Compile structured report
+3. **Structured report output** — written to `.planning/reviews/YYYY-MM-DD-test-review.md` with YAML frontmatter
+4. **User-choice routing** — quick task, milestone, or done (after report is presented)
+5. **Documentation** — help.md, USER-GUIDE.md, README.md updates
 
-### Future Consideration (v2.9+)
+### Defer (post-v2.9)
 
-- [ ] Partial proposal acceptance via frontmatter flags — approve individual proposals, defer others. Deferred because task-skip in execute phase is sufficient for v2.8.
-- [ ] `steward.auto_consolidate` mode (explicit opt-in) — applies prune/parameterize automatically without creating a phase. Deferred: requires confidence in correctness that current heuristic analysis doesn't provide.
+- Integration with `audit-milestone` (auto-run test-review during milestone audit) — let users validate the command standalone first
+- Custom source-to-test mapping configuration — naming conventions cover the common case
+- Budget impact projection ("adding these tests would bring you to N%") — nice but not essential
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| `gaps.test_consolidation` frontmatter field | HIGH | LOW | P1 |
-| `audit-milestone` populates new field | HIGH | LOW | P1 |
-| `plan-milestone-gaps` parses new field | HIGH | MEDIUM | P1 |
-| Proposal-to-task mapping (all 4 strategies) | HIGH | MEDIUM | P1 |
-| Budget threshold gate | HIGH | LOW | P1 |
-| Single cleanup phase grouping | MEDIUM | LOW | P1 |
-| Graceful skip / no-proposals path | HIGH | LOW | P1 |
-| Only-test-gaps audit status path | MEDIUM | LOW | P1 |
-| Per-proposal estimated budget projection | LOW | LOW | P2 |
-| `gsd health` consolidation reporting | LOW | MEDIUM | P2 |
-| Partial proposal acceptance state | LOW | HIGH | P3 |
-| `steward.auto_consolidate` opt-in mode | LOW | HIGH | P3 |
+| Source-to-test file mapping | HIGH | MEDIUM | P1 |
+| Coverage gap detection | HIGH | MEDIUM | P1 |
+| Stale test detection (diff-scoped) | HIGH | LOW | P1 |
+| Structured report output | HIGH | LOW | P1 |
+| `--report-only` flag | MEDIUM | LOW | P1 |
+| User-choice routing | HIGH | LOW | P1 |
+| Read-only constraint | HIGH | LOW | P1 |
+| Missing test file detection | MEDIUM | LOW | P1 |
+| Diff-scoped consolidation recs | MEDIUM | LOW | P1 |
+| Budget context in report | LOW | LOW | P1 |
+| Documentation updates | MEDIUM | LOW | P1 |
+| Budget impact projection | LOW | MEDIUM | P2 |
+| Auto-run during milestone audit | LOW | MEDIUM | P2 |
+| Custom source-to-test mapping config | LOW | MEDIUM | P3 |
 
 **Priority key:**
-- P1: Must have for launch (v2.8)
+- P1: Must have for launch (v2.9)
 - P2: Should have, add when possible
 - P3: Nice to have, future consideration
 
-## Competitor Feature Analysis
+## Comparison: Test Review Approaches
 
-The domain here is "autonomous development tooling that acts on AI test analysis." No direct competitors exist. The relevant comparison is manual workflow vs the bridge.
+The domain offers two fundamental approaches to diff-aware test analysis. GSD uses the heuristic/LLM approach because it requires no instrumentation.
 
-| Feature | Manual workflow (today) | With consolidation bridge (v2.8) |
-|---------|------------------------|----------------------------------|
-| Discovering proposals | Run `/gsd:audit-tests` separately after milestone | Proposals surface automatically during `audit-milestone` |
-| Acting on proposals | Developer reads steward report, manually applies changes | `plan-milestone-gaps` creates a cleanup phase with one task per proposal |
-| Autopilot visibility | Autopilot ignores test debt; budget can creep over 100% silently | Budget overage triggers consolidation phase in the audit-fix loop |
-| Task clarity | Developer interprets "parameterize these tests" from steward prose | Task description includes source files, specific action, and estimated count reduction |
-| Budget verification | Developer must recount tests manually after cleanup | Re-audit loop (existing) spawns steward again, updates budget_status |
+| Approach | How It Works | Pros | Cons | GSD Fit |
+|----------|-------------|------|------|---------|
+| **Instrumented coverage** (Istanbul, c8, JaCoCo) | Run tests with coverage, track which lines each test covers, diff against changed lines | Precise line-level mapping, definitive gap identification | Requires instrumentation setup, slow (runs full suite), project-specific config | Poor — adds hard dependency, violates zero-config principle |
+| **Heuristic + LLM static analysis** | Naming conventions, import tracing, agent reads source + test files | Zero-config, works across frameworks, understands semantic gaps | Approximate (may miss indirect dependencies), no runtime data | Good — matches GSD's agent-driven, read-only, zero-config pattern |
+
+**Recommendation:** Heuristic + LLM approach. Consistent with every other GSD analysis tool (steward, pr-review). The agent reads files and applies judgment — no build tooling integration required.
 
 ## Sources
 
-- `/Users/seanspade/.claude/agents/gsd-test-steward.md` — proposal format, four strategy types, consolidation triggers (budget thresholds)
-- `/Users/seanspade/.claude/get-shit-done/workflows/audit-milestone.md` — step 3.5 steward invocation, step 6 frontmatter schema, `test_health` block
-- `/Users/seanspade/.claude/get-shit-done/workflows/plan-milestone-gaps.md` — existing gap parsing (requirements/integration/flows), phase creation patterns, gap-to-task mapping
-- `/Users/seanspade/Documents/Source/get-more-shit-done/.planning/v2.3-MILESTONE-AUDIT.md` — real example of frontmatter with `test_health` block
-- `/Users/seanspade/Documents/Source/get-more-shit-done/.planning/PROJECT.md` — v2.8 target features, constraint: `steward.auto_consolidate remains false`, existing decision record
-- [Test Automation Maintenance Guide 2026](https://bugbug.io/blog/software-testing/test-automation-maintenance/) — periodic review/prune cycle is industry standard; scheduled cleanup integrated into sprint cycles
-- [Test Maintenance Best Practices 2026](https://bugbug.io/blog/software-testing/best-practices-of-test-maintenance/) — parameterize, prune, and refactor as the canonical maintenance strategies
-- [CI/CD Quality Gates](https://testrigor.com/blog/software-quality-gates/) — quality gates as checkpoints that gate progression; budget thresholds as the natural gate for test consolidation
+- [diff_cover](https://github.com/Bachmann1234/diff_cover) — Open source tool for finding diff lines needing test coverage; demonstrates the diff-to-coverage mapping pattern
+- [Teamscale Test Gap Analysis](https://teamscale.com/features/test-gap-analysis) — Commercial tool for identifying untested code changes; demonstrates the "changed code without tests" detection pattern
+- [Test Impact Analysis (Martin Fowler)](https://martinfowler.com/articles/rise-test-impact-analysis.html) — Canonical reference for mapping source files to test cases; describes static vs dynamic TIA approaches
+- [Codacy Diff Coverage](https://blog.codacy.com/diff-coverage) — PR-level coverage metrics; demonstrates the "coverage delta on PR" pattern
+- [minware Test Impact Analysis](https://www.minware.com/guide/best-practices/test-impact-analysis) — Best practices for TIA without instrumentation; describes file-level dependency mapping
+- `/Users/seanspade/Documents/Source/get-more-shit-done/.planning/PROJECT.md` — v2.9 active requirements, existing architecture, constraints
+- `/Users/seanspade/Documents/Source/get-more-shit-done/agents/gsd-test-steward.md` — Steward analysis patterns (redundancy, staleness, consolidation)
+- `/Users/seanspade/Documents/Source/get-more-shit-done/commands/gsd/audit-tests.md` — On-demand agent spawning pattern (command as thin orchestrator)
+- `/Users/seanspade/Documents/Source/get-more-shit-done/commands/gsd/pr-review.md` — PR review command pattern (argument parsing, routing, report output)
+- `/Users/seanspade/Documents/Source/get-more-shit-done/get-shit-done/bin/lib/testing.cjs` — Existing test infrastructure (findTestFiles, countTestsInProject, getTestConfig)
 
 ---
-*Feature research for: Test Steward Consolidation Bridge (GSD v2.8)*
-*Researched: 2026-03-20*
+*Feature research for: /gsd:test-review — PR Diff-Aware Test Review (GSD v2.9)*
+*Researched: 2026-03-21*

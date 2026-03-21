@@ -1,23 +1,25 @@
 # Stack Research
 
-**Domain:** GSD autopilot — test steward consolidation bridge (v2.8)
-**Researched:** 2026-03-20
+**Domain:** GSD autopilot — PR diff-aware test review command (v2.9)
+**Researched:** 2026-03-21
 **Confidence:** HIGH
 
 ## Scope
 
-This research covers ONLY what is new for v2.8 (test steward consolidation bridge). The existing validated
+This research covers ONLY what is new for v2.9 (`/gsd:test-review` command). The existing validated
 stack (Node.js CJS, zx/ESM, node:test suite, gsd-tools dispatcher, testing.cjs, cli.cjs, autopilot.mjs,
-validation.cjs, frontmatter.cjs) is NOT re-evaluated.
+validation.cjs, frontmatter.cjs, markdown commands/agents/workflows) is NOT re-evaluated.
 
 ## Verdict: No New Dependencies
 
-This milestone is a pure markdown-workflow and YAML-frontmatter extension. Every parsing, writing, and
-routing capability needed already exists. The answer to "what stack additions are needed?" is: none.
+This milestone is purely additive markdown files: one command spec (`commands/gsd/test-review.md`) and
+one agent definition (`agents/gsd-test-reviewer.md`), plus documentation updates. No new npm packages,
+no new CJS modules, no new gsd-tools dispatch entries.
 
-The new `gaps.test_consolidation` array is structurally identical to the existing `gaps.integration` array
-(array of objects with string/number fields at two-level nesting). `extractFrontmatter()` in
-`frontmatter.cjs` already handles this structure — no parser changes, no new npm packages.
+The command gathers git diff data and existing test metadata via shell commands and `gsd-tools.cjs`
+dispatch entries that already exist (`test-count`, `test-config`, `commit`). The agent is a read-only
+analysis agent (like `gsd-test-steward`) that receives structured input and produces a markdown report.
+The routing flow (quick task / milestone / done) reuses the same patterns proven in `/gsd:pr-review`.
 
 ## Recommended Stack (No Changes)
 
@@ -25,123 +27,146 @@ The new `gaps.test_consolidation` array is structurally identical to the existin
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Node.js CJS modules | >=16.7.0 (existing) | `frontmatter.cjs` parsing layer | `extractFrontmatter()` handles array-of-objects at 2-level nesting — verified against `gaps.integration` which is structurally identical to `gaps.test_consolidation`. No change. |
-| Markdown workflow files | n/a | `audit-milestone.md`, `plan-milestone-gaps.md` | Claude reads these as context — no build step, no parser, just text extension. Adding `test_consolidation` handling is a text edit. |
-| YAML frontmatter (custom parser) | n/a (in-repo, `frontmatter.cjs`) | State storage in MILESTONE-AUDIT.md | `extractFrontmatter()` + `reconstructFrontmatter()` + `spliceFrontmatter()` already provides read/write round-trip. Proven across 16 milestones. |
+| Claude Code CLI | current | Executes command spec, spawns agent via `Task()` | All GSD commands are markdown files interpreted by Claude Code. No alternative exists. |
+| Git CLI | system | `git diff main...HEAD` for changed files and full diff | Standard git commands executed via Bash tool. The diff is the primary input to the agent. |
+| `gsd-tools.cjs` dispatch | n/a (in-repo) | `test-count`, `test-config`, `commit` | Existing dispatch entries provide all test metadata needed. No new entries required. |
+| `testing.cjs` | n/a (in-repo) | `findTestFiles()`, `countTestsInProject()`, `getTestConfig()` | Consumed indirectly via gsd-tools dispatch. Already exports everything the command needs. |
 
 ### Supporting Libraries
 
 No new supporting libraries required.
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `frontmatter.cjs` (in-repo) | n/a | YAML frontmatter read/write for MILESTONE-AUDIT.md | Only needed if programmatic frontmatter manipulation is required beyond workflow text reads. The workflows read files as Claude context — no programmatic call needed for v2.8. |
-| `gsd-tools.cjs` (in-repo) | n/a | `frontmatter merge` dispatch command | Available if a programmatic consumer of `gaps.test_consolidation` is added in the future. Not needed for v2.8. |
+| Library | Status | Purpose | Notes |
+|---------|--------|---------|-------|
+| `zx` | ^8.0.0 (existing) | Not used by this feature | `/gsd:test-review` is a markdown command, not an autopilot extension. No zx involvement. |
+| `@playwright/test` | ^1.50.0 (existing, devDep) | Not used by this feature | Test review analyzes unit/integration tests, not E2E. Playwright is unrelated. |
 
-## What Changes (File Modifications, Not New Tools)
+### Development Tools
 
-Two workflow files get text extensions. No new files, no new modules.
+No new development tools required.
 
-### 1. `get-shit-done/workflows/audit-milestone.md`
+| Tool | Status | Notes |
+|------|--------|-------|
+| `node:test` runner | existing | Tests for new CJS utility functions if any are extracted. Design doc says no new modules needed. |
+| `c8` coverage | existing | Coverage reporting unchanged. New markdown files are not instrumented. |
 
-**Change in Step 6:** Add `gaps.test_consolidation` to the YAML frontmatter template. Populate from
-`steward_report` consolidation proposals already in scope from step 3.5. Add status logic: if
-`gaps.requirements`, `gaps.integration`, and `gaps.flows` are all empty but `gaps.test_consolidation`
-is non-empty, set `status: tech_debt` instead of `passed`.
+## What Changes (File Additions, Not New Tools)
 
-**New frontmatter structure to emit:**
-```yaml
-gaps:
-  requirements: [...]
-  integration: [...]
-  flows: [...]
-  test_consolidation:       # NEW
-    - strategy: "prune"
-      source: "tests/foo.test.cjs"
-      action: "Remove — references deleted module"
-      reduction: 3
-    - strategy: "parameterize"
-      source: "tests/bar.test.cjs:L12-L45"
-      action: "Combine 5 near-identical tests into test.each"
-      reduction: 4
+Four files are added or modified. No new modules, no new dependencies.
+
+### 1. `commands/gsd/test-review.md` (NEW)
+
+**Pattern:** Follows `audit-tests.md` (direct agent spawn with data gathering) combined with
+`pr-review.md` (post-analysis routing with `--report-only`/`--quick`/`--milestone` options).
+
+**Data gathering via existing tools:**
+```bash
+# Changed files list
+git diff main...HEAD --name-only
+
+# Full diff for agent analysis
+git diff main...HEAD
+
+# Test metadata via existing gsd-tools dispatch
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-count --raw
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-config
 ```
 
-**Why no parser change is needed:** `extractFrontmatter()` already parses arrays of objects. The
-`test_consolidation` items (`strategy`, `source`, `action`, `reduction`) are flat key/value pairs
-at one level below the array — identical in structure to `integration` items (`id`, `severity`,
-`description`). The parser's array-of-objects path at lines 60-82 of `frontmatter.cjs` covers this.
+**Agent spawn:** `Task()` with `subagent_type="gsd-test-reviewer"`, passing diff + test data as
+XML block input. Identical pattern to `audit-tests.md` spawning `gsd-test-steward`.
 
-### 2. `get-shit-done/workflows/plan-milestone-gaps.md`
+**Report persistence:** Write to `.planning/reviews/YYYY-MM-DD-test-review.md` using existing
+`reviews/` directory (shared with pr-review reports). Commit via `gsd-tools.cjs commit`.
 
-**Changes in Step 1:** Parse `gaps.test_consolidation` alongside the existing three gap arrays.
+**Routing:** User-choice prompt after report display (quick task / milestone / done). Quick task
+uses same directory structure and planner/executor pattern as pr-review. Milestone delegates to
+`/gsd:new-milestone --auto` with MILESTONE-CONTEXT.md — same as brainstorm routing.
 
-**Changes in Step 3:** Add grouping rule — all `test_consolidation` entries go into one "Test Suite
-Consolidation" phase, always last in the gap closure sequence.
+### 2. `agents/gsd-test-reviewer.md` (NEW)
 
-**Changes in Step 5:** Include the consolidation phase in the gap closure plan presentation.
+**Pattern:** Read-only analysis agent, modeled on `gsd-test-steward.md`. Same tools
+(Read, Bash, Grep, Glob), same constraint (never modifies source or test files).
 
-**No changes to Steps 4, 6, 7, 8, 9, 10** — phase numbering, ROADMAP.md updates, directory creation,
-commit, and next-step routing operate generically on whatever phases get created. Adding a new phase
-type requires zero changes to the phase machinery.
+**No code execution:** The agent reads files and diffs, performs static analysis, and produces
+a markdown report. No test execution, no file modification.
+
+**Shared vocabulary:** Uses same consolidation strategy terms as test steward
+(prune/parameterize/promote/merge) but carries definitions inline in the agent prompt.
+No code sharing needed — the terms are just markdown text.
+
+### 3. `commands/gsd/help.md` (MODIFIED)
+
+Add `/gsd:test-review` entry to the command reference table. Text edit only.
+
+### 4. Documentation files (MODIFIED)
+
+`USER-GUIDE.md` and `README.md` get documentation sections. Text edits only.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Custom `extractFrontmatter()` (existing) | `js-yaml` npm package | Only if YAML structure becomes deeply recursive or uses anchors/tags. Current `test_consolidation` entries are flat objects — custom parser is sufficient. Adding `js-yaml` would be a new dependency with no functional gain. |
-| Custom `extractFrontmatter()` (existing) | `gray-matter` npm package | Only if markdown file processing needs templating or custom delimiters. GSD uses raw `---` fences with no special YAML features. `gray-matter` adds weight without benefit. |
-| Workflow text extension | New `test-consolidation.cjs` module | Only if `plan-milestone-gaps` needed programmatic invocation from `autopilot.mjs`. Currently the workflow is Claude-executed text — no programmatic call site exists, and the design doc confirms autopilot handles this via the existing audit-fix-reaudit loop with no changes. |
+| Inline git diff parsing by agent | `diff-parse` npm package for structured diff parsing | Only if the agent consistently fails to parse diffs from raw text. Claude handles unified diff format well — adding a parser library would mean a new CJS module wrapping the npm package. Not worth the complexity unless evidence shows parsing failures. |
+| XML block input to agent | JSON input via gsd-tools | Only if Claude struggles with large XML blocks. The XML block pattern is proven across audit-tests and pr-review. JSON would require a new gsd-tools dispatch entry to serialize the diff, which adds unnecessary code. |
+| User-choice routing (quick/milestone/done) | Automatic scoring like pr-review's hybrid heuristic | Only if users consistently make poor routing decisions. The test review report gives users enough information to choose. Automatic scoring adds complexity and may misroute — a test review with 20 findings might still be a quick task if they are all trivial. User judgment is better here. |
+| Single agent (gsd-test-reviewer) | Reuse gsd-test-steward with a "diff mode" | Only if the two agents share significant prompt text (>50%). They don't — steward focuses on suite-wide health (budget, redundancy across all tests) while reviewer focuses on diff-scoped analysis (coverage gaps for changed code, staleness of affected tests). Separate agents with clear scopes are simpler than a modal agent. |
+| Read-only agent + command routing | Agent that directly creates tasks/milestones | Never. The read-only constraint is a deliberate architectural decision. The agent produces a report; the command handles routing. Mixing analysis and action in one agent violates the separation proven across 14 existing agents. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `js-yaml` | Adds npm dependency for YAML parsing when `extractFrontmatter()` handles all structures in use. Supply-chain surface with zero functional gain. | `extractFrontmatter()` in `frontmatter.cjs` |
-| `gray-matter` | Same rationale as js-yaml. Full markdown-with-frontmatter library is overkill for structured object reads. | `extractFrontmatter()` in `frontmatter.cjs` |
-| New `gsd-tools` dispatch commands for `test_consolidation` | No programmatic consumer of `gaps.test_consolidation` exists or is planned for v2.8. Adding CLI dispatch before a caller exists is premature. | Direct file read in workflow context |
-| Schema additions to `FRONTMATTER_SCHEMAS` in `frontmatter.cjs` | `FRONTMATTER_SCHEMAS` validates plan/summary/verification files — not audit files. Audit files are read by Claude as context, not validated programmatically. | No change to `FRONTMATTER_SCHEMAS` |
-| Changes to `autopilot.mjs` | The design doc explicitly confirms the existing audit-fix-reaudit loop handles the `tech_debt` routing path without modification. `plan-milestone-gaps` is already invoked on `tech_debt` status. | No change to autopilot |
+| `diff-parse` or `parse-diff` npm packages | Adds npm dependency for something Claude handles natively. Git unified diff format is well-understood by LLMs. Supply-chain surface with zero functional gain. | Raw `git diff` output passed directly to agent |
+| New `gsd-tools` dispatch entries | No programmatic consumer exists. The command gathers data via existing entries (`test-count`, `test-config`) and shell commands (`git diff`). Adding CLI dispatch before a caller exists is premature. | Existing `test-count`, `test-config` dispatch + direct `git` commands |
+| Workflow file (`workflows/test-review.md`) | The command is simple enough for inline execution (data gather + spawn agent + write report + route). Adding a workflow file is the pr-review pattern, but pr-review needed it for its complex ingest/parse/score/route pipeline. Test review's pipeline is simpler — closer to audit-tests which has no workflow file. | Direct agent spawn from command spec (audit-tests pattern) |
+| Changes to `testing.cjs` | All needed functions already exist and are exported: `findTestFiles()`, `countTestsInProject()`, `getTestConfig()`. No new test analysis functions are needed — the agent does the analysis, not CJS code. | Existing `testing.cjs` exports via `gsd-tools.cjs` dispatch |
+| Changes to `autopilot.mjs` | `/gsd:test-review` is an on-demand user command, not part of the autonomous pipeline. The autopilot has no awareness of it and needs none. | No change to autopilot |
+| `gsd-tools.cjs commit` changes | The existing `commit` dispatch handles committing files with a message. The report file path and commit message are provided by the command spec. No structural changes needed. | Existing `gsd-tools.cjs commit` |
 
 ## Stack Patterns by Variant
 
-**If `gaps.test_consolidation` is empty (steward ran, no proposals):**
-- Write `test_consolidation: []` to frontmatter
-- `plan-milestone-gaps` skips consolidation phase creation
-- Empty array is valid YAML and parseable by `extractFrontmatter()` — no special handling
+**If no diff exists (branch is up-to-date with main):**
+- `git diff main...HEAD --name-only` returns empty output
+- Command displays "No changes found vs main" and exits
+- No agent spawn, no report, no routing
 
-**If steward is disabled (`test.steward: false`):**
-- `audit-milestone.md` already skips steward at step 3.5
-- `gaps.test_consolidation` key is omitted from frontmatter entirely
-- `plan-milestone-gaps` checks for key existence; if missing, treats as empty — no error
+**If `--report-only` flag is provided:**
+- Command gathers data, spawns agent, writes report, exits
+- Skips user-choice routing prompt
+- Report still committed to `.planning/reviews/`
 
-**If only test consolidation gaps exist (no requirement/integration/flow gaps):**
-- This is the current dead-end scenario this milestone fixes
-- `audit-milestone.md` sets `status: tech_debt` (not `passed`)
-- `tech_debt` routing in `offer_next` already offers `/gsd:plan-milestone-gaps` as option B
-- `plan-milestone-gaps` creates only the consolidation phase — phase machinery unchanged
+**If test count is zero (no tests in project):**
+- Command still proceeds — the agent can recommend creating initial tests for changed files
+- Agent input includes `test_count: 0` and empty `test_files` list
+- Coverage gap analysis becomes "all changed files lack tests"
 
-**If consolidation proposals don't bring budget under threshold after execution:**
-- Next audit produces new findings
-- Existing audit-fix-reaudit loop handles this — no special case needed
-- User can always `/gsd:complete-milestone` to accept remaining debt
+**If diff is very large (many changed files):**
+- Full diff passed to agent via `git diff main...HEAD`
+- Claude's context window handles large diffs well
+- Agent naturally prioritizes highest-impact files in recommendations
+- No truncation or pagination needed — the agent is a subagent with its own context window
 
 ## Version Compatibility
 
 | Component | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `extractFrontmatter()` | All existing MILESTONE-AUDIT.md frontmatter + new `test_consolidation` structure | `test_consolidation` items are 2-level nesting (array of flat objects) — within supported depth. Isomorphic to existing `integration` array-of-objects. |
-| `reconstructFrontmatter()` | 3-level nesting maximum | `test_consolidation` items are 1-level objects inside an array — well within limit. |
-| Existing 807-test suite | No impact | v2.8 changes are workflow text files and audit frontmatter structure. No CJS module changes means no new tests required beyond any added to cover new workflow logic. |
+| `gsd-tools.cjs test-count` | All existing testing.cjs versions | Returns raw count with `--raw` flag. Used by command for agent input. |
+| `gsd-tools.cjs test-config` | All existing testing.cjs versions | Returns JSON config object. Used by command for agent input. |
+| `gsd-tools.cjs commit` | All existing versions | Commits staged files with message. Used to persist report. |
+| `.planning/reviews/` directory | Shared with pr-review reports | Both commands write timestamped reports here. No naming conflict — test-review uses `test-review` in filename, pr-review uses `pr-review`. |
+| Quick task infrastructure | Existing STATE.md Source column | Design doc confirms quick task uses same directory structure and planner pattern as pr-review. Source column already supports generic entries. |
+| Task() agent spawn | Claude Code CLI | Same `Task()` pattern used by audit-tests, pr-review, and all workflow agent spawns. |
 
 ## Sources
 
-- `get-shit-done/bin/lib/frontmatter.cjs` — verified `extractFrontmatter()` handles array-of-objects at 2-level nesting (lines 60-82); `reconstructFrontmatter()` handles same (lines 86-148) — HIGH confidence (direct codebase inspection)
-- `get-shit-done/workflows/audit-milestone.md` — verified existing `gaps` frontmatter structure and `test_health` section; `steward_report` already in scope at step 6; `tech_debt` routing already exists in `offer_next` — HIGH confidence (direct codebase inspection)
-- `get-shit-done/workflows/plan-milestone-gaps.md` — verified steps 1-10 structure; steps 4-10 are generic over gap types; adding `test_consolidation` extends only steps 1, 3, and 5 — HIGH confidence (direct codebase inspection)
-- `.planning/milestones/v2.7-MILESTONE-AUDIT.md` — live example of audit frontmatter with `test_health.consolidation_proposals: 2`; confirmed `gaps.integration` structure is isomorphic to proposed `gaps.test_consolidation` — HIGH confidence (production artifact)
-- `.planning/designs/2026-03-20-test-steward-consolidation-bridge-design.md` — design doc specifying exact frontmatter schema, workflow extension points, and autopilot no-change confirmation — HIGH confidence (first-party design artifact)
-- `package.json` — confirmed no YAML parsing dependency exists; only non-dev dep is `zx ^8.0.0` — HIGH confidence (direct codebase inspection)
+- `commands/gsd/audit-tests.md` — verified direct agent spawn pattern: data gathering via gsd-tools dispatch, Task() spawn with XML input, report display — HIGH confidence (direct codebase inspection)
+- `commands/gsd/pr-review.md` — verified routing pattern: workflow delegation, `--quick`/`--milestone` flags, report persistence to `.planning/reviews/` — HIGH confidence (direct codebase inspection)
+- `.planning/designs/2026-03-20-pr-test-review-command-design.md` — design doc specifying exact command flow, agent definition, input/output format, routing, and integration points — HIGH confidence (first-party design artifact)
+- `get-shit-done/bin/lib/testing.cjs` — verified exports: `findTestFiles()`, `countTestsInProject()`, `getTestConfig()` all exist and are dispatched via gsd-tools — HIGH confidence (direct codebase inspection)
+- `get-shit-done/bin/gsd-tools.cjs` — verified dispatch entries: `test-count` (line 642), `test-config` (line 659), `commit` exist — HIGH confidence (direct codebase inspection)
+- `package.json` — confirmed dependencies: only `zx ^8.0.0` runtime, no YAML/diff parsing packages — HIGH confidence (direct codebase inspection)
+- `agents/` directory — confirmed 14 existing agents, all markdown files with YAML frontmatter, establishing the pattern for `gsd-test-reviewer.md` — HIGH confidence (direct codebase inspection)
 
 ---
-*Stack research for: GSD test steward consolidation bridge (v2.8)*
-*Researched: 2026-03-20*
+*Stack research for: GSD PR diff-aware test review command (v2.9)*
+*Researched: 2026-03-21*
