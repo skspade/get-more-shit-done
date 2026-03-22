@@ -258,7 +258,9 @@ Plans:
   3. The workflow judges pass/fail by comparing observed DOM state against expected behavior descriptions, with screenshots as supplementary evidence
   4. Chrome MCP availability is verified via a full round-trip probe, and the workflow falls back to Playwright on probe failure
   5. The workflow runs fully autonomously with a configurable timeout (default 10 minutes) preventing stuck sessions
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 92-01-PLAN.md — uat-auto.md workflow with test discovery, Chrome MCP engine, and results writing
 
 ### Phase 93: Playwright Fallback Engine
 **Goal**: When Chrome MCP is unavailable, the uat-auto workflow can execute the same tests using Playwright with headless Chromium
