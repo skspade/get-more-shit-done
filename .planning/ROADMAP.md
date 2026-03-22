@@ -231,6 +231,33 @@
 - [x] **Phase 93: Playwright Fallback Engine** - Playwright headless path, ephemeral scripts, Chromium availability check (completed 2026-03-22)
 - [x] **Phase 94: Autopilot Integration** - runAutomatedUAT(), gap closure wiring, app startup, evidence and reporting (completed 2026-03-22)
 - [x] **Phase 95: Documentation** - help.md, USER-GUIDE.md, README.md updates (completed 2026-03-22)
+- [ ] **Phase 96: Integration Risk Fixes and Traceability Cleanup** - Fix allowed-tools, gitignore evidence dir, update checkboxes and SUMMARY frontmatter (Gap Closure)
+- [ ] **Phase 97: Test Suite Consolidation** - Retire subsumed tests, prune duplicates, parameterize routing tests (Gap Closure)
+
+### Phase 96: Integration Risk Fixes and Traceability Cleanup
+**Goal**: Close integration risks from audit and clean up tech debt (checkboxes, SUMMARY frontmatter, stale tool names)
+**Depends on**: Phase 95
+**Requirements**: Addresses CMCP-01-05 (allowed-tools risk), EVID-01/EVID-04 (gitignore risk)
+**Gap Closure**: Closes gaps from v3.1 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `commands/gsd/uat-auto.md` allowed-tools list includes all `mcp__claude-in-chrome__*` tools used by the workflow
+  2. `.planning/uat-evidence/` is in `.gitignore`
+  3. All 20 unchecked requirement checkboxes in REQUIREMENTS.md are checked (verified satisfied by audit)
+  4. SUMMARY.md files for phases 91-94 include `requirements-completed` frontmatter
+  5. REQUIREMENTS.md tool names updated from stale `chrome_navigate` to `mcp__claude-in-chrome__navigate` format
+**Plans**: TBD
+
+### Phase 97: Test Suite Consolidation
+**Goal**: Bring test suite under budget (800) by retiring subsumed tests, pruning duplicates, and parameterizing verbose routing tests
+**Depends on**: Phase 96
+**Gap Closure**: Closes test consolidation gaps from v3.1 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `tests/verify-health.test.cjs` deleted — all 12 tests subsumed by `validation.test.cjs`
+  2. `tests/autopilot.test.cjs` pre-flight validation describe block removed (3 tests)
+  3. `tests/dispatcher.test.cjs` routing tests replaced with parameterized smoke table (~8 tests, -21)
+  4. All tests pass after consolidation (`npm test`)
+  5. Test count is at or below 811 (from 847)
+**Plans**: TBD
 
 ## Phase Details
 
@@ -330,3 +357,5 @@ Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 | 93. Playwright Fallback | 1/1 | Complete    | 2026-03-22 | - |
 | 94. Autopilot Integration | 2/2 | Complete    | 2026-03-22 | - |
 | 95. Documentation | 1/1 | Complete    | 2026-03-22 | - |
+| 96. Integration Risk Fixes | 0/0 | Not Started | - | - |
+| 97. Test Suite Consolidation | 0/0 | Not Started | - | - |
