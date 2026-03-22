@@ -309,6 +309,22 @@ Validate built features through conversational UAT.
 
 Usage: `/gsd:verify-work 3`
 
+### Automated UAT
+
+**`/gsd:uat-auto`**
+Run an automated UAT session against a web application using Chrome MCP (primary) or Playwright headless (fallback).
+
+- Discovers tests from `*-UAT.md` files or generates scenarios from SUMMARY.md files
+- Chrome MCP for real browser interaction with DOM inspection and screenshots
+- Playwright headless Chromium fallback when Chrome MCP is unavailable
+- Starts dev server automatically if not running (configurable via `uat-config.yaml`)
+- Writes MILESTONE-UAT.md with pass/fail results and evidence screenshots
+- Runs autonomously in autopilot after milestone audit passes
+- Configurable timeout (default 10 minutes) prevents stuck sessions
+
+Usage: `/gsd:uat-auto`
+Result: Creates `.planning/MILESTONE-UAT.md` with test results and `.planning/uat-evidence/` screenshots
+
 ### Milestone Auditing
 
 **`/gsd:audit-milestone [version]`**
