@@ -1,5 +1,27 @@
 # Milestones
 
+## v3.1 Automated UAT Session (Shipped: 2026-03-22)
+
+**Phases completed:** 7 phases, 9 plans
+**Timeline:** 1 day (2026-03-22)
+**Git range:** feat(91) → fix(97) (37 commits)
+**Files changed:** 56 (5,687 insertions, 543 deletions)
+
+**Key accomplishments:**
+- Built UAT config validation module (uat.cjs) with js-yaml schema, silent skip for non-web projects, and MILESTONE-UAT.md template with gap-compatible frontmatter
+- Created uat-auto.md workflow with Chrome MCP execution engine — test discovery from UAT.md (primary) and SUMMARY.md (fallback), DOM-first assertion protocol, full round-trip probe with automatic Playwright fallback
+- Added Playwright fallback engine with ephemeral inline script generation, Chromium binary auto-install, and identical output format to Chrome MCP mode
+- Wired `runAutomatedUAT()` and `auditAndUAT()` into autopilot.mjs — UAT runs after milestone audit passes, gaps feed into gap closure loop, crashes handled by debug retry
+- Updated plan-milestone-gaps.md to scan MILESTONE-UAT.md as gap source alongside MILESTONE-AUDIT.md with identical gap schema
+- Updated help.md, USER-GUIDE.md, and README.md with /gsd:uat-auto command reference and automated UAT usage guide
+
+**Known Tech Debt:**
+- Test count 817 exceeds budget of 800 (102.1%)
+- 1 dispatcher routing smoke test subsumed by roadmap.test.cjs
+- edge-cases-consolidation.test.cjs has stale Phase 77 comment (cosmetic)
+
+---
+
 ## v3.0 Linear Interview Refactor (Shipped: 2026-03-22)
 
 **Phases completed:** 7 phases, 10 plans
