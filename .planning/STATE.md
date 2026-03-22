@@ -5,7 +5,7 @@ milestone_name: Automated UAT Session
 status: unknown
 last_updated: "2026-03-22T17:44:33.910Z"
 progress:
-  total_phases: 5
+  total_phases: 7
   completed_phases: 5
   total_plans: 7
   completed_plans: 7
