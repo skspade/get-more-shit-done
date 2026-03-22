@@ -229,11 +229,11 @@
   3. Override flags (`--quick`, `--milestone`) skip only the complexity question while still running other interview questions
   4. When the complexity question is skipped because the ticket explicitly states scope, Claude infers the route and asks for confirmation
   5. All interview Q&A is stored as `$INTERVIEW_CONTEXT` and the workflow steps are renumbered from 7 to 9 steps
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 84-01: TBD
-- [ ] 84-02: TBD
+- [ ] 84-01-PLAN.md — Interview engine (pre-scan + adaptive questions + $INTERVIEW_CONTEXT)
+- [ ] 84-02-PLAN.md — Routing decision + heuristic removal + step renumbering
 
 ### Phase 85: Hybrid Output
 **Goal**: Users see a confirmation summary for quick tasks or approach proposals for milestones, with the ability to clarify or select
@@ -300,7 +300,7 @@ Phases execute in numeric order: 84 → 85 → 86 → 87
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
-| 84. Interview Engine and Route Decision | v3.0 | 0/0 | Not started | - |
+| 84. Interview Engine and Route Decision | v3.0 | 0/2 | Planned | - |
 | 85. Hybrid Output | v3.0 | 0/0 | Not started | - |
 | 86. Comment-Back and Enriched Context | v3.0 | 0/0 | Not started | - |
 | 87. Command Spec and Documentation | v3.0 | 0/0 | Not started | - |
