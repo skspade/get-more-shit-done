@@ -117,6 +117,42 @@ Log the probe result: "Browser: {browser_mode} (probe: {passed|failed})"
 
 Skip the Chrome MCP probe. Set browser_mode to "playwright".
 
+## Step 3.5: Verify Playwright Runtime
+
+**Skip if:** browser_mode is "chrome-mcp". This step only runs when Playwright is the selected engine.
+
+### 3.5a. Check Playwright package
+
+Verify the Playwright package is available:
+
+```bash
+node -e "require('playwright'); console.log('OK')"
+```
+
+**If this fails:** Abort with error: "Playwright package not installed. Run: npm install @playwright/test"
+
+### 3.5b. Check Chromium binary
+
+Verify the Chromium browser binary is installed (not just the npm package):
+
+```bash
+node -e "const { chromium } = require('playwright'); chromium.launch({ headless: true }).then(b => { b.close(); console.log('OK'); }).catch(() => { console.log('MISSING'); process.exit(1); })"
+```
+
+**If output is "OK":** Chromium binary confirmed. Proceed to Step 4.
+
+**If output is "MISSING" or exit code is non-zero:** Install Chromium:
+
+```bash
+npx playwright install chromium
+```
+
+Log: "Chromium binary installed for Playwright fallback."
+
+### 3.5c. Re-verify after install
+
+After installation, re-run the binary check from 3.5b. If it still fails, abort with error: "Failed to install Chromium binary for Playwright. Check permissions and network connectivity."
+
 ## Step 4: Start App (if needed)
 
 Check if the application is already running:
@@ -183,9 +219,100 @@ Initialize results tracking:
 
 **Playwright execution** (when browser_mode is "playwright"):
 
-Playwright execution engine is implemented in Phase 93. For now:
-- Mark all tests as `skipped` with reason "Playwright fallback not yet implemented"
-- This is not a failure — set overall status to `passed` (no failures detected)
+For each test, generate an ephemeral inline Node.js script, execute it, judge the result, and clean up.
+
+1. **Generate ephemeral script:** Write a temporary file `/tmp/uat-test-{N}.cjs` with the following structure:
+
+   ```javascript
+   const { chromium } = require('playwright');
+   (async () => {
+     let browser;
+     try {
+       browser = await chromium.launch({ headless: true });
+       const page = await browser.newPage();
+       await page.goto('{test_url}', { waitUntil: 'networkidle', timeout: 30000 });
+
+       // --- Interactions ---
+       // The agent writes test-specific Playwright API calls here based on the
+       // test's expected behavior description. Examples:
+       //   await page.getByText('{text}').click();
+       //   await page.getByLabel('{label}').fill('{value}');
+       //   await page.keyboard.press('{key}');
+       // If no interaction is needed (just verify content), skip this section.
+
+       // --- Evidence ---
+       const fs = require('fs');
+       fs.mkdirSync('{evidence_dir}', { recursive: true });
+       await page.screenshot({ path: '{evidence_path}', fullPage: true });
+
+       // --- Extract page text ---
+       const text = await page.innerText('body');
+
+       console.log(JSON.stringify({ pageText: text, screenshotPath: '{evidence_path}' }));
+       await browser.close();
+     } catch (err) {
+       if (browser) await browser.close().catch(() => {});
+       console.log(JSON.stringify({ error: err.message }));
+       process.exit(1);
+     }
+   })();
+   ```
+
+   The agent customizes the script per test:
+   - `{test_url}` — base_url + path from test description (or just base_url)
+   - `{evidence_dir}` — `.planning/uat-evidence/{milestone}/`
+   - `{evidence_path}` — `.planning/uat-evidence/{milestone}/{phase}-test-{N}.png`
+   - Interaction section — translated from the test's natural language description into Playwright API calls (same role as Chrome MCP mode where the agent decides which MCP tools to call)
+
+   Write the script file using Bash:
+   ```bash
+   cat > /tmp/uat-test-{N}.cjs << 'SCRIPT'
+   {generated script content}
+   SCRIPT
+   ```
+
+2. **Execute script:**
+
+   ```bash
+   node /tmp/uat-test-{N}.cjs
+   ```
+
+   Capture stdout (JSON result) and exit code.
+
+3. **Clean up script:**
+
+   ```bash
+   rm -f /tmp/uat-test-{N}.cjs
+   ```
+
+4. **Parse result:**
+   - If exit code is 0 and stdout contains valid JSON: extract `pageText` and `screenshotPath`
+   - If exit code is non-zero or JSON contains `error` field: record test as failed with the error message as the observed behavior
+
+5. **Judge Pass/Fail:** Apply the SAME judgment protocol as Chrome MCP mode (see `<judgment_protocol>` section):
+
+   **PRIMARY signal (DOM text):**
+   - Does the `pageText` from the script output contain the expected content described in the test?
+   - Are expected elements, messages, or data present?
+   - Are there error messages or unexpected states?
+
+   **SUPPLEMENTARY signal (screenshot):**
+   - The screenshot was saved to disk at `screenshotPath` for evidence
+
+   **Verdict:**
+   - **PASS** if pageText content matches the expected behavior description
+   - **FAIL** if pageText contradicts the expected behavior, expected content is missing, or error messages are present
+
+6. **Record result:** Same format as Chrome MCP:
+   - For PASS: `{phase, name, status: "pass", evidence: "{path}"}`
+   - For FAIL: `{phase, name, status: "fail", evidence: "{path}", expected: "{expected behavior}", observed: "{what pageText showed}"}`
+
+**Key points:**
+- Scripts use CJS `require()` (not ESM imports) — consistent with the project
+- Scripts are ephemeral — written to `/tmp`, executed via `node`, deleted immediately after
+- The agent remains the judgment engine — Playwright is just the browser driver
+- The agent writes different Playwright code per test based on the test description
+- Output format is identical to Chrome MCP mode — the results table, gaps section, and MILESTONE-UAT.md structure are the same regardless of which engine ran
 
 ## Step 6: Write Results
 
