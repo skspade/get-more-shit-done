@@ -350,7 +350,7 @@ AskUserQuestion(
 )
 ```
 
-**If "Yes, proceed":** Continue to Step 7.
+**If "Yes, proceed":** Continue to Step 6.
 
 **If "No, let me clarify":** Proceed to 5c.
 
@@ -371,7 +371,7 @@ AskUserQuestion(
 )
 ```
 
-**If "Cancel — proceed as-is":** Continue to Step 7.
+**If "Cancel — proceed as-is":** Continue to Step 6.
 
 **Otherwise:** Re-ask the selected dimension's interview question using the same AskUserQuestion format from Step 3:
 - "Goal" → re-ask Q1 (Interview: Goal)
@@ -471,7 +471,7 @@ $SELECTED_APPROACH = "
 
 Display: `✓ Approach selected: {Name}`
 
-Proceed to Step 7.
+Proceed to Step 6.
 
 **If user selects "Let me suggest modifications":**
 
