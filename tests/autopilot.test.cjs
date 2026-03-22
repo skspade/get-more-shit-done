@@ -283,6 +283,61 @@ describe('autopilot.mjs streaming functions (static analysis)', () => {
   });
 });
 
+// ─── Static Analysis: UAT integration (Phase 94) ─────────────────────────────
+
+describe('autopilot.mjs UAT integration (static analysis)', () => {
+  const source = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
+
+  test('runAutomatedUAT function exists', () => {
+    assert.ok(
+      source.includes('async function runAutomatedUAT'),
+      'autopilot.mjs should contain runAutomatedUAT function'
+    );
+  });
+
+  test('auditAndUAT helper function exists', () => {
+    assert.ok(
+      source.includes('async function auditAndUAT'),
+      'autopilot.mjs should contain auditAndUAT helper function'
+    );
+  });
+
+  test('UAT gates on uat-config.yaml existence', () => {
+    assert.ok(
+      source.includes('uat-config.yaml'),
+      'runAutomatedUAT should check for uat-config.yaml'
+    );
+  });
+
+  test('UAT invokes /gsd:uat-auto workflow', () => {
+    assert.ok(
+      source.includes('uat-auto'),
+      'runAutomatedUAT should invoke the uat-auto workflow'
+    );
+  });
+
+  test('UAT reads MILESTONE-UAT.md for results', () => {
+    assert.ok(
+      source.includes('MILESTONE-UAT.md'),
+      'runAutomatedUAT should read MILESTONE-UAT.md'
+    );
+  });
+
+  test('auditAndUAT calls runMilestoneAudit', () => {
+    assert.ok(
+      source.includes('runMilestoneAudit()'),
+      'auditAndUAT should call runMilestoneAudit'
+    );
+  });
+
+  test('auditAndUAT calls runAutomatedUAT', () => {
+    assert.ok(
+      source.includes('runAutomatedUAT()'),
+      'auditAndUAT should call runAutomatedUAT'
+    );
+  });
+});
+
 // ─── Pre-flight Validation (TEST-03) ────────────────────────────────────────
 
 const { validateProjectHealth } = require('../get-shit-done/bin/lib/validation.cjs');

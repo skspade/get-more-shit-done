@@ -8,7 +8,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 
 <process>
 
-## 1. Load Audit Results
+## 1. Load Audit and UAT Results
 
 ```bash
 # Find the most recent audit file
@@ -25,7 +25,14 @@ If `gaps.test_consolidation` is absent or empty, skip test consolidation with no
 
 Also extract `test_health.budget_status` from the frontmatter (values: `OK`, `Warning`, `Over Budget`). If absent, default to `OK`.
 
-If no audit file exists or has no gaps, error:
+Also check for UAT test results:
+```bash
+ls -t .planning/MILESTONE-UAT.md 2>/dev/null | head -1
+```
+
+If `MILESTONE-UAT.md` exists, read its `## Gaps` section. UAT gaps use the identical schema (`truth`, `status`, `reason`, `severity`) and should be merged with audit gaps before grouping into fix phases. UAT gaps are treated as `gaps.requirements` entries for prioritization purposes.
+
+If no audit file exists and no UAT file exists, or neither has gaps, error:
 ```
 No audit gaps found. Run `/gsd:audit-milestone` first.
 ```
@@ -317,6 +324,7 @@ Each strategy maps to a specific task type. All field values (`{source}`, `{acti
 
 <success_criteria>
 - [ ] MILESTONE-AUDIT.md loaded and gaps parsed
+- [ ] MILESTONE-UAT.md loaded if present and UAT gaps merged
 - [ ] Gaps prioritized (must/should/nice)
 - [ ] Gaps grouped into logical phases
 - [ ] User confirmed phase plan
