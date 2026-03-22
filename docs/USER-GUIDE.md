@@ -9,6 +9,7 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 - [Workflow Diagrams](#workflow-diagrams)
 - [Test Architecture](#test-architecture)
 - [UI Testing (Playwright)](#ui-testing-playwright)
+- [Automated UAT](#automated-uat)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -309,6 +310,126 @@ When you run `/gsd:add-tests [phase]`, GSD classifies implementation files into 
 
 ---
 
+## Automated UAT
+
+GSD can run automated User Acceptance Testing against web applications using Chrome MCP (primary) or Playwright headless (fallback). The `/gsd:uat-auto` command executes UAT tests autonomously, producing a MILESTONE-UAT.md report with pass/fail results and evidence screenshots. In the autopilot pipeline, automated UAT runs after milestone audit passes and before milestone completion.
+
+### Workflow
+
+```
+  /gsd:uat-auto
+         |
+         +-- Load uat-config.yaml
+         |     (skip silently if missing -- non-web projects)
+         |
+         +-- Discover tests
+         |     +-- Scan phases for *-UAT.md (status: complete)
+         |     +-- Fallback: generate scenarios from SUMMARY.md files
+         |
+         +-- Detect browser engine
+         |     +-- Chrome MCP probe (full round-trip)
+         |     +-- Fallback: Playwright headless Chromium
+         |
+         +-- Start app (if not running)
+         |     +-- Fetch base_url to check
+         |     +-- Run startup_command if needed
+         |     +-- Wait startup_wait_seconds
+         |
+         +-- Execute tests
+         |     +-- Navigate, interact, screenshot, judge pass/fail
+         |     +-- Save evidence to .planning/uat-evidence/{milestone}/
+         |
+         +-- Write MILESTONE-UAT.md
+         |     +-- YAML frontmatter (status, counts, browser, timestamps)
+         |     +-- Results table with pass/fail per test
+         |     +-- Gaps section for failures (truth, status, reason, severity)
+         |
+         +-- Commit results to git
+```
+
+### Configuration
+
+Automated UAT is configured via `uat-config.yaml` in your project root. If this file does not exist, UAT is skipped silently (non-web projects proceed to milestone completion without UAT).
+
+```yaml
+# uat-config.yaml
+base_url: http://localhost:3000
+startup_command: npm run dev
+startup_wait_seconds: 10
+browser: chrome-mcp
+fallback_browser: playwright
+timeout_minutes: 10
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `base_url` | string | Yes | -- | URL of the application to test |
+| `startup_command` | string | No | -- | Command to start the dev server |
+| `startup_wait_seconds` | integer | No | `10` | Seconds to wait after starting the server |
+| `browser` | string | No | `chrome-mcp` | Primary browser engine |
+| `fallback_browser` | string | No | `playwright` | Fallback browser engine when primary is unavailable |
+| `timeout_minutes` | integer | No | `10` | Maximum session duration in minutes |
+
+### Test Discovery
+
+The UAT workflow discovers tests from two sources:
+
+1. **UAT.md files** -- Scans phase directories for `*-UAT.md` files with `status: complete` in their frontmatter. These are tests created by `/gsd:verify-work` during manual UAT.
+
+2. **SUMMARY.md fallback** -- When no UAT.md files exist, the workflow generates test scenarios from SUMMARY.md files across milestone phases. Each summary's deliverables become test scenarios.
+
+### Browser Engines
+
+**Chrome MCP (Primary)**
+
+Uses Chrome MCP tools to interact with a real browser instance:
+- `chrome_navigate` -- Navigate to pages
+- `chrome_click_element`, `chrome_fill_or_select`, `chrome_keyboard` -- Interact with elements
+- `chrome_screenshot` -- Capture visual evidence
+- `chrome_get_web_content` -- Read DOM content for pass/fail judgment
+
+Chrome MCP availability is verified via a full round-trip probe (not just checking if tools exist). If the probe fails, the workflow automatically falls back to Playwright.
+
+**Playwright (Fallback)**
+
+When Chrome MCP is unavailable:
+- Generates ephemeral inline Playwright scripts per test (no persistent `.spec.ts` files)
+- Runs in headless Chromium mode
+- Checks Chromium binary availability and installs if missing (`npx playwright install chromium`)
+- Produces identical output format (screenshots, results) to Chrome MCP mode
+
+### Pipeline Integration
+
+In the autopilot pipeline, automated UAT is wired into the milestone completion flow:
+
+```
+  Milestone audit passes
+         |
+         +-- runAutomatedUAT()
+         |     +-- Check uat-config.yaml exists
+         |     +-- Spawn /gsd:uat-auto workflow
+         |     +-- Read MILESTONE-UAT.md status
+         |
+         +-- Route by result
+               |
+               +-- All tests pass --> runMilestoneCompletion()
+               +-- Gaps found --> runGapClosureLoop()
+               +-- Crash --> debug retry mechanism
+```
+
+UAT failures feed into the same gap closure loop used by milestone audit. The gap planner recognizes MILESTONE-UAT.md as a gap source alongside MILESTONE-AUDIT.md, so UAT gaps are automatically planned and fixed.
+
+### Example Usage
+
+```
+# Run automated UAT session
+/gsd:uat-auto
+```
+
+The command requires no arguments. It reads configuration from `uat-config.yaml` and runs fully autonomously. In most cases, you will not invoke this command directly -- the autopilot runs it automatically after milestone audit.
+
+---
+
 ## Command Reference
 
 ### Core Workflow
@@ -362,6 +483,7 @@ When you run `/gsd:add-tests [phase]`, GSD classifies implementation files into 
 | `/gsd:linear <issue-id> [flags]` | Route Linear issue to quick task or milestone | Have a Linear issue to implement |
 | `/gsd:brainstorm [topic]` | Collaborative brainstorming that produces a design doc and routes into milestone/project creation | Want to explore an idea before committing to implementation |
 | `/gsd:ui-test [phase] [url]` | Generate and run Playwright E2E tests | After UI is deployed or running locally |
+| `/gsd:uat-auto` | Run automated UAT session (Chrome MCP + Playwright fallback) | After milestone audit, or on-demand for web projects |
 | `/gsd:add-tests [phase]` | Add unit and E2E tests to a phase | After execution, to boost test coverage |
 | `/gsd:pr-review [flags] [aspects...]` | Route PR review findings to quick task or milestone | Have PR review feedback to act on |
 | `/gsd:test-review [--report-only]` | Analyze diff for test coverage gaps and route findings | After code changes, to check test health |
@@ -724,6 +846,17 @@ Analyze your branch diff for test coverage gaps, stale tests, and consolidation 
 
 After completion, GSD displays a banner with route taken (if any), report path, and artifacts created. The permanent report at `.planning/reviews/YYYY-MM-DD-test-review.md` serves as an audit trail.
 
+### Automated UAT
+
+Run automated UAT against a web application. Requires `uat-config.yaml` in your project root.
+
+```
+# Run automated UAT session
+/gsd:uat-auto
+```
+
+**Flow:** The command loads `uat-config.yaml`, discovers tests from UAT.md files (or generates scenarios from SUMMARY.md), detects the browser engine (Chrome MCP with Playwright fallback), starts the dev server if needed, executes tests, and writes results to MILESTONE-UAT.md with evidence screenshots. In the autopilot pipeline, this runs automatically after milestone audit passes.
+
 ---
 
 ## Troubleshooting
@@ -793,6 +926,10 @@ To disable acceptance test gathering entirely: `gsd settings set test.acceptance
 
 Make sure your dev server is running before running `/gsd:ui-test`. Playwright tests need a live server at the URL you provide.
 
+### Automated UAT Skipped or Not Running
+
+If `/gsd:uat-auto` is skipped silently, check that `uat-config.yaml` exists in your project root. Non-web projects (those without `uat-config.yaml`) skip UAT automatically. If Chrome MCP is unavailable, the workflow falls back to Playwright -- ensure Playwright is installed (`npx playwright install chromium`) if you need the fallback.
+
 ### Subagent Appears to Fail but Work Was Done
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
@@ -816,6 +953,7 @@ A known workaround exists for a Claude Code classification bug. GSD's orchestrat
 | Test budget warnings | `gsd settings set test.budget.per_phase N` to increase limit |
 | Test suite health concerns | `/gsd:audit-tests` for on-demand health check |
 | Need E2E test coverage | `/gsd:ui-test [phase] [url]` or `/gsd:add-tests [phase]` |
+| Automated UAT not running | Check `uat-config.yaml` exists; non-web projects skip UAT silently |
 
 ---
 
