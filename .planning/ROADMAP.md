@@ -212,7 +212,7 @@
 
 **Milestone Goal:** Replace the numeric complexity scoring heuristic in `/gsd:linear` with an always-on interview phase that captures richer context via adaptive questions, routes based on complexity signal, and posts enriched summaries back to Linear before execution.
 
-- [ ] **Phase 84: Interview Engine and Route Decision** - Core behavioral change: adaptive interview questions replace scoring heuristic, complexity signal drives routing
+- [x] **Phase 84: Interview Engine and Route Decision** - Core behavioral change: adaptive interview questions replace scoring heuristic, complexity signal drives routing (completed 2026-03-22)
 - [ ] **Phase 85: Hybrid Output** - User-facing confirmation summary (quick) and approach proposals (milestone) with re-ask capability
 - [ ] **Phase 86: Comment-Back and Enriched Context** - Pre-execution Linear comment, enriched downstream context in frontmatter, descriptions, and MILESTONE-CONTEXT.md
 - [ ] **Phase 87: Command Spec and Documentation** - Update command spec and success criteria to reflect interview-driven routing
@@ -300,7 +300,7 @@ Phases execute in numeric order: 84 → 85 → 86 → 87
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
-| 84. Interview Engine and Route Decision | v3.0 | 0/2 | Planned | - |
+| 84. Interview Engine and Route Decision | v3.0 | Complete    | 2026-03-22 | - |
 | 85. Hybrid Output | v3.0 | 0/0 | Not started | - |
 | 86. Comment-Back and Enriched Context | v3.0 | 0/0 | Not started | - |
 | 87. Command Spec and Documentation | v3.0 | 0/0 | Not started | - |
