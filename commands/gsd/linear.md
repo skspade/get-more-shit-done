@@ -17,13 +17,14 @@ allowed-tools:
   - mcp__plugin_linear_linear__list_issues
 ---
 <objective>
-Route Linear issues to GSD workflows. Fetches issue from Linear, auto-routes to quick or milestone based on complexity scoring, delegates to appropriate workflow.
+Route Linear issues to GSD workflows. Fetches issue from Linear, conducts an adaptive interview to gather goal, scope, and complexity signal, then routes to quick or milestone workflow.
 
 - Reads the Linear issue via MCP tools
-- Scores complexity to determine routing (quick task vs new milestone)
+- Conducts 3-5 adaptive interview questions covering goal, scope, criteria, and complexity
+- Routes based on complexity signal from interview (quick task vs new milestone)
 - Accepts override flags: --quick (force quick), --milestone (force milestone)
-- Delegates to the appropriate GSD workflow with issue context
-- Posts status comments back to Linear on completion
+- Presents confirmation summary (quick) or approach proposals (milestone)
+- Posts interview summary to Linear before execution, completion comment after
 </objective>
 
 <execution_context>
@@ -38,5 +39,5 @@ Context files are resolved inside the workflow (`init linear`) and delegated via
 
 <process>
 Execute the linear workflow from @~/.claude/get-shit-done/workflows/linear.md end-to-end.
-Preserve all workflow gates (issue fetch, complexity scoring, routing, execution, Linear status updates).
+Preserve all workflow gates (issue fetch, interview, routing, hybrid output, execution, Linear status updates).
 </process>
