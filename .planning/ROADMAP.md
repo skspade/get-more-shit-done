@@ -218,7 +218,7 @@
 - [x] **Phase 87: Command Spec and Documentation** - Update command spec and success criteria to reflect interview-driven routing (completed 2026-03-22)
 - [x] **Phase 88: Fix Step 5→6 Routing** - Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of skipping to Step 7 (Gap Closure) (completed 2026-03-22)
 - [x] **Phase 89: Fix Step 5→6 Routing (Actual File Fix)** - Actually change lines 353, 374, 474 in linear.md from Step 7 to Step 6 (Gap Closure) (completed 2026-03-22)
-- [ ] **Phase 90: Traceability and Tech Debt Cleanup** - Update REQUIREMENTS.md checkboxes, fix SUMMARY frontmatter, correct WKFL-01 step count, fix Phase 88 VERIFICATION.md (Gap Closure)
+- [x] **Phase 90: Traceability and Tech Debt Cleanup** - Update REQUIREMENTS.md checkboxes, fix SUMMARY frontmatter, correct WKFL-01 step count, fix Phase 88 VERIFICATION.md (Gap Closure) (completed 2026-03-22)
 
 ## Phase Details
 
@@ -352,4 +352,4 @@ Phases execute in numeric order: 84 → 85 → 86 → 87 → 88 → 89 → 90
 | 87. Command Spec and Documentation | 1/1 | Complete    | 2026-03-22 | - |
 | 88. Fix Step 5→6 Routing (Gap Closure) | 1/1 | Complete    | 2026-03-22 | - |
 | 89. Fix Step 5→6 Routing (Actual File Fix) (Gap Closure) | 0/0 | Complete    | 2026-03-22 | - |
-| 90. Traceability and Tech Debt Cleanup (Gap Closure) | 0/1 | Planned | - | - |
+| 90. Traceability and Tech Debt Cleanup (Gap Closure) | 1/1 | Complete   | 2026-03-22 | - |
