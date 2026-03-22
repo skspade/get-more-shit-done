@@ -1,12 +1,15 @@
 <purpose>
-Route Linear issues to GSD workflows. Fetches issue data from Linear via MCP tools, auto-routes to quick task or new milestone based on complexity scoring heuristic, and delegates to the appropriate GSD workflow end-to-end.
+Route Linear issues to GSD workflows. Fetches issue data from Linear via MCP tools, asks adaptive interview questions to gather context, routes to quick task or new milestone based on complexity signal, and delegates to the appropriate GSD workflow end-to-end.
 
 - Parses issue IDs and flags from arguments
 - Fetches issue data and comments via Linear MCP tools
-- Scores issue complexity to determine routing (quick vs milestone)
+- Asks 3-5 adaptive interview questions (skipping those answered by ticket data)
+- Routes based on complexity signal from interview (quick vs milestone)
 - Accepts override flags: `--quick`, `--milestone`, `--full`
-- Delegates to quick workflow (steps 2-8) or new-milestone workflow (steps 1-11)
-- Posts summary comments back to Linear issues after completion
+- Presents confirmation summary (quick) or approach proposals (milestone) before execution
+- Posts interview summary to Linear issues before execution starts
+- Delegates to quick workflow (steps 3-10) or new-milestone workflow (steps 1-11)
+- Posts completion comments back to Linear issues after execution
 - Cleans up temporary `.planning/linear-context.md` after comment-back
 </purpose>
 
@@ -91,42 +94,460 @@ For each issue, display:
 
 ---
 
-**Step 3: Route via heuristic**
+**Step 3: Interview**
+
+After fetching issue data, pre-scan the primary issue to determine which questions to skip, then ask adaptive interview questions to gather context.
+
+**3a. Pre-scan ticket data:**
+
+Read `$ISSUES[0]` (primary issue) and build a skip checklist:
+
+- `$SKIP_GOAL = true` ONLY if description contains a markdown section `## Goal` or `## Objective` with content beneath it
+- `$SKIP_SCOPE = true` ONLY if description explicitly names files or components (e.g., path references like `src/`, component names) OR has a `## Scope` section
+- `$SKIP_CRITERIA = true` ONLY if description contains a `## Acceptance Criteria` or `## Done When` section with list items
+- `$SKIP_COMPLEXITY = true` if `$FORCE_QUICK` or `$FORCE_MILESTONE` is true (from Step 1 flag parsing)
+- If `$SKIP_COMPLEXITY` is false, also check: if description or labels explicitly contain "quick fix", "small change", "epic", or "milestone" — set `$SKIP_COMPLEXITY = true` and store `$INFERRED_COMPLEXITY` with the matched value (e.g., "quick fix" → "Quick task", "epic" → "Milestone")
+
+Display pre-scan results:
+```
+◆ Pre-scan: {N} of 5 questions will be skipped (ticket provides answers)
+```
+
+**3b. Adaptive interview questions:**
+
+Initialize `$INTERVIEW_CONTEXT = ""`. Ask questions one at a time using AskUserQuestion. After each answer, incorporate the response before deciding on the next question.
+
+**Q1: Goal clarification** (skip if `$SKIP_GOAL`)
+
+If skipped: Extract goal text from the ticket's `## Goal` or `## Objective` section. Append to `$INTERVIEW_CONTEXT`:
+```
+**Goal:** (from ticket) {extracted goal text}
+```
+
+If asked:
+```
+AskUserQuestion(
+  header: "Interview: Goal",
+  question: "What's the core outcome you want from {$ISSUES[0].identifier}?",
+  options: [
+    {2-3 interpretations derived from the issue title, if title is ambiguous},
+    "Something else — let me describe"
+  ],
+  followUp: null
+)
+```
+If user selects "Something else", their free-text response becomes the goal.
+Append to `$INTERVIEW_CONTEXT`:
+```
+**Goal:** {answer}
+```
+
+**Q2: Scope boundaries** (skip if `$SKIP_SCOPE`)
+
+If skipped: Extract scope from ticket's file references or `## Scope` section. Append:
+```
+**Scope:** (from ticket) {extracted scope — files/components named}
+```
+
+If asked: Derive options from ticket context — mention component areas, file patterns, or subsystems referenced in the description or comments.
+```
+AskUserQuestion(
+  header: "Interview: Scope",
+  question: "How much of the codebase should this touch?",
+  options: [
+    {2-3 scope options derived from ticket context, e.g., "Just {component}" or "The {area} subsystem"},
+    "Broader — touches multiple areas",
+    "Not sure yet"
+  ],
+  followUp: null
+)
+```
+Append:
+```
+**Scope:** {answer}
+```
+
+**Q3: Success criteria** (skip if `$SKIP_CRITERIA`)
+
+If skipped: Extract criteria from ticket's `## Acceptance Criteria` or `## Done When` section. Append:
+```
+**Success Criteria:** (from ticket) {extracted criteria}
+```
+
+If asked: Synthesize options from the goal answer (Q1).
+```
+AskUserQuestion(
+  header: "Interview: Success Criteria",
+  question: "How will you know this is done?",
+  options: [
+    {2-3 criteria synthesized from the Q1 goal answer},
+    "I'll define these after seeing the approach"
+  ],
+  followUp: null
+)
+```
+Append:
+```
+**Success Criteria:** {answer}
+```
+
+**Q4: Complexity signal** (skip if `$SKIP_COMPLEXITY`)
+
+If skipped via flag: Append:
+```
+**Complexity:** (flag override) {$FORCE_QUICK ? "Quick task" : "Milestone"}
+```
+
+If skipped via ticket inference: Append:
+```
+**Complexity:** (from ticket) {$INFERRED_COMPLEXITY}
+```
+
+If asked:
+```
+AskUserQuestion(
+  header: "Interview: Complexity",
+  question: "How much work does this feel like?",
+  options: [
+    "Quick task (hours)",
+    "Medium (1-2 sessions)",
+    "Milestone (multi-phase)"
+  ],
+  followUp: null
+)
+```
+Append:
+```
+**Complexity:** {answer}
+```
+
+**Q5: Additional context** (conditional)
+
+Only ask if previous answers surfaced ambiguity: Q1 answer was "Something else", Q2 was "Not sure yet", Q3 was "I'll define these after seeing the approach", or any answer contradicts the ticket data.
+
+If asked:
+```
+AskUserQuestion(
+  header: "Interview: Additional",
+  question: "Anything else I should know about this task?",
+  followUp: null
+)
+```
+Append:
+```
+**Additional:** {answer}
+```
+
+If not asked: Append:
+```
+**Additional:** none
+```
+
+Display completion:
+```
+✓ Interview complete ({N} questions asked, {M} skipped from ticket)
+```
+
+---
+
+**Step 4: Route decision**
+
+Three-tier routing fallback: flag override → interview answer → ticket inference with confirmation.
+
+**Tier 1: Flag override** (already set in Step 1)
 
 **If `$FORCE_QUICK`:**
 - Set `$ROUTE = "quick"`
 - Display: "Route: QUICK (flag override)"
-- Skip scoring, proceed to Step 4.
+- Proceed to Step 5.
 
 **If `$FORCE_MILESTONE`:**
 - Set `$ROUTE = "milestone"`
 - Display: "Route: MILESTONE (flag override)"
-- Skip scoring, proceed to Step 4.
+- Proceed to Step 5.
 
-**Otherwise, compute `$MILESTONE_SCORE`:**
+**Tier 2: Interview answer** (from Step 3 Q4)
 
-Start at 0, then apply:
+If the complexity question was answered (not skipped), parse the complexity answer from `$INTERVIEW_CONTEXT`:
+- "Quick task (hours)" → set `$ROUTE = "quick"`
+- "Medium (1-2 sessions)" → set `$ROUTE = "quick"`, set `$FULL_MODE = true`
+- "Milestone (multi-phase)" → set `$ROUTE = "milestone"`
 
-| Condition | Points |
-|-----------|--------|
-| Multiple issues (`$ISSUE_IDS` length > 1) | +3 |
-| Any issue has sub-issues/children | +2 |
-| Any issue description > 500 words | +1 |
-| Any label matches "feature" or "epic" (case-insensitive) | +2 |
-| Any label matches "bug", "fix", "chore", or "docs" (case-insensitive) | -1 |
-| Any blocking or related issue relations | +1 |
+Display: "Route: {$ROUTE}{$FULL_MODE ? ' (full mode)' : ''} (from interview)"
+Proceed to Step 5.
 
-**Minimum score is 0** (do not go negative).
+**Tier 3: Ticket inference with confirmation** (when Q4 was skipped by ticket content)
 
-**Route decision:**
-- `$MILESTONE_SCORE >= 3` → set `$ROUTE = "milestone"`
-- `$MILESTONE_SCORE < 3` → set `$ROUTE = "quick"`
+If `$SKIP_COMPLEXITY` is true AND no flag override (Tier 1 did not fire):
 
-Display: "Routing: {$ROUTE} (score: {$MILESTONE_SCORE})"
+Use `$INFERRED_COMPLEXITY` from Step 3 pre-scan to determine the proposed route:
+- "quick fix" / "small change" → propose `$ROUTE = "quick"`
+- "epic" / "milestone" → propose `$ROUTE = "milestone"`
+
+Ask for confirmation:
+```
+AskUserQuestion(
+  header: "Route Confirmation",
+  question: "Based on the ticket, this looks like a {proposed route}. Is that right?",
+  options: [
+    "Yes, {proposed route}",
+    "No, it's a quick task (hours)",
+    "No, it's medium (1-2 sessions)",
+    "No, it's a milestone (multi-phase)"
+  ],
+  followUp: null
+)
+```
+
+Map the confirmation answer to `$ROUTE` and `$FULL_MODE` using the same mapping as Tier 2.
+Update `$INTERVIEW_CONTEXT`: replace the Complexity line with the confirmed answer.
+
+Display: "Route: {$ROUTE} (confirmed from ticket inference)"
+
+**Display route banner:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► ROUTE: {$ROUTE}{$FULL_MODE ? ' (FULL MODE)' : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ---
 
-**Step 4: Write linear-context.md**
+**Step 5: Hybrid output**
+
+Initialize `$SELECTED_APPROACH = ""`.
+
+### Quick Route
+
+**If `$ROUTE == "quick"`:**
+
+**5a. Display confirmation summary:**
+
+Display a banner with the confirmation summary:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► CONFIRMATION SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Issue:    {$ISSUES[0].identifier} — {$ISSUES[0].title}
+Goal:     {extracted from $INTERVIEW_CONTEXT **Goal:** line}
+Scope:    {extracted from $INTERVIEW_CONTEXT **Scope:** line}
+Criteria: {extracted from $INTERVIEW_CONTEXT **Success Criteria:** line}
+Route:    {$ROUTE}{$FULL_MODE ? ' (full mode)' : ''}
+```
+
+**5b. Ask for confirmation:**
+
+```
+AskUserQuestion(
+  header: "Confirm",
+  question: "Does this look right?",
+  options: [
+    "Yes, proceed",
+    "No, let me clarify"
+  ],
+  followUp: null
+)
+```
+
+**If "Yes, proceed":** Continue to Step 7.
+
+**If "No, let me clarify":** Proceed to 5c.
+
+**5c. Dimension picker:**
+
+```
+AskUserQuestion(
+  header: "Clarify",
+  question: "Which part would you like to revisit?",
+  options: [
+    "Goal",
+    "Scope",
+    "Success Criteria",
+    "Complexity",
+    "Cancel — proceed as-is"
+  ],
+  followUp: null
+)
+```
+
+**If "Cancel — proceed as-is":** Continue to Step 7.
+
+**Otherwise:** Re-ask the selected dimension's interview question using the same AskUserQuestion format from Step 3:
+- "Goal" → re-ask Q1 (Interview: Goal)
+- "Scope" → re-ask Q2 (Interview: Scope)
+- "Success Criteria" → re-ask Q3 (Interview: Success Criteria)
+- "Complexity" → re-ask Q4 (Interview: Complexity)
+
+After the user answers, update the corresponding `**{Dimension}:**` line in `$INTERVIEW_CONTEXT` with the new answer. If the user changes Complexity, also update `$ROUTE` and `$FULL_MODE` using the same mapping as Step 4 Tier 2.
+
+Then return to 5a to re-display the updated confirmation summary with the same Yes/No prompt. This loop continues until the user selects "Yes, proceed" or "Cancel — proceed as-is".
+
+### Milestone Route
+
+**If `$ROUTE == "milestone"`:**
+
+**5d. Synthesize approach proposals:**
+
+Based on `$INTERVIEW_CONTEXT` (goal, scope, criteria) and `$ISSUES` (title, description, labels), synthesize 2-3 distinct implementation approaches. Each approach should represent a meaningfully different strategy for achieving the goal.
+
+Display:
+
+```
+## Proposed Approaches
+
+### Approach 1: {Name}
+
+{Description — 2-3 sentences explaining the approach and how it addresses the goal}
+
+**Pros:**
+- {Advantage}
+- {Advantage}
+
+**Cons:**
+- {Disadvantage}
+- {Disadvantage}
+
+### Approach 2: {Name}
+
+{Description}
+
+**Pros:**
+- {Advantage}
+- {Advantage}
+
+**Cons:**
+- {Disadvantage}
+- {Disadvantage}
+
+### Approach 3: {Name} (if warranted by complexity)
+
+{Description}
+
+**Pros:**
+- {Advantage}
+
+**Cons:**
+- {Disadvantage}
+
+### Recommendation
+
+I recommend **Approach {N}: {Name}** because {reasoning tied to user's stated goal and constraints from interview}.
+```
+
+**5e. Ask user to select approach:**
+
+```
+AskUserQuestion(
+  header: "Approach Selection",
+  question: "Which approach would you like to go with?",
+  options: [
+    "Approach 1: {Name}",
+    "Approach 2: {Name}",
+    {"Approach 3: {Name}" if 3 approaches presented},
+    "Let me suggest modifications"
+  ],
+  followUp: null
+)
+```
+
+**If user selects an approach:** Store the selected approach in `$SELECTED_APPROACH`:
+
+```
+$SELECTED_APPROACH = "
+## Selected Approach
+
+### {Approach Name}
+
+{Description}
+
+**Pros:**
+- {pros list}
+
+**Cons:**
+- {cons list}
+"
+```
+
+Display: `✓ Approach selected: {Name}`
+
+Proceed to Step 7.
+
+**If user selects "Let me suggest modifications":**
+
+```
+AskUserQuestion(
+  header: "Modifications",
+  question: "What would you like to change about the proposed approaches?",
+  followUp: null
+)
+```
+
+Incorporate the user's feedback, revise the approach proposals, and return to 5d to re-present the updated proposals. This loop continues until the user selects a specific approach.
+
+---
+
+**Step 6: Pre-execution comment-back**
+
+Post interview summary to Linear before execution starts.
+
+**Build comment body based on route:**
+
+**If `$ROUTE == "quick"`:**
+
+Build comment body:
+
+```markdown
+## GSD Interview Summary
+
+**Goal:** {extracted from $INTERVIEW_CONTEXT **Goal:** line}
+**Scope:** {extracted from $INTERVIEW_CONTEXT **Scope:** line}
+**Success criteria:** {extracted from $INTERVIEW_CONTEXT **Success Criteria:** line}
+**Route:** Quick task
+
+Execution starting...
+```
+
+**If `$ROUTE == "milestone"`:**
+
+Build comment body:
+
+```markdown
+## GSD Interview Summary
+
+**Goal:** {extracted from $INTERVIEW_CONTEXT **Goal:** line}
+**Scope:** {extracted from $INTERVIEW_CONTEXT **Scope:** line}
+**Success criteria:** {extracted from $INTERVIEW_CONTEXT **Success Criteria:** line}
+**Route:** Milestone
+**Selected approach:** {approach name extracted from $SELECTED_APPROACH}
+
+{2-3 sentence approach description extracted from $SELECTED_APPROACH}
+
+Milestone creation starting...
+```
+
+**Post comment to each issue (non-blocking):**
+
+For each issue in `$ISSUES`:
+
+```
+mcp__plugin_linear_linear__create_comment(
+  issueId: issue.id,
+  body: comment_body
+)
+```
+
+Display: `✓ Pre-execution summary posted to {issue.identifier}`
+
+**On MCP failure:** Display warning but do not fail:
+```
+⚠ Failed to post pre-execution summary to {issue.identifier}. Continuing...
+```
+Continue to next issue (do not abort the loop).
+
+---
+
+**Step 7: Write linear-context.md**
 
 Write `.planning/linear-context.md`:
 
@@ -134,7 +555,7 @@ Write `.planning/linear-context.md`:
 ---
 issue_ids: [{comma-separated issue identifiers}]
 route: {quick|milestone}
-score: {$MILESTONE_SCORE or "override"}
+interview: true
 fetched: {ISO date}
 ---
 # Linear Context
@@ -145,13 +566,13 @@ Consumed by Phase 22 completion loop.
 
 ---
 
-**Step 5: Execute route**
+**Step 8: Execute route**
 
 ### Quick Route (WKFL-05)
 
 **If `$ROUTE == "quick"`:**
 
-**5a. Synthesize description:**
+**8a. Synthesize description:**
 
 Build `$DESCRIPTION` from issue data:
 - Start with first issue title
@@ -161,7 +582,7 @@ Build `$DESCRIPTION` from issue data:
 
 For multiple issues routed to quick (only possible via `--quick` flag override), use the first issue only.
 
-**5b. Initialize:**
+**8b. Initialize:**
 
 ```bash
 SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "$DESCRIPTION")
@@ -172,7 +593,7 @@ Parse INIT JSON for: `planner_model`, `executor_model`, `checker_model`, `verifi
 
 **If `roadmap_exists` is false:** Error — "Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first."
 
-**5c. Create task directory:**
+**8c. Create task directory:**
 
 ```bash
 mkdir -p "${quick_dir}"
@@ -187,7 +608,7 @@ Directory: ${QUICK_DIR}
 Linear: ${first issue identifier}
 ```
 
-**5d. Spawn planner (quick mode):**
+**8d. Spawn planner (quick mode):**
 
 ```
 Task(
@@ -233,7 +654,7 @@ After planner returns:
 
 If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
 
-**5e. Plan-checker loop (only when `$FULL_MODE`):**
+**8e. Plan-checker loop (only when `$FULL_MODE`):**
 
 Skip if NOT `$FULL_MODE`.
 
@@ -286,12 +707,12 @@ Task(
 ```
 
 Handle checker return:
-- **`## VERIFICATION PASSED`:** Display confirmation, proceed to 5f.
+- **`## VERIFICATION PASSED`:** Display confirmation, proceed to 8f.
 - **`## ISSUES FOUND`:** Display issues, enter revision loop (max 2 iterations).
 
 Revision loop: spawn planner with revision context and checker issues, re-check. If max iterations reached, offer: 1) Force proceed, 2) Abort.
 
-**5f. Spawn executor:**
+**8f. Spawn executor:**
 
 ```
 Task(
@@ -326,7 +747,7 @@ After executor returns:
 
 If summary not found, error: "Executor failed to create ${next_num}-SUMMARY.md"
 
-**5g. Verification (only when `$FULL_MODE`):**
+**8g. Verification (only when `$FULL_MODE`):**
 
 Skip if NOT `$FULL_MODE`.
 
@@ -363,7 +784,7 @@ Read verification status from `${QUICK_DIR}/${next_num}-VERIFICATION.md`.
 | `human_needed` | Display items needing manual check, store `$VERIFICATION_STATUS = "Needs Review"`, continue |
 | `gaps_found` | Display gap summary, offer: 1) Re-run executor, 2) Accept as-is. Store `$VERIFICATION_STATUS = "Gaps"` |
 
-**5h. Update STATE.md:**
+**8h. Update STATE.md:**
 
 Read STATE.md. Check for `### Quick Tasks Completed` section.
 
@@ -388,7 +809,7 @@ Update "Last activity" line:
 Last activity: ${date} - Completed quick task ${next_num}: ${first issue title}
 ```
 
-**5i. Final commit and completion:**
+**8i. Final commit and completion:**
 
 Build file list:
 - `${QUICK_DIR}/${next_num}-PLAN.md`
@@ -422,7 +843,7 @@ Commit: ${commit_hash}
 
 **If `$ROUTE == "milestone"`:**
 
-**5a. Build MILESTONE-CONTEXT.md:**
+**8a. Build MILESTONE-CONTEXT.md:**
 
 ```markdown
 # Milestone Context
@@ -447,11 +868,13 @@ ${For each of first 5 comments:}
 - ${comment.body truncated to 300 chars}
 ${end for each}
 ${end for each}
+
+${$SELECTED_APPROACH}
 ```
 
 Write to `.planning/MILESTONE-CONTEXT.md`.
 
-**5b. Initialize milestone models:**
+**8b. Initialize milestone models:**
 
 ```bash
 MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
@@ -459,7 +882,7 @@ MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
 
 Parse MINIT JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`.
 
-**5c. Execute new-milestone workflow steps 1-11 inline:**
+**8c. Execute new-milestone workflow steps 1-11 inline:**
 
 Follow the new-milestone workflow (`new-milestone.md`) from Step 1 through Step 11:
 
@@ -494,7 +917,7 @@ Display next step from new-milestone workflow Step 11 output.
 
 ---
 
-**Step 6: Comment-back to Linear issues**
+**Step 9: Comment-back to Linear issues**
 
 Post a summary comment to each Linear issue that triggered this workflow.
 
@@ -549,7 +972,7 @@ Continue to next issue (do not abort the loop).
 
 ---
 
-**Step 7: Cleanup**
+**Step 10: Cleanup**
 
 Delete the temporary linear-context.md file:
 
@@ -562,19 +985,31 @@ Display: `✓ Cleaned up .planning/linear-context.md`
 </process>
 
 <success_criteria>
-- [ ] Issue IDs parsed from arguments matching letter-dash-number pattern (WKFL-01)
-- [ ] Flags --quick, --milestone, --full parsed from arguments (WKFL-01)
-- [ ] User prompted via AskUserQuestion when no issue ID provided (WKFL-01)
-- [ ] Issue data fetched via mcp get_issue with includeRelations:true (WKFL-02)
-- [ ] Comments fetched via mcp list_comments (WKFL-02)
-- [ ] Fetched issue title, state, labels, and comment count displayed (WKFL-02)
-- [ ] Routing heuristic scores on issue count, sub-issues, description, labels, relations (WKFL-03)
-- [ ] Score >= 3 routes to milestone, < 3 routes to quick (WKFL-03)
-- [ ] --quick and --milestone flags bypass heuristic entirely (WKFL-04)
-- [ ] Quick route synthesizes description and delegates to quick workflow steps 2-8 (WKFL-05)
-- [ ] Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow (WKFL-06)
-- [ ] .planning/linear-context.md written with issue IDs and route decision
+- [ ] Issue IDs parsed from arguments matching letter-dash-number pattern
+- [ ] Flags --quick, --milestone, --full parsed from arguments
+- [ ] User prompted via AskUserQuestion when no issue ID provided
+- [ ] Issue data fetched via mcp get_issue with includeRelations:true
+- [ ] Comments fetched via mcp list_comments
+- [ ] Fetched issue title, state, labels, and comment count displayed
+- [ ] Interview asks 3-5 adaptive questions after ticket fetch, skipping questions already answered by ticket (INTV-01)
+- [ ] Pre-scan reads ticket title, description, labels, comments to build skip checklist (INTV-02)
+- [ ] Each interview question adapts based on previous answers (INTV-03)
+- [ ] Interview covers five dimensions: goal, scope, success criteria, complexity, additional context (INTV-04)
+- [ ] All interview Q&A stored as $INTERVIEW_CONTEXT with labeled sections (INTV-05)
+- [ ] Complexity signal from interview determines route: Quick/Medium/Milestone (ROUT-01)
+- [ ] $MILESTONE_SCORE heuristic fully removed (ROUT-02)
+- [ ] Override flags skip complexity question but still run other interview questions (ROUT-03)
+- [ ] When complexity skipped by ticket, Claude infers route and asks for confirmation (ROUT-04)
+- [ ] Workflow steps renumbered to 9 steps (WKFL-01)
+- [ ] --quick and --milestone flags bypass complexity question only
+- [ ] Quick route displays confirmation summary (issue, goal, scope, criteria, route) with "Yes, proceed" / "No, let me clarify" (OUTP-01)
+- [ ] "No, let me clarify" re-enters relevant interview question via dimension picker (OUTP-02)
+- [ ] Milestone route displays 2-3 approach proposals with pros/cons and recommendation, user selects via AskUserQuestion (OUTP-03)
+- [ ] Selected approach written to MILESTONE-CONTEXT.md under ## Selected Approach (OUTP-04)
+- [ ] Quick route synthesizes description and delegates to quick workflow
+- [ ] Milestone route writes MILESTONE-CONTEXT.md and delegates to new-milestone workflow
+- [ ] .planning/linear-context.md written with issue IDs and route decision (no score field)
 - [ ] STATE.md quick tasks table extended with Linear column for quick route
-- [ ] Summary comment posted to each Linear issue after completion (WKFL-07)
-- [ ] .planning/linear-context.md deleted after comment-back (WKFL-08)
+- [ ] Summary comment posted to each Linear issue after completion
+- [ ] .planning/linear-context.md deleted after comment-back
 </success_criteria>
