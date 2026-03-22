@@ -18,6 +18,7 @@ const {
   escapeRegex,
   generateSlugInternal,
   normalizePhaseName,
+  matchPhaseDir,
   comparePhaseNum,
   safeReadFile,
   pathExistsInternal,
@@ -540,6 +541,53 @@ describe('searchPhaseInDir', () => {
     fs.mkdirSync(path.join(phasesDir, '01-core-cjs-tests'));
     const result = searchPhaseInDir(phasesDir, '.planning/phases', '01');
     assert.strictEqual(result.phase_slug, 'core-cjs-tests');
+  });
+
+  test('does NOT match phase 100 when searching for phase 10 (prefix collision)', () => {
+    fs.mkdirSync(path.join(phasesDir, '10-test-coverage'));
+    fs.mkdirSync(path.join(phasesDir, '100-hook-reporting'));
+    const result = searchPhaseInDir(phasesDir, '.planning/phases', '10');
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.phase_number, '10');
+    assert.strictEqual(result.phase_name, 'test-coverage');
+  });
+
+  test('returns null for phase 10 when only phase 100 exists (no false match)', () => {
+    fs.mkdirSync(path.join(phasesDir, '100-hook-reporting'));
+    const result = searchPhaseInDir(phasesDir, '.planning/phases', '10');
+    assert.strictEqual(result, null);
+  });
+});
+
+// ─── matchPhaseDir ──────────────────────────────────────────────────────────────
+
+describe('matchPhaseDir', () => {
+  test('matches directory with slug', () => {
+    assert.strictEqual(matchPhaseDir('10-test-coverage', '10'), true);
+  });
+
+  test('matches bare directory (no slug)', () => {
+    assert.strictEqual(matchPhaseDir('10', '10'), true);
+  });
+
+  test('does NOT match prefix collision (10 vs 100)', () => {
+    assert.strictEqual(matchPhaseDir('100-hook-reporting', '10'), false);
+  });
+
+  test('does NOT match letter suffix collision (12 vs 12A)', () => {
+    assert.strictEqual(matchPhaseDir('12A-special', '12'), false);
+  });
+
+  test('matches letter suffix phase', () => {
+    assert.strictEqual(matchPhaseDir('12A-special', '12A'), true);
+  });
+
+  test('matches decimal phase', () => {
+    assert.strictEqual(matchPhaseDir('12.1-hotfix', '12.1'), true);
+  });
+
+  test('does NOT match decimal prefix collision (12.1 vs 12.10)', () => {
+    assert.strictEqual(matchPhaseDir('12.10-something', '12.1'), false);
   });
 });
 

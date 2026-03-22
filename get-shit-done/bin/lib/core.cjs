@@ -174,6 +174,10 @@ function normalizePhaseName(phase) {
   return padded + letter + decimal;
 }
 
+function matchPhaseDir(dirName, normalized) {
+  return dirName.startsWith(normalized + '-') || dirName === normalized;
+}
+
 function comparePhaseNum(a, b) {
   const pa = String(a).match(/^(\d+)([A-Z])?((?:\.\d+)*)/i);
   const pb = String(b).match(/^(\d+)([A-Z])?((?:\.\d+)*)/i);
@@ -206,7 +210,7 @@ function searchPhaseInDir(baseDir, relBase, normalized) {
   try {
     const entries = fs.readdirSync(baseDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
-    const match = dirs.find(d => d.startsWith(normalized));
+    const match = dirs.find(d => matchPhaseDir(d, normalized));
     if (!match) return null;
 
     const dirMatch = match.match(/^(\d+[A-Z]?(?:\.\d+)*)-?(.*)/i);
@@ -423,6 +427,7 @@ module.exports = {
   execGit,
   escapeRegex,
   normalizePhaseName,
+  matchPhaseDir,
   comparePhaseNum,
   searchPhaseInDir,
   findPhaseInternal,

@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getRoadmapPhaseInternal, output, error } = require('./core.cjs');
+const { escapeRegex, normalizePhaseName, matchPhaseDir, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getRoadmapPhaseInternal, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
@@ -62,7 +62,7 @@ function cmdPhasesList(cwd, options, raw) {
     // If filtering by phase number
     if (phase) {
       const normalized = normalizePhaseName(phase);
-      const match = dirs.find(d => d.startsWith(normalized));
+      const match = dirs.find(d => matchPhaseDir(d, normalized));
       if (!match) {
         output({ files: [], count: 0, phase_dir: null, error: 'Phase not found' }, raw, '');
         return;
@@ -129,7 +129,7 @@ function cmdPhaseNextDecimal(cwd, basePhase, raw) {
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
 
     // Check if base phase exists
-    const baseExists = dirs.some(d => d.startsWith(normalized + '-') || d === normalized);
+    const baseExists = dirs.some(d => matchPhaseDir(d, normalized));
 
     // Find existing decimal phases for this base
     const decimalPattern = new RegExp(`^${normalized}\\.(\\d+)`);
@@ -184,7 +184,7 @@ function cmdFindPhase(cwd, phase, raw) {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
 
-    const match = dirs.find(d => d.startsWith(normalized));
+    const match = dirs.find(d => matchPhaseDir(d, normalized));
     if (!match) {
       output(notFound, raw, '');
       return;
@@ -232,7 +232,7 @@ function cmdPhasePlanIndex(cwd, phase, raw) {
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
-    const match = dirs.find(d => d.startsWith(normalized));
+    const match = dirs.find(d => matchPhaseDir(d, normalized));
     if (match) {
       phaseDir = path.join(phasesDir, match);
     }
@@ -485,7 +485,7 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => comparePhaseNum(a, b));
-    targetDir = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
+    targetDir = dirs.find(d => matchPhaseDir(d, normalized));
   } catch {}
 
   // Check for executed work (SUMMARY.md files)
