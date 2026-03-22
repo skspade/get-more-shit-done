@@ -555,7 +555,12 @@ Write `.planning/linear-context.md`:
 ---
 issue_ids: [{comma-separated issue identifiers}]
 route: {quick|milestone}
-interview: true
+route_source: {$FORCE_QUICK || $FORCE_MILESTONE ? "override" : "interview"}
+interview_summary: |
+  Goal: {extracted from $INTERVIEW_CONTEXT **Goal:** line}
+  Scope: {extracted from $INTERVIEW_CONTEXT **Scope:** line}
+  Criteria: {extracted from $INTERVIEW_CONTEXT **Success Criteria:** line}
+  Route: {$ROUTE}
 fetched: {ISO date}
 ---
 # Linear Context
@@ -574,9 +579,11 @@ Consumed by Phase 22 completion loop.
 
 **8a. Synthesize description:**
 
-Build `$DESCRIPTION` from issue data:
-- Start with first issue title
-- Append "\n\n" + first issue description (truncated to 1500 chars)
+Build `$DESCRIPTION` from interview context and issue data:
+- Start with first issue identifier + " — " + first issue title
+- Append "\nGoal: " + {goal extracted from $INTERVIEW_CONTEXT **Goal:** line}
+- Append "\nScope: " + {scope extracted from $INTERVIEW_CONTEXT **Scope:** line}
+- Append "\nCriteria: " + {criteria extracted from $INTERVIEW_CONTEXT **Success Criteria:** line}
 - Append "\n\nLinear comments:\n" + first 3 comment bodies (each truncated to 200 chars)
 - Truncate total `$DESCRIPTION` to 2000 chars
 
