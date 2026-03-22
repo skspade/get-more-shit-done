@@ -231,7 +231,7 @@
 - [x] **Phase 93: Playwright Fallback Engine** - Playwright headless path, ephemeral scripts, Chromium availability check (completed 2026-03-22)
 - [x] **Phase 94: Autopilot Integration** - runAutomatedUAT(), gap closure wiring, app startup, evidence and reporting (completed 2026-03-22)
 - [x] **Phase 95: Documentation** - help.md, USER-GUIDE.md, README.md updates (completed 2026-03-22)
-- [ ] **Phase 96: Integration Risk Fixes and Traceability Cleanup** - Fix allowed-tools, gitignore evidence dir, update checkboxes and SUMMARY frontmatter (Gap Closure)
+- [x] **Phase 96: Integration Risk Fixes and Traceability Cleanup** - Fix allowed-tools, gitignore evidence dir, update checkboxes and SUMMARY frontmatter (Gap Closure) (completed 2026-03-22)
 - [ ] **Phase 97: Test Suite Consolidation** - Retire subsumed tests, prune duplicates, parameterize routing tests (Gap Closure)
 
 ### Phase 96: Integration Risk Fixes and Traceability Cleanup
@@ -359,5 +359,5 @@ Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 | 93. Playwright Fallback | 1/1 | Complete    | 2026-03-22 | - |
 | 94. Autopilot Integration | 2/2 | Complete    | 2026-03-22 | - |
 | 95. Documentation | 1/1 | Complete    | 2026-03-22 | - |
-| 96. Integration Risk Fixes | 0/0 | Not Started | - | - |
+| 96. Integration Risk Fixes | 1/1 | Complete    | 2026-03-22 | - |
 | 97. Test Suite Consolidation | 0/0 | Not Started | - | - |
