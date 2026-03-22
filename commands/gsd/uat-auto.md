@@ -8,6 +8,15 @@ allowed-tools:
   - Grep
   - Bash
   - Write
+  - mcp__claude-in-chrome__tabs_context_mcp
+  - mcp__claude-in-chrome__tabs_create_mcp
+  - mcp__claude-in-chrome__navigate
+  - mcp__claude-in-chrome__computer
+  - mcp__claude-in-chrome__form_input
+  - mcp__claude-in-chrome__shortcuts_execute
+  - mcp__claude-in-chrome__read_page
+  - mcp__claude-in-chrome__get_page_text
+  - mcp__claude-in-chrome__find
 ---
 <objective>
 Run automated UAT using Chrome MCP (primary) or Playwright (fallback) to verify user-facing web UI behavior at milestone level. Loads config from `.planning/uat-config.yaml`, discovers tests from phase SUMMARY files, starts the application, executes browser-based tests, and writes results to MILESTONE-UAT.md.
