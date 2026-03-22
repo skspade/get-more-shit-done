@@ -760,6 +760,48 @@
 
 ---
 
+## Milestone: v3.1 — Automated UAT Session
+
+**Shipped:** 2026-03-22
+**Phases:** 7 | **Plans:** 9 | **Commits:** 37
+
+### What Was Built
+- UAT config validation module (uat.cjs) with js-yaml schema, silent skip for non-web projects, MILESTONE-UAT.md template with gap-compatible frontmatter
+- uat-auto.md workflow with Chrome MCP execution engine — test discovery from UAT.md (primary) and SUMMARY.md (fallback), DOM-first assertion protocol, full round-trip probe
+- Playwright fallback engine with ephemeral inline script generation, Chromium auto-install, identical output format to Chrome MCP mode
+- `runAutomatedUAT()` and `auditAndUAT()` wired into autopilot.mjs — UAT after audit, gaps feed into gap closure, crashes handled by debug retry
+- plan-milestone-gaps.md updated to scan MILESTONE-UAT.md as gap source alongside MILESTONE-AUDIT.md
+- Documentation updated across help.md, USER-GUIDE.md, README.md for /gsd:uat-auto command
+
+### What Worked
+- Autopilot-driven execution: all 7 phases completed in ~3 hours with zero human intervention
+- Workflow-first design: uat-auto.md is a single workflow file containing all logic — Claude subagent executes the entire workflow autonomously
+- Gap schema reuse: MILESTONE-UAT.md gaps use identical format to MILESTONE-AUDIT.md — plan-milestone-gaps handles both with zero code changes
+- Audit caught real integration risks: allowed-tools list was incomplete, gitignore missing for evidence dir, REQUIREMENTS.md had stale tool names
+
+### What Was Inefficient
+- REQUIREMENTS.md checkboxes not checked during phase execution (again) — Phase 96 had to check all 30 at once
+- SUMMARY frontmatter `requirements-completed` not added during execution for phases 91-93 — Phase 96 had to retroactively add them
+- Test budget still over 800 after consolidation (817) — Phase 97 reduced from 847 but couldn't hit target
+
+### Patterns Established
+- Dual-engine browser testing: Chrome MCP primary with Playwright fallback covers both interactive and headless environments
+- DOM-first assertion: text content is primary signal, screenshots supplement but don't drive pass/fail judgment
+- Ephemeral script pattern: generate and execute inline scripts rather than maintaining persistent test files
+- Gap-compatible artifact schema: new verification artifact (UAT) reuses exact gap format for seamless pipeline integration
+
+### Key Lessons
+1. REQUIREMENTS.md checkbox and SUMMARY frontmatter updates remain the #1 recurring gap — need process improvement
+2. Dual-engine browser testing works well — Chrome MCP for interactive, Playwright for headless/CI
+3. Gap schema reuse dramatically simplifies pipeline integration — design new artifacts to match existing schemas
+4. Test budget is difficult to maintain precisely — consolidation reduced count but new features add tests
+
+### Cost Observations
+- Sessions: 1 (autopilot run)
+- Notable: 7 phases in ~3 hours; gap closure phases (96-97) were small scoped fixes
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -784,12 +826,13 @@
 | v2.8 | 11 | 3 | Test steward consolidation bridge — workflow-only milestone, gap type addition, budget gating, zero gap closure |
 | v2.9 | 28 | 6 | Test review command — direct agent spawn pattern, user-choice routing, dual-signal test mapping |
 | v3.0 | 43 | 7 | Linear interview refactor — interview-first routing, hybrid output, comment-back, enriched context |
+| v3.1 | 37 | 7 | Automated UAT — dual-engine browser testing (Chrome MCP + Playwright), autopilot integration, gap-compatible schema |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 15 of 18 milestones (v2.1, v2.7, v2.8 are clean passes)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 14 of 18 milestones; v2.1, v2.7, v2.8 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 14 of 18 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 16 of 19 milestones (v2.1, v2.7, v2.8 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 15 of 19 milestones; v2.1, v2.7, v2.8 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 15 of 19 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -806,4 +849,5 @@
 17. Research insights must be explicitly propagated to implementation — flagging a pitfall in research doesn't guarantee it appears in the delivered artifacts (v2.7 webServer block)
 18. Three-tier detection (configured/installed/not-detected) is superior to boolean for stateful tools — enables differentiated guidance at each tier (v2.7)
 19. Verify file changes by reading the file after edit — v3.0 Phase 88 claimed a fix but the edit didn't persist, requiring Phase 89 to actually apply it
-20. REQUIREMENTS.md checkboxes must be updated as each phase completes, not batched — recurring issue in v2.9 and v3.0
+20. REQUIREMENTS.md checkboxes must be updated as each phase completes, not batched — recurring issue in v2.9, v3.0, and v3.1
+21. Design new verification artifacts to reuse existing gap schemas — MILESTONE-UAT.md reuses MILESTONE-AUDIT.md format, enabling zero-change pipeline integration (v3.1)
