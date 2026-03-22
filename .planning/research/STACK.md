@@ -1,172 +1,167 @@
-# Stack Research
+# Technology Stack
 
-**Domain:** GSD autopilot — PR diff-aware test review command (v2.9)
-**Researched:** 2026-03-21
-**Confidence:** HIGH
+**Project:** GSD Linear Interview Refactor (v3.0)
+**Researched:** 2026-03-22
 
 ## Scope
 
-This research covers ONLY what is new for v2.9 (`/gsd:test-review` command). The existing validated
-stack (Node.js CJS, zx/ESM, node:test suite, gsd-tools dispatcher, testing.cjs, cli.cjs, autopilot.mjs,
-validation.cjs, frontmatter.cjs, markdown commands/agents/workflows) is NOT re-evaluated.
+This research covers ONLY what is new for v3.0: interview phase with adaptive questions, hybrid output (confirmation vs approach proposals), pre-execution comment-back, and removal of the numeric complexity scoring heuristic. The existing validated stack (Node.js CJS, zx/ESM, Claude Code CLI, Linear MCP tools, AskUserQuestion, markdown-based state) is NOT re-evaluated.
 
 ## Verdict: No New Dependencies
 
-This milestone is purely additive markdown files: one command spec (`commands/gsd/test-review.md`) and
-one agent definition (`agents/gsd-test-reviewer.md`), plus documentation updates. No new npm packages,
-no new CJS modules, no new gsd-tools dispatch entries.
+The interview phase, hybrid output, and pre-execution comment-back features are **entirely implementable with the existing stack**. This is a workflow-layer refactor -- modifications to two markdown files (`linear.md` workflow, `linear.md` command spec) plus documentation updates. Zero new npm packages, zero new CJS modules, zero new gsd-tools dispatch entries.
 
-The command gathers git diff data and existing test metadata via shell commands and `gsd-tools.cjs`
-dispatch entries that already exist (`test-count`, `test-config`, `commit`). The agent is a read-only
-analysis agent (like `gsd-test-steward`) that receives structured input and produces a markdown report.
-The routing flow (quick task / milestone / done) reuses the same patterns proven in `/gsd:pr-review`.
+**Why:** Every building block already exists and is validated:
+- **AskUserQuestion** -- used in brainstorm.md Step 3 for adaptive clarifying questions (exact same pattern)
+- **mcp create_comment** -- used in linear.md Step 6 for comment-back (called a second time earlier)
+- **Approach proposals** -- used in brainstorm.md Step 4 for 2-3 approaches with pros/cons (reused for milestone route)
+- **String interpolation in markdown** -- used in every GSD workflow for building context blocks
 
 ## Recommended Stack (No Changes)
 
 ### Core Technologies
 
-| Technology | Version | Purpose | Why Recommended |
+| Technology | Version | Purpose | Status for v3.0 |
 |------------|---------|---------|-----------------|
-| Claude Code CLI | current | Executes command spec, spawns agent via `Task()` | All GSD commands are markdown files interpreted by Claude Code. No alternative exists. |
-| Git CLI | system | `git diff main...HEAD` for changed files and full diff | Standard git commands executed via Bash tool. The diff is the primary input to the agent. |
-| `gsd-tools.cjs` dispatch | n/a (in-repo) | `test-count`, `test-config`, `commit` | Existing dispatch entries provide all test metadata needed. No new entries required. |
-| `testing.cjs` | n/a (in-repo) | `findTestFiles()`, `countTestsInProject()`, `getTestConfig()` | Consumed indirectly via gsd-tools dispatch. Already exports everything the command needs. |
+| Node.js | >=16.7.0 | CJS modules, CLI, gsd-tools | No change |
+| zx | ^8.0.0 | ESM autopilot script | No change (not involved in this feature) |
+| Claude Code CLI | current | Executes command spec, workflow interpretation | No change |
 
-### Supporting Libraries
+### Linear MCP Tools (Already Available)
 
-No new supporting libraries required.
+| MCP Tool | Purpose | v3.0 Usage |
+|----------|---------|------------|
+| `mcp__plugin_linear_linear__get_issue` | Fetch issue data (Step 2) | Unchanged |
+| `mcp__plugin_linear_linear__list_comments` | Fetch comments (Step 2) | Unchanged |
+| `mcp__plugin_linear_linear__create_comment` | Post comments | **Called twice now:** Step 5.5 (interview summary, NEW) + Step 8 (completion summary, existing) |
+| `mcp__plugin_linear_linear__list_issues` | Listed in allowed-tools | Not used by interview features |
 
-| Library | Status | Purpose | Notes |
-|---------|--------|---------|-------|
-| `zx` | ^8.0.0 (existing) | Not used by this feature | `/gsd:test-review` is a markdown command, not an autopilot extension. No zx involvement. |
-| `@playwright/test` | ^1.50.0 (existing, devDep) | Not used by this feature | Test review analyzes unit/integration tests, not E2E. Playwright is unrelated. |
+### Interaction Tools (Already Available)
 
-### Development Tools
+| Tool | Purpose | v3.0 Usage |
+|------|---------|------------|
+| `AskUserQuestion` | Adaptive interview questions (Steps 3-5) | **Primary new interaction mechanism.** Called 3-5 times for interview, plus 1 time for confirmation/approach selection. Same API as brainstorm.md. |
+| `Task()` | Subagent spawning for planner/executor/verifier | Unchanged |
 
-No new development tools required.
+## Integration Points
 
-| Tool | Status | Notes |
-|------|--------|-------|
-| `node:test` runner | existing | Tests for new CJS utility functions if any are extracted. Design doc says no new modules needed. |
-| `c8` coverage | existing | Coverage reporting unchanged. New markdown files are not instrumented. |
+### AskUserQuestion Pattern (Validated in brainstorm.md)
 
-## What Changes (File Additions, Not New Tools)
+The interview phase reuses the exact AskUserQuestion pattern from brainstorm.md Step 3:
 
-Four files are added or modified. No new modules, no new dependencies.
+1. **Multiple choice** -- when options are enumerable (complexity signal: "Quick task / Medium / Milestone")
+2. **Open-ended** -- when domain is too broad (goal clarification, additional context)
+3. **Skip logic** -- pre-scan ticket data, skip questions already answered by ticket content
+4. **Incorporate and adapt** -- each answer informs the next question
 
-### 1. `commands/gsd/test-review.md` (NEW)
+No new tool configuration needed. `AskUserQuestion` is already in the command spec's `allowed-tools` list.
 
-**Pattern:** Follows `audit-tests.md` (direct agent spawn with data gathering) combined with
-`pr-review.md` (post-analysis routing with `--report-only`/`--quick`/`--milestone` options).
+### Comment-Back Pattern (Validated in linear.md Step 6)
 
-**Data gathering via existing tools:**
-```bash
-# Changed files list
-git diff main...HEAD --name-only
+The pre-execution comment-back (new Step 5.5) uses the identical MCP call and error handling:
 
-# Full diff for agent analysis
-git diff main...HEAD
-
-# Test metadata via existing gsd-tools dispatch
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-count --raw
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" test-config
+```
+mcp__plugin_linear_linear__create_comment(
+  issueId: issue.id,
+  body: interview_comment_body
+)
 ```
 
-**Agent spawn:** `Task()` with `subagent_type="gsd-test-reviewer"`, passing diff + test data as
-XML block input. Identical pattern to `audit-tests.md` spawning `gsd-test-steward`.
+Error handling: warning on failure, do not block execution. Same pattern as existing Step 6.
 
-**Report persistence:** Write to `.planning/reviews/YYYY-MM-DD-test-review.md` using existing
-`reviews/` directory (shared with pr-review reports). Commit via `gsd-tools.cjs commit`.
+Difference from existing: timing (before execution vs after) and content (interview summary vs completion summary).
 
-**Routing:** User-choice prompt after report display (quick task / milestone / done). Quick task
-uses same directory structure and planner/executor pattern as pr-review. Milestone delegates to
-`/gsd:new-milestone --auto` with MILESTONE-CONTEXT.md — same as brainstorm routing.
+### Approach Proposals Pattern (Validated in brainstorm.md Step 4)
 
-### 2. `agents/gsd-test-reviewer.md` (NEW)
+The milestone-route hybrid output presents 2-3 approaches with pros/cons and a recommendation. This is brainstorm.md Step 4's pattern applied in the linear workflow context. The selected approach feeds into MILESTONE-CONTEXT.md under a new `## Selected Approach` section.
 
-**Pattern:** Read-only analysis agent, modeled on `gsd-test-steward.md`. Same tools
-(Read, Bash, Grep, Glob), same constraint (never modifies source or test files).
+## What Changes (File Modifications Only)
 
-**No code execution:** The agent reads files and diffs, performs static analysis, and produces
-a markdown report. No test execution, no file modification.
+| File | Change Type | What Changes |
+|------|-------------|--------------|
+| `get-shit-done/workflows/linear.md` | Major refactor | Remove Step 3 heuristic scoring. Add Steps 3 (interview), 4 (routing from interview), 5 (hybrid output), 5.5 (pre-execution comment-back). Renumber old Steps 4-7 to 6-9. Modify Step 6 to add `interview_summary` to linear-context.md frontmatter. Modify Step 7 quick description synthesis to use interview context instead of truncated ticket text. Modify Step 7 milestone MILESTONE-CONTEXT.md to include selected approach. |
+| `commands/gsd/linear.md` | Minor update | Update `<objective>` description to mention interview phase. No tool list changes needed. |
+| Documentation files | Minor updates | help.md, USER-GUIDE.md, README.md get updated descriptions. |
 
-**Shared vocabulary:** Uses same consolidation strategy terms as test steward
-(prune/parameterize/promote/merge) but carries definitions inline in the agent prompt.
-No code sharing needed — the terms are just markdown text.
+### linear-context.md Schema Change
 
-### 3. `commands/gsd/help.md` (MODIFIED)
+Current frontmatter:
+```yaml
+---
+issue_ids: [LIN-123]
+route: quick
+score: 3
+fetched: 2026-03-22
+---
+```
 
-Add `/gsd:test-review` entry to the command reference table. Text edit only.
+New frontmatter (v3.0):
+```yaml
+---
+issue_ids: [LIN-123]
+route: quick
+fetched: 2026-03-22
+interview_summary: "Goal: ... Scope: ... Criteria: ..."
+---
+```
 
-### 4. Documentation files (MODIFIED)
+**Removed:** `score` field (numeric heuristic eliminated).
+**Added:** `interview_summary` text field.
 
-`USER-GUIDE.md` and `README.md` get documentation sections. Text edits only.
+### MILESTONE-CONTEXT.md Addition (Milestone Route Only)
+
+New section appended when milestone route is selected via approach proposals:
+
+```markdown
+## Selected Approach
+
+**Approach:** {approach name}
+{2-3 sentence approach description from user's selection}
+```
+
+## What NOT to Add
+
+| Temptation | Why Not |
+|------------|---------|
+| Prompt templating library (handlebars, mustache) | Markdown string interpolation in workflow files is the GSD pattern. Every workflow does this. Zero-dependency is a project value. |
+| JSON schema for interview responses | AskUserQuestion returns strings or option selections. Validation is inline conditional logic, not a schema concern. |
+| State machine library (xstate) | Interview flow is 3-5 sequential questions with skip conditions. A conditional loop is sufficient. State machines are for complex branching; this is linear with skips. |
+| Conversation memory library | `$INTERVIEW_CONTEXT` is a markdown string accumulated during one workflow run. No persistence beyond the session. |
+| LLM orchestration framework (langchain) | Conflicts with "native GSD extension" architecture constraint. Claude Code's workflow interpretation is the orchestration layer. |
+| New MCP tools | All required Linear operations (get_issue, list_comments, create_comment) already exist in allowed-tools. |
+| New gsd-tools dispatch entries | No programmatic consumers exist. The workflow operates entirely in Claude Code's markdown interpretation layer. |
+| New CJS modules | Interview logic lives in the workflow markdown, not in Node.js code. No parsing, scoring, or state management needs to move to CJS. |
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| Inline git diff parsing by agent | `diff-parse` npm package for structured diff parsing | Only if the agent consistently fails to parse diffs from raw text. Claude handles unified diff format well — adding a parser library would mean a new CJS module wrapping the npm package. Not worth the complexity unless evidence shows parsing failures. |
-| XML block input to agent | JSON input via gsd-tools | Only if Claude struggles with large XML blocks. The XML block pattern is proven across audit-tests and pr-review. JSON would require a new gsd-tools dispatch entry to serialize the diff, which adds unnecessary code. |
-| User-choice routing (quick/milestone/done) | Automatic scoring like pr-review's hybrid heuristic | Only if users consistently make poor routing decisions. The test review report gives users enough information to choose. Automatic scoring adds complexity and may misroute — a test review with 20 findings might still be a quick task if they are all trivial. User judgment is better here. |
-| Single agent (gsd-test-reviewer) | Reuse gsd-test-steward with a "diff mode" | Only if the two agents share significant prompt text (>50%). They don't — steward focuses on suite-wide health (budget, redundancy across all tests) while reviewer focuses on diff-scoped analysis (coverage gaps for changed code, staleness of affected tests). Separate agents with clear scopes are simpler than a modal agent. |
-| Read-only agent + command routing | Agent that directly creates tasks/milestones | Never. The read-only constraint is a deliberate architectural decision. The agent produces a report; the command handles routing. Mixing analysis and action in one agent violates the separation proven across 14 existing agents. |
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `diff-parse` or `parse-diff` npm packages | Adds npm dependency for something Claude handles natively. Git unified diff format is well-understood by LLMs. Supply-chain surface with zero functional gain. | Raw `git diff` output passed directly to agent |
-| New `gsd-tools` dispatch entries | No programmatic consumer exists. The command gathers data via existing entries (`test-count`, `test-config`) and shell commands (`git diff`). Adding CLI dispatch before a caller exists is premature. | Existing `test-count`, `test-config` dispatch + direct `git` commands |
-| Workflow file (`workflows/test-review.md`) | The command is simple enough for inline execution (data gather + spawn agent + write report + route). Adding a workflow file is the pr-review pattern, but pr-review needed it for its complex ingest/parse/score/route pipeline. Test review's pipeline is simpler — closer to audit-tests which has no workflow file. | Direct agent spawn from command spec (audit-tests pattern) |
-| Changes to `testing.cjs` | All needed functions already exist and are exported: `findTestFiles()`, `countTestsInProject()`, `getTestConfig()`. No new test analysis functions are needed — the agent does the analysis, not CJS code. | Existing `testing.cjs` exports via `gsd-tools.cjs` dispatch |
-| Changes to `autopilot.mjs` | `/gsd:test-review` is an on-demand user command, not part of the autonomous pipeline. The autopilot has no awareness of it and needs none. | No change to autopilot |
-| `gsd-tools.cjs commit` changes | The existing `commit` dispatch handles committing files with a message. The report file path and commit message are provided by the command spec. No structural changes needed. | Existing `gsd-tools.cjs commit` |
-
-## Stack Patterns by Variant
-
-**If no diff exists (branch is up-to-date with main):**
-- `git diff main...HEAD --name-only` returns empty output
-- Command displays "No changes found vs main" and exits
-- No agent spawn, no report, no routing
-
-**If `--report-only` flag is provided:**
-- Command gathers data, spawns agent, writes report, exits
-- Skips user-choice routing prompt
-- Report still committed to `.planning/reviews/`
-
-**If test count is zero (no tests in project):**
-- Command still proceeds — the agent can recommend creating initial tests for changed files
-- Agent input includes `test_count: 0` and empty `test_files` list
-- Coverage gap analysis becomes "all changed files lack tests"
-
-**If diff is very large (many changed files):**
-- Full diff passed to agent via `git diff main...HEAD`
-- Claude's context window handles large diffs well
-- Agent naturally prioritizes highest-impact files in recommendations
-- No truncation or pagination needed — the agent is a subagent with its own context window
+| Decision | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Interview via AskUserQuestion | AskUserQuestion (existing) | Custom CLI prompts via readline | AskUserQuestion is the GSD interaction pattern. readline bypasses Claude Code's tool model. |
+| Interview context as markdown string | `$INTERVIEW_CONTEXT` variable | Structured JSON object | Workflow files operate on markdown. JSON needs parsing. Consumer (Linear comment, context file) is also markdown. |
+| Routing from complexity signal answer | Direct string match | Weighted scoring on all answers | Design explicitly replaces scoring. Reintroducing scoring defeats the refactor's purpose. |
+| Two Linear comments (pre + post) | Separate calls at Step 5.5 and Step 8 | Single combined comment after execution | Pre-execution comment gives real-time visibility into GSD's understanding. Users see the summary before work starts. |
+| Skip logic via pre-scan | Claude reads ticket then decides which questions to skip | Always ask all 5 questions | Pre-scan is the brainstorm pattern. Asking already-answered questions wastes user time and feels robotic. |
 
 ## Version Compatibility
 
 | Component | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `gsd-tools.cjs test-count` | All existing testing.cjs versions | Returns raw count with `--raw` flag. Used by command for agent input. |
-| `gsd-tools.cjs test-config` | All existing testing.cjs versions | Returns JSON config object. Used by command for agent input. |
-| `gsd-tools.cjs commit` | All existing versions | Commits staged files with message. Used to persist report. |
-| `.planning/reviews/` directory | Shared with pr-review reports | Both commands write timestamped reports here. No naming conflict — test-review uses `test-review` in filename, pr-review uses `pr-review`. |
-| Quick task infrastructure | Existing STATE.md Source column | Design doc confirms quick task uses same directory structure and planner pattern as pr-review. Source column already supports generic entries. |
-| Task() agent spawn | Claude Code CLI | Same `Task()` pattern used by audit-tests, pr-review, and all workflow agent spawns. |
+| `AskUserQuestion` | All Claude Code versions | Core tool, stable API. Used across brainstorm, linear, and other commands. |
+| `mcp create_comment` | Linear MCP plugin (current) | Same call signature as existing Step 6. No API changes needed. |
+| `Task()` spawn | All Claude Code versions | Standard subagent pattern. Unchanged for planner/executor/verifier. |
+| `.planning/linear-context.md` | Backward compatible | `score` field removed, `interview_summary` added. Old consumers (Step 6 completion loop) read `issue_ids` and `route`, which remain. |
+| `.planning/MILESTONE-CONTEXT.md` | Backward compatible | New `## Selected Approach` section appended. `new-milestone.md` reads features/context sections; new section is additive. |
+| `--quick` / `--milestone` / `--full` flags | Unchanged behavior | Flags still override routing. With interview: skip complexity question but still run other interview questions. |
 
 ## Sources
 
-- `commands/gsd/audit-tests.md` — verified direct agent spawn pattern: data gathering via gsd-tools dispatch, Task() spawn with XML input, report display — HIGH confidence (direct codebase inspection)
-- `commands/gsd/pr-review.md` — verified routing pattern: workflow delegation, `--quick`/`--milestone` flags, report persistence to `.planning/reviews/` — HIGH confidence (direct codebase inspection)
-- `.planning/designs/2026-03-20-pr-test-review-command-design.md` — design doc specifying exact command flow, agent definition, input/output format, routing, and integration points — HIGH confidence (first-party design artifact)
-- `get-shit-done/bin/lib/testing.cjs` — verified exports: `findTestFiles()`, `countTestsInProject()`, `getTestConfig()` all exist and are dispatched via gsd-tools — HIGH confidence (direct codebase inspection)
-- `get-shit-done/bin/gsd-tools.cjs` — verified dispatch entries: `test-count` (line 642), `test-config` (line 659), `commit` exist — HIGH confidence (direct codebase inspection)
-- `package.json` — confirmed dependencies: only `zx ^8.0.0` runtime, no YAML/diff parsing packages — HIGH confidence (direct codebase inspection)
-- `agents/` directory — confirmed 14 existing agents, all markdown files with YAML frontmatter, establishing the pattern for `gsd-test-reviewer.md` — HIGH confidence (direct codebase inspection)
+- Design document: `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` -- PRIMARY source for all feature specifications (HIGH confidence, first-party design artifact)
+- Existing workflow: `get-shit-done/workflows/linear.md` -- current implementation being refactored (HIGH confidence, direct codebase inspection)
+- Brainstorm workflow: `get-shit-done/workflows/brainstorm.md` -- pattern reference for AskUserQuestion adaptive questions (Step 3) and approach proposals (Step 4) (HIGH confidence, direct codebase inspection)
+- Command spec: `commands/gsd/linear.md` -- allowed-tools list confirming AskUserQuestion and all 4 Linear MCP tools (HIGH confidence, direct codebase inspection)
+- PROJECT.md: `.planning/PROJECT.md` -- architecture constraints ("native GSD extension"), out-of-scope items, existing validated capabilities (HIGH confidence, direct codebase inspection)
+- `package.json` -- confirmed dependencies: only `zx ^8.0.0` runtime, no new packages needed (HIGH confidence, direct codebase inspection)
 
 ---
-*Stack research for: GSD PR diff-aware test review command (v2.9)*
-*Researched: 2026-03-21*
+*Stack research for: GSD Linear Interview Refactor (v3.0)*
+*Researched: 2026-03-22*

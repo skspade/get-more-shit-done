@@ -1,169 +1,151 @@
 # Project Research Summary
 
-**Project:** GSD v2.9 — `/gsd:test-review` Command
-**Domain:** PR diff-aware test analysis for autonomous development framework
-**Researched:** 2026-03-21
+**Project:** GSD Linear Interview Refactor (v3.0)
+**Domain:** Workflow refactor — replacing numeric scoring heuristic with interview-driven routing in autonomous development framework
+**Researched:** 2026-03-22
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone adds a single on-demand command (`/gsd:test-review`) to the existing GSD Autopilot framework. The command is purely additive — no new npm dependencies, no new CJS modules beyond one init function, no changes to autopilot.mjs. It follows two well-established in-repo patterns: the direct agent spawn pattern from `audit-tests.md` (thin command orchestrator + read-only analysis agent), and the routing pattern from `pr-review.md` (user-choice quick task / milestone / done after report). The intellectual core of the feature is the `gsd-test-reviewer` agent, which performs static diff analysis using LLM reasoning rather than instrumented coverage tooling — consistent with every other GSD analysis tool.
+This is a workflow-layer refactor of the existing `/gsd:linear` command, not a greenfield build. The project replaces a 6-factor numeric scoring heuristic with an adaptive interview phase (3-5 questions via AskUserQuestion) that captures richer context about the user's intent before routing to quick or milestone execution paths. The refactor also adds hybrid output (confirmation summary for quick route, approach proposals for milestone route) and a pre-execution comment-back to Linear. Every building block — AskUserQuestion, MCP comment-back, approach proposals, markdown state management — already exists and is validated in the codebase. Zero new dependencies are needed.
 
-The recommended implementation approach uses heuristic + LLM static analysis: the agent receives the git diff and test metadata, maps source files to test files via naming conventions and import-graph grepping, then detects coverage gaps, stale tests, and consolidation opportunities scoped to the changed files only. This is deliberately scoped to the diff rather than the full suite (as `audit-tests` does), making the output immediately actionable for the developer's current work. Post-analysis routing is user-driven rather than auto-scored, because test recommendations lack the natural severity scoring that PR review findings have.
+The recommended approach is a phased modification of the single `linear.md` workflow file, plus minor updates to the command spec and documentation. The interview pattern is proven in `brainstorm.md` (Steps 3-4), and the comment-back pattern is proven in the existing `linear.md` Step 6. The refactor reuses these patterns rather than inventing new ones. The key architectural constraint is that AskUserQuestion must be called from the top-level workflow (not from a Task() subagent), which means the interview logic must remain inline in the workflow file.
 
-The primary risks center on the agent receiving inputs that are too large (large diffs), too narrow (naming-only test file mapping), or context-unaware (ignoring the test budget). All three risks are preventable at the prompt-engineering level before implementation begins — retrofitting them post-build is more costly. The base branch resolution for `git diff` must also account for stale local branches. These four mitigations should be baked into the command spec and agent definition in Phase 1 and Phase 2, not deferred.
+The primary risks are: (1) override flags (`--quick`/`--milestone`) accidentally skipping the entire interview instead of just the complexity question, losing context enrichment; (2) overeager question skipping on ambiguous tickets, causing wrong assumptions to propagate silently through downstream artifacts; and (3) step renumbering breaking success criteria references and command spec language that still mentions "scoring heuristic." All three are preventable with disciplined implementation ordering — structural changes first, behavioral changes second.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new dependencies are required. The command is two markdown files (command spec + agent spec) plus one init function in `init.cjs` and one dispatch case in `gsd-tools.cjs`. All test data is gathered via existing `gsd-tools.cjs` dispatch entries (`test-count`, `test-config`, `commit`) and standard git commands.
+No new dependencies. The existing stack handles everything.
 
-See `.planning/research/STACK.md` for full stack details.
+**Core technologies (unchanged):**
+- **Node.js (>=16.7.0):** CJS modules, CLI, gsd-tools — no changes needed
+- **Claude Code CLI:** Workflow interpretation engine — interview logic lives in markdown, not code
+- **AskUserQuestion:** Primary interaction mechanism for interview (3-5 calls) and hybrid output (1 call) — already in allowed-tools
+- **Linear MCP tools:** `get_issue`, `list_comments`, `create_comment` — create_comment gets a second call point (pre-execution) but same API
 
-**Core technologies (all unchanged):**
-- Claude Code CLI: executes the command spec, spawns the agent via `Task()` — all GSD commands are markdown files interpreted by Claude Code
-- Git CLI: `git diff origin/main...HEAD` provides the primary input (changed files + full diff) — no parsing library needed, LLM handles unified diff format natively
-- `gsd-tools.cjs` existing dispatch: `test-count`, `test-config`, `commit`, `generate-slug`, `resolve-model` — no new entries except `init test-review`
-- `testing.cjs` existing exports: `findTestFiles()`, `countTestsInProject()`, `getTestConfig()` consumed indirectly via gsd-tools dispatch
-
-**Explicitly avoided:**
-- `diff-parse` / `parse-diff` npm packages — adds supply-chain surface for something Claude handles natively
-- New `gsd-tools` dispatch entries beyond `init test-review` — no programmatic consumer exists for them
-- Workflow file for the command — the pipeline is linear; a workflow file adds indirection without value (audit-tests pattern, not pr-review pattern)
+**What NOT to add:** No prompt templating libraries, no state machine libraries, no LLM orchestration frameworks, no new CJS modules, no new gsd-tools entries. The interview is pure workflow markdown logic.
 
 ### Expected Features
 
-See `.planning/research/FEATURES.md` for full feature analysis with priority matrix and dependency graph.
-
 **Must have (table stakes):**
-- Source-to-test file mapping (naming conventions + import-graph check) — the core value proposition; without it the command is not diff-aware
-- Coverage gap detection (new/changed exports without test assertions) — most common post-change question
-- Stale test detection scoped to changed files — flags tests that reference deleted/renamed exports
-- Structured markdown report at `.planning/reviews/YYYY-MM-DD-test-review.md` — every GSD analysis command produces a persistent report
-- `--report-only` flag — analysis without routing, for users who want to decide themselves
-- User-choice routing (quick task / milestone / done) — test findings require human judgment, not auto-scoring
-- Read-only constraint — analysis agents never modify source or test files; users trust it cannot break anything
+- 3-5 adaptive interview questions with pre-scan-based skip logic
+- Complexity signal question as primary routing input (replaces scoring)
+- Override flags still work (`--quick`/`--milestone` skip complexity question, not entire interview)
+- Confirmation summary for quick route with re-ask on rejection
+- Approach proposals for milestone route (brainstorm Step 4 pattern)
+- Interview summary posted to Linear before execution (non-blocking)
+- `$INTERVIEW_CONTEXT` threaded through all downstream steps
+- Enriched task descriptions replacing raw truncation
 
 **Should have (differentiators):**
-- Diff-scoped consolidation recommendations — redundancy in the area you are already working is more actionable than a global report
-- Missing test file detection — "you modified `lib/parser.cjs` but `tests/parser.test.cjs` does not exist"
-- Budget context in report — "project is at 103% budget" informs whether to add tests or consolidate first
+- Inferred routing with confirmation when complexity question is skipped
+- Re-ask loop on confirmation rejection (conversational, not form-like)
+- Selected approach embedded in MILESTONE-CONTEXT.md
+- `interview_summary` field in linear-context.md frontmatter
 
-**Defer (post-v2.9):**
-- Integration with `audit-milestone` (auto-run test-review during milestone audit) — validate standalone first
-- Custom source-to-test mapping configuration — naming conventions cover the common case
-- Budget impact projection ("+N tests would bring you to X%") — nice but not essential for launch
+**Defer (post-v3.0):**
+- Multi-issue interview strategy
+- Interview analytics (tracking skip patterns)
 
 ### Architecture Approach
 
-The architecture is a two-file addition: a thin command orchestrator (`test-review.md`) that gathers data and handles routing, and a read-only analysis agent (`gsd-test-reviewer.md`) that receives a structured XML input block and returns a structured markdown report. The command uses the direct agent spawn pattern (no workflow file needed — the pipeline is linear: gather, analyze, report, route). Routing reuses the quick task and milestone infrastructure proven in pr-review, with the key difference that routing is always user-driven rather than auto-scored.
-
-See `.planning/research/ARCHITECTURE.md` for full component responsibility table, data flow diagrams, and anti-patterns.
+The refactor expands the workflow from 7 steps to 9 steps (1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9). Steps 1-2 and 8-9 are unchanged. Old Step 3 (scoring heuristic) is deleted and replaced by new Steps 3 (interview), 4 (routing), 5 (hybrid output), and 5.5 (pre-execution comment-back). Steps 6-7 (write context, execute route) are modified to consume interview data.
 
 **Major components:**
-1. `commands/gsd/test-review.md` (NEW) — thin orchestrator: parse args, gather diff + test data, spawn agent, write report, user prompt, route to quick/milestone/done
-2. `agents/gsd-test-reviewer.md` (NEW) — 6-step read-only analysis agent: diff parsing, coverage gap detection, staleness detection, consolidation recommendations, report compilation
-3. `init.cjs` cmdInitTestReview() (NEW function, existing file) — resolves models, paths, timestamps, quick task numbering; near-copy of cmdInitPrReview()
-4. `gsd-tools.cjs` init test-review case (NEW case, existing file) — one-line dispatch entry routing to cmdInitTestReview
-5. All existing infrastructure — `testing.cjs`, quick task directories, milestone routing, `.planning/reviews/` — reused without modification
+1. **Interview Phase (new Step 3)** — pre-scan ticket, ask 3-5 adaptive questions, accumulate `$INTERVIEW_CONTEXT`
+2. **Route Decision (new Step 4)** — map complexity signal answer to route; three-tier fallback: flag -> interview -> inference
+3. **Hybrid Output (new Step 5)** — confirmation (quick) or approach proposals (milestone) with user interaction
+4. **Pre-Execution Comment-Back (new Step 5.5)** — post interview summary to Linear; warning-only on failure
+5. **Modified Context Writing (Step 6)** — add `interview_summary` to frontmatter, remove `score`
+6. **Modified Route Execution (Step 7)** — enriched descriptions from interview, selected approach for milestones
 
 ### Critical Pitfalls
 
-See `.planning/research/PITFALLS.md` for all six critical pitfalls with full prevention strategies and phase-to-prevention mapping.
-
-1. **Large diff context overflow** — Add a diff size gate in the command spec (~2,000 lines threshold); pass `--stat` + file list for large diffs and let the agent pull file details on demand via Read/Grep tools. Address in Phase 1 (command spec).
-
-2. **Name-only test file mapping produces false positives** — Agent must check import/require statements in test files, not just naming conventions. A single Grep per changed source file catches tests that cover it under a different name. Address in Phase 2 (agent definition).
-
-3. **Staleness false positives from internal refactors** — Agent must differentiate removed/renamed exports (HIGH priority) from internal implementation changes (LOW priority). Tests referencing changed internal variables are not stale in a breaking way. Address in Phase 2 (agent definition).
-
-4. **Budget-unaware recommendations create add/remove cycles** — With the project at 826/800 (103.25% of budget), recommending new tests without mentioning budget causes test inflation that the steward immediately flags for removal. Agent prompt must order consolidation recommendations above new test recommendations when over budget. Address in Phase 2 (agent definition).
-
-5. **Stale local `main` branch fails the diff** — Use `origin/main` with fallback chain (`origin/main` -> `origin/master` -> `main` -> `master`), preceded by `git fetch origin main --quiet`. Address in Phase 1 (command spec).
-
-6. **Quick task routing loses recommendation detail** — Each recommendation type (missing/stale/consolidation) has different fields; forcing them into a generic `<group>` XML format loses the specificity the planner needs to create actionable tasks. Define type-specific XML elements and include the full report path as a `<files_to_read>` directive. Address in Phase 3 (routing implementation).
+1. **Override flags skip entire interview** — Flags must only skip the complexity question (#4), not all questions. Implement per-question skip conditions with a three-tier routing fallback (flag -> interview answer -> ticket inference).
+2. **Overeager question skipping on ambiguous tickets** — Only skip when ticket has explicit sections (## Goal, ## Acceptance Criteria) or definitive labels. Never skip based on LLM confidence that a title is "self-explanatory." Show inferred answers in confirmation summary so users can catch mistakes.
+3. **Step renumbering breaks references** — Grep all WKFL-XX tags and "scoring"/"heuristic" text across the codebase before making behavioral changes. Update command spec to say "interview-driven routing" instead of "complexity scoring."
+4. **Pre-execution comment-back blocks execution** — Wrap MCP call in error handling that catches ALL failure modes (not just MCP errors, but also tool-not-available and timeouts). Never let a comment failure propagate.
+5. **Hybrid output paths drift over time** — Extract shared interview context template before the quick/milestone fork. Both paths render the same context block; only the decision mechanism (confirm vs select) differs.
 
 ## Implications for Roadmap
 
-The natural dependency order maps cleanly to four phases that the architecture research already confirms. Phase 1 and Phase 2 together produce a working feature (report-only mode functional). Phase 3 adds routing. Phase 4 validates and documents.
+Based on research, suggested phase structure:
 
-### Phase 1: Command Spec + Infrastructure
-**Rationale:** The command spec defines the entire data flow, edge cases, and input format before the agent is written. Building the command first establishes the contract the agent must satisfy. Critical mitigations (diff size gate, base branch resolution) must be in the command spec before anything else — retrofitting them is more expensive after the agent is written to expect a specific input format.
-**Delivers:** `commands/gsd/test-review.md` (working through report write step, `--report-only` mode functional), `init.cjs` cmdInitTestReview(), `gsd-tools.cjs` init test-review dispatch case
-**Addresses:** `--report-only` flag, structured report output, data gathering pipeline, report persistence
-**Avoids:** Large diff context overflow (Pitfall 1), stale local main (Pitfall 5) — both must be in the command spec before implementation
+### Phase 1: Workflow Restructuring
 
-### Phase 2: Agent Definition
-**Rationale:** The agent is the intellectual core of the feature. It must be written with full awareness of the mitigations from Phase 1 (what input format it receives, how large inputs are bounded). Budget awareness and import-graph checking are prompt engineering decisions that are far harder to retrofit after the agent is used in production and users have formed expectations about its output.
-**Delivers:** `agents/gsd-test-reviewer.md` — 6-step read-only analysis agent with import-graph checking, priority-level staleness detection, and budget-aware recommendation ordering
-**Addresses:** Coverage gap detection, stale test detection, consolidation recommendations, missing test file detection, budget context
-**Avoids:** Name-only mapping false positives (Pitfall 2), staleness false positives (Pitfall 3), budget-unaware add/remove cycles (Pitfall 4)
+**Rationale:** Structural changes must come before behavioral changes. Step renumbering, reference updates, and scoring heuristic removal are prerequisites for everything else. This phase is mechanical and low-risk — it sets the stage without changing behavior.
+**Delivers:** Workflow file with new step skeleton (empty new steps, renumbered old steps), updated success criteria tags, updated command spec language, removed scoring heuristic code.
+**Addresses:** Step renumbering, WKFL tag migration, `score` field removal from linear-context.md, `$FULL_MODE` semantics clarification.
+**Avoids:** Pitfall 3 (reference breakage) and Pitfall 10 (`$FULL_MODE` ambiguity) by handling them as explicit first-phase deliverables.
 
-### Phase 3: Routing Implementation
-**Rationale:** Routing (quick task / milestone / done) depends on the report format established in Phase 2. The XML context format for the planner must match the recommendation types in the report — this can only be defined accurately after the report structure is known. Routing also requires the init function from Phase 1.
-**Delivers:** Complete routing in `test-review.md` — quick task spawn (planner + executor + STATE.md update), milestone delegation (MILESTONE-CONTEXT.md + /gsd:new-milestone --auto), zero-recommendation exit path
-**Addresses:** User-choice routing, quick task creation, milestone creation
-**Avoids:** Quick task routing context mismatch (Pitfall 6), routing prompt on empty recommendations
+### Phase 2: Interview Implementation
 
-### Phase 4: Documentation + Tests
-**Rationale:** Documentation and tests validate a working implementation. Writing them before the feature is stable wastes effort on a moving target. Tests for the init function mirror the pr-review init tests — straightforward once the function is stable.
-**Delivers:** `commands/gsd/help.md` update, `USER-GUIDE.md` section, `README.md` command table entry, `node:test` tests for cmdInitTestReview()
-**Addresses:** Documentation requirement, test coverage for new CJS code
+**Rationale:** The interview is the core value of the refactor and has the most behavioral complexity. It must be built and tested before the hybrid output that consumes its data, and before the comment-back that posts its results.
+**Delivers:** Pre-scan logic, adaptive question loop (Q1-Q5) with skip conditions, `$INTERVIEW_CONTEXT` variable with defined structure, routing decision from complexity signal, flag override integration (partial skip).
+**Addresses:** Adaptive interview questions, complexity signal routing, override flag semantics, pre-scan skip logic, context variable structure.
+**Avoids:** Pitfall 1 (flag skip semantics) by implementing per-question skip conditions from the start. Pitfall 2 (silent context gaps) by using conservative skip criteria. Pitfall 6 (context not consumed) by defining variable structure before building consumers.
+
+### Phase 3: Hybrid Output and Comment-Back
+
+**Rationale:** Depends on Phase 2's interview context. Both the confirmation/proposal output and the comment-back consume `$INTERVIEW_CONTEXT`. Building them together ensures consistent formatting across both consumption points.
+**Delivers:** Quick route confirmation summary with re-ask loop, milestone route approach proposals with selection, pre-execution comment-back to Linear, shared interview context template.
+**Addresses:** Confirmation summary, approach proposals, pre-execution comment-back, brainstorm escape hatch for complex milestones.
+**Avoids:** Pitfall 4 (comment blocks execution) with error handling. Pitfall 5 (path drift) with shared template. Pitfall 8 (shallow proposals) with brainstorm escape hatch. Pitfall 9 (comment noise) by deciding one-comment vs two-comment strategy.
+
+### Phase 4: Context Threading and Description Enrichment
+
+**Rationale:** Final integration phase. Interview data flows into linear-context.md frontmatter, enriched task descriptions for quick route, and MILESTONE-CONTEXT.md for milestone route. These are modifications to existing steps that depend on all prior phases.
+**Delivers:** `interview_summary` in linear-context.md frontmatter, enriched `$DESCRIPTION` replacing raw truncation for quick tasks, `## Selected Approach` section in MILESTONE-CONTEXT.md, documentation updates.
+**Addresses:** Context threading through all downstream steps, description synthesis replacement, MILESTONE-CONTEXT.md enrichment.
+**Avoids:** Pitfall 6 (context not consumed) by verifying each consumption point. Pitfall 7 (confusing inferred route UX) by implementing confidence threshold for auto-routing.
 
 ### Phase Ordering Rationale
 
-- **Command before agent:** The command spec defines the input contract the agent receives. Writing the agent first risks designing around assumptions that the command spec then contradicts.
-- **Agent before routing:** The routing XML context format must match the agent's output structure. Defining routing before the report format is known produces a mismatch (Pitfall 6).
-- **Mitigations in Phase 1 and 2, not Phase 3:** Context overflow, base branch resolution, import-graph checking, and budget awareness are all baked into the inputs/prompts. The earlier they are defined, the cheaper they are to get right.
-- **Documentation last:** No user-facing docs should be written until the feature is end-to-end functional. Updating help.md before routing works would document incomplete behavior.
+- **Structural before behavioral:** Phase 1 handles all renumbering and reference cleanup so subsequent phases work against correct step numbers and criteria tags.
+- **Core before consumers:** Phase 2 builds the interview engine that Phases 3-4 consume. Building consumers before the producer would require placeholder data and rework.
+- **User-facing before background:** Phase 3 builds the user-visible confirmation/proposal output before Phase 4 wires up background context threading. Users see value from Phase 3; Phase 4 improves execution quality behind the scenes.
+- **Each phase is independently testable:** Phase 1 can be verified by grep. Phase 2 can be tested with manual interview runs. Phase 3 can be tested by observing output and Linear comments. Phase 4 can be tested by inspecting generated context files.
 
 ### Research Flags
 
-Phases with well-documented patterns (skip research-phase during planning):
-- **Phase 1:** Command spec pattern is well-established (`audit-tests.md`, `pr-review.md` provide exact models). Init function is a near-copy of `cmdInitPrReview()`. All patterns have HIGH-confidence references in the existing codebase.
-- **Phase 2:** Agent definition pattern is well-established (`gsd-test-steward.md` provides the exact read-only analysis agent model). The 6-step structure is defined in the design doc.
-- **Phase 3:** Routing patterns are fully established by pr-review's quick task and milestone routes. The only novel element is the type-specific XML context format, which can be defined inline during implementation without additional research.
-- **Phase 4:** Documentation and test patterns are trivially established by existing commands.
+Phases likely needing deeper research during planning:
+- **Phase 2:** Interview skip logic requires careful calibration. The boundary between "ticket is clear enough to skip" and "ticket seems clear but is ambiguous" needs concrete heuristics defined during planning. Run `/gsd:research-phase` for this phase.
+- **Phase 3 (milestone path):** The brainstorm escape hatch (offering to switch to `/gsd:brainstorm` for complex features) needs UX design. How does the workflow hand off mid-stream? Research during planning.
 
-No phases require `/gsd:research-phase` during planning. All patterns have HIGH-confidence references in the existing codebase.
+Phases with standard patterns (skip research-phase):
+- **Phase 1:** Purely mechanical restructuring. Grep, rename, update references. No research needed.
+- **Phase 4:** Context threading is pattern replication from existing steps. Well-documented in the codebase.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Direct codebase inspection confirmed all existing dispatch entries, module exports, and file patterns. No new dependencies — zero uncertainty about tooling. |
-| Features | HIGH | Primary sources are existing codebase patterns and the approved design doc. Domain research confirms the heuristic + LLM approach is the right fit for GSD's zero-config constraint. |
-| Architecture | HIGH | Direct analysis of `audit-tests.md`, `pr-review.md`, `gsd-test-steward.md`, `init.cjs`, and `gsd-tools.cjs`. Component boundaries and data flow are fully specified in the design doc and validated against production code. |
-| Pitfalls | HIGH | Derived from direct design doc analysis and comparison with existing command implementations. The project's test budget situation (826/800 = 103.25%) is a concrete data point, not speculation. |
+| Stack | HIGH | Zero new dependencies. All tools validated in production. Source: direct codebase inspection. |
+| Features | HIGH | All features specified in approved design document. Proven patterns from brainstorm.md. |
+| Architecture | HIGH | Single-file workflow modification. Component boundaries clear. AskUserQuestion constraint well-understood. |
+| Pitfalls | HIGH | Derived from direct analysis of existing code, design doc, and integration points. Recovery costs low for all. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Git diff size threshold:** The ~2,000-line threshold for switching to summarized mode is a heuristic, not a measured value. Validate during Phase 1 implementation by running the command on branches with varying diff sizes and observing agent behavior. Adjust threshold based on observed context window performance.
-- **Import-graph check performance boundary:** PITFALLS.md flags O(changed * tests) Grep calls as a potential slowdown for branches touching >20 source files with >100 test files. This is within acceptable range for this project's current size (826 tests) but should be noted as a future scaling concern.
-- **Empty recommendations flow:** The design doc mentions zero-recommendation handling but does not fully specify whether to skip the routing prompt entirely or still offer "done". Resolve during Phase 3 implementation — the simplest approach (skip routing, display "no issues found", exit cleanly) should be the default.
+- **Question skip calibration:** The exact heuristics for when to skip each interview question are not fully specified in the design doc. "Clear from description" is subjective. Phase 2 planning must define concrete skip criteria (e.g., description has >100 chars and contains a verb phrase describing the goal).
+- **Inferred route confidence threshold:** The design says Claude infers the route when the complexity question is skipped, but does not define what constitutes high vs low confidence for auto-routing vs asking for confirmation. Phase 2 planning must define this.
+- **Multi-issue interview behavior:** The design does not address how the interview works when multiple issue IDs are provided. Currently deferred to post-v3.0, but the workflow must at minimum not crash on multi-issue input.
+- **Two-comment vs one-comment decision:** The design specifies two comments, but Pitfall 9 identifies notification noise concerns for quick tasks. Phase 3 planning must make a definitive call.
 
 ## Sources
 
-### Primary (HIGH confidence — direct codebase inspection)
-
-- `.planning/designs/2026-03-20-pr-test-review-command-design.md` — approved design doc specifying command flow, agent steps, input/output format, routing
-- `commands/gsd/audit-tests.md` — direct agent spawn pattern (thin command + read-only agent)
-- `commands/gsd/pr-review.md` — routing pattern (quick task + milestone + done), report output, XML context format
-- `agents/gsd-test-steward.md` — read-only analysis agent pattern (6-step structure, tool constraints, consolidation vocabulary)
-- `get-shit-done/bin/lib/testing.cjs` — confirmed exports: findTestFiles(), countTestsInProject(), getTestConfig(), detectFramework()
-- `get-shit-done/bin/gsd-tools.cjs` — confirmed dispatch entries: test-count (line 642), test-config (line 659), commit, generate-slug, resolve-model
-- `get-shit-done/bin/lib/init.cjs` — cmdInitPrReview() as template for cmdInitTestReview()
-- `.planning/PROJECT.md` — v2.9 requirements; test budget at 826/800 (103.25%)
-
-### Secondary (MEDIUM confidence — domain research)
-
-- [diff_cover](https://github.com/Bachmann1234/diff_cover) — demonstrates diff-to-coverage mapping pattern; confirms the approach is well-understood
-- [Test Impact Analysis (Martin Fowler)](https://martinfowler.com/articles/rise-test-impact-analysis.html) — canonical reference for static vs dynamic TIA; validates heuristic approach for zero-config environments
-- [minware Test Impact Analysis](https://www.minware.com/guide/best-practices/test-impact-analysis) — file-level dependency mapping without instrumentation; supports import-graph check approach
+### Primary (HIGH confidence)
+- `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` — approved design document, primary specification
+- `get-shit-done/workflows/linear.md` — existing workflow being refactored
+- `get-shit-done/workflows/brainstorm.md` — proven pattern for adaptive questions (Step 3) and approach proposals (Step 4)
+- `commands/gsd/linear.md` — command spec with allowed tools and execution context
+- `.planning/PROJECT.md` — v3.0 requirements, architecture constraints, known tech debt
+- `package.json` — dependency list confirming no new packages needed
 
 ---
-*Research completed: 2026-03-21*
+*Research completed: 2026-03-22*
 *Ready for roadmap: yes*

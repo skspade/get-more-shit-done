@@ -1,238 +1,301 @@
-# Architecture Research
+# Architecture Patterns
 
-**Domain:** /gsd:test-review integration with existing GSD Autopilot framework
-**Researched:** 2026-03-21
+**Domain:** /gsd:linear interview phase integration with existing workflow
+**Researched:** 2026-03-22
 **Confidence:** HIGH
 
 ## System Overview
 
 ```
-/gsd:test-review Command Flow
-==============================
+/gsd:linear Workflow -- Current vs Refactored
+=============================================
 
-┌─────────────────────────────────────────────────────────────────┐
-│                       Command Layer                              │
-│  ┌──────────────────┐                                            │
-│  │ test-review.md   │  Thin orchestrator: args, git diff,        │
-│  │ (NEW)            │  gather data, spawn agent, write report,   │
-│  │                  │  prompt user, route result                  │
-│  └────────┬─────────┘                                            │
-│           │ Task()                                               │
-├───────────┴──────────────────────────────────────────────────────┤
-│                       Agent Layer                                │
-│  ┌──────────────────┐                                            │
-│  │ gsd-test-reviewer│  Read-only analysis: diff parsing,         │
-│  │ (NEW)            │  coverage gaps, staleness, consolidation   │
-│  └────────┬─────────┘                                            │
-│           │ returns structured report                            │
-├───────────┴──────────────────────────────────────────────────────┤
-│                    Existing Infrastructure                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐     │
-│  │testing.  │  │gsd-tools │  │init.cjs  │  │quick task    │     │
-│  │cjs       │  │.cjs      │  │          │  │infra         │     │
-│  │(reuse)   │  │(reuse)   │  │(new init)│  │(reuse)       │     │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
+CURRENT (7 steps):                    REFACTORED (9 steps):
+
+1. Parse arguments -----------------> 1. Parse arguments        [UNCHANGED]
+2. Fetch issue data ----------------> 2. Fetch issue data       [UNCHANGED]
+3. Route via heuristic ------+        3. Interview (3-5 Qs)     [NEW]
+                             |        4. Route from interview    [NEW -- replaces 3]
+                             x        5. Hybrid output           [NEW]
+                                      5.5 Comment-back (pre)     [NEW]
+4. Write linear-context.md ---------> 6. Write linear-context.md [MODIFIED]
+5. Execute route -------------------> 7. Execute route           [MODIFIED]
+6. Comment-back --------------------> 8. Completion comment-back [UNCHANGED]
+7. Cleanup -------------------------> 9. Cleanup                 [UNCHANGED]
 ```
 
 ### Component Responsibilities
 
 | Component | Responsibility | Status |
 |-----------|----------------|--------|
-| `commands/gsd/test-review.md` | Thin orchestrator: parse args, gather diff + test data, spawn agent, write report, user prompt, route to quick/milestone/done | **NEW** |
-| `agents/gsd-test-reviewer.md` | Read-only analysis: parse diff, detect coverage gaps, detect stale tests, suggest consolidation, compile report | **NEW** |
-| `init.cjs` cmdInitTestReview() | Resolve models, quick task numbering, timestamps, paths, file existence checks | **NEW function** (in existing file) |
-| `gsd-tools.cjs` init test-review | Dispatch entry routing to cmdInitTestReview | **NEW case** (in existing file) |
-| `testing.cjs` | findTestFiles(), countTestsInProject(), getTestConfig() | **REUSE as-is** |
-| `gsd-tools.cjs` test-count, test-config | CLI dispatch for test data gathering | **REUSE as-is** |
-| `gsd-tools.cjs` commit, generate-slug | Report commit, slug generation for quick tasks | **REUSE as-is** |
-| Quick task directory structure | .planning/quick/{N}-{slug}/ with PLAN.md, SUMMARY.md | **REUSE as-is** |
-| pr-review.md workflow patterns | Quick route and milestone route code patterns | **PATTERN REFERENCE** (not imported) |
-| `commands/gsd/help.md` | Command reference table | **UPDATE** (add entry) |
-| `USER-GUIDE.md`, `README.md` | User-facing documentation | **UPDATE** (add section) |
+| `workflows/linear.md` Step 3 (old) | Complexity scoring heuristic ($MILESTONE_SCORE) | **DELETE** |
+| `workflows/linear.md` Step 3 (new) | Interview: pre-scan ticket, ask 3-5 adaptive questions via AskUserQuestion | **NEW** |
+| `workflows/linear.md` Step 4 (new) | Route decision from interview complexity signal question | **NEW** |
+| `workflows/linear.md` Step 5 (new) | Hybrid output: confirmation summary (quick) or approach proposals (milestone) | **NEW** |
+| `workflows/linear.md` Step 5.5 (new) | Pre-execution comment-back to Linear via MCP | **NEW** |
+| `workflows/linear.md` Step 6 (was 4) | Write linear-context.md -- add `interview_summary` field | **MODIFIED** |
+| `workflows/linear.md` Step 7 (was 5) | Execute route -- enriched descriptions from interview context | **MODIFIED** |
+| `workflows/linear.md` Steps 8-9 | Completion comment-back + cleanup | **UNCHANGED** |
+| `commands/gsd/linear.md` | Command spec -- update objective description | **MODIFIED** (minor) |
+| `$INTERVIEW_CONTEXT` variable | Stores all Q&A from interview phase | **NEW data structure** |
 
 ## New Components Required
 
-### 1. `commands/gsd/test-review.md` (command spec)
+### 1. Interview Phase (New Step 3 in linear.md)
 
-Follows the `audit-tests.md` pattern: direct agent spawn, no workflow file needed.
+Replaces the `$MILESTONE_SCORE` calculation entirely. This is not a new file -- it is new content within the existing `linear.md` workflow.
 
-**Why no workflow file:** The command's flow is linear (gather data, spawn agent, write report, prompt, route). No branching complexity that warrants a separate workflow. This matches `audit-tests.md` (direct spawn) rather than `pr-review.md` (which needs a workflow for its multi-step capture/parse/dedup/score pipeline).
+**Structure within the step:**
 
-**Key difference from audit-tests.md:** After the agent returns, this command has a routing step (quick/milestone/done). The routing logic lives inline in the command spec, not in a workflow. This is similar to how `linear.md` handles routing inline.
+1. **Pre-scan** -- Read ticket title, description, labels, comments. Build internal checklist of what is already clear (goal, scope, criteria, approach).
 
-**Structure:**
-```
+2. **Adaptive question loop** -- 3-5 questions via AskUserQuestion, each conditionally skipped:
+   - Q1: Goal clarification (skip if description states goal)
+   - Q2: Scope boundaries (skip if ticket names files/components)
+   - Q3: Success criteria (skip if acceptance criteria exist)
+   - Q4: Complexity signal (skip if --quick or --milestone flag; primary routing input)
+   - Q5: Additional context (only if ambiguity remains)
+
+3. **Output** -- Accumulate all answers into `$INTERVIEW_CONTEXT` string for downstream consumption.
+
+**Why inline, not a separate agent:** AskUserQuestion cannot be called from within a Task() subagent -- it must be called from the top-level workflow. The interview is a direct user conversation, not analysis work. Extracting to an agent would fail at runtime.
+
+### 2. Route Decision (New Step 4 in linear.md)
+
+Replaces the scoring table with a direct mapping from the complexity signal answer:
+
+| Answer | Route | Notes |
+|--------|-------|-------|
+| "Quick task (hours)" | quick | Straightforward |
+| "Medium (1-2 sessions)" | quick + $FULL_MODE=true | Triggers plan-checking and verification |
+| "Milestone (multi-phase)" | milestone | Full milestone creation |
+
+**Override flags still bypass:** `--quick` and `--milestone` skip the complexity question but still run the other interview questions (goal, scope, criteria). Flags skip routing, not understanding.
+
+**Inferred routing fallback:** If Q4 was skipped because the ticket was explicit enough, Claude infers the route and confirms with the user.
+
+### 3. Hybrid Output (New Step 5 in linear.md)
+
+Two presentation modes based on route:
+
+**Quick route:** Confirmation summary (goal, scope, criteria, route). AskUserQuestion: "Yes, proceed" / "No, let me clarify". If "No", re-ask the relevant question and re-present.
+
+**Milestone route:** 2-3 approach proposals with pros/cons, matching brainstorm Step 4. AskUserQuestion to select approach. Selected approach feeds MILESTONE-CONTEXT.md.
+
+**Why diverge by route:** Quick tasks need validation ("did I understand you?"), milestone tasks need design input ("which direction?").
+
+### 4. Pre-Execution Comment-Back (New Step 5.5 in linear.md)
+
+Posts interview summary to Linear before execution starts. Uses `mcp__plugin_linear_linear__create_comment` already in allowed-tools.
+
+**Failure handling:** Warning only, never blocks execution. Same pattern as completion comment-back.
+
+**Result:** Each ticket gets two comments total -- interview summary before work, completion summary after work.
+
+## Existing Components Modified
+
+### 1. `workflows/linear.md` Step 6 (Write linear-context.md)
+
+**Change:** Add `interview_summary` text field to YAML frontmatter. Remove `score` field.
+
+```yaml
 ---
-name: gsd:test-review
-description: Analyze branch diff and recommend test improvements
-argument-hint: "[--report-only]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, AskUserQuestion
+issue_ids: [LIN-123]
+route: quick
+interview_summary: "Goal: Fix the login redirect. Scope: auth module only. Criteria: Redirect works for all OAuth providers."
+fetched: 2026-03-22
 ---
-<objective>...</objective>
-<execution_context>No workflow file -- direct agent spawn with inline routing.</execution_context>
-<context>$ARGUMENTS</context>
-<process>
-  1. Parse --report-only flag
-  2. Get changed files: git diff main...HEAD --name-only
-  3. If empty, display "No changes" and exit
-  4. Get full diff: git diff main...HEAD
-  5. Gather test data (test-count, test-config, find test files)
-  6. Display banner
-  7. Spawn gsd-test-reviewer via Task()
-  8. Write report to .planning/reviews/YYYY-MM-DD-test-review.md
-  9. Commit report
-  10. If --report-only, exit
-  11. AskUserQuestion: "Fix these? (quick / milestone / done)"
-  12. Route based on answer
-</process>
 ```
 
-### 2. `agents/gsd-test-reviewer.md` (agent definition)
+### 2. `workflows/linear.md` Step 7 (Execute route)
 
-Follows the `gsd-test-steward.md` pattern: read-only analysis agent.
+**Quick route 5a (description synthesis):** Replace `title + description[:1500]` truncation with interview-enriched context. `$DESCRIPTION` now includes goal, scope, and success criteria from interview.
 
-**Tools:** Read, Bash, Grep, Glob (same as test steward -- no Write needed, agent is read-only)
+**Milestone route 5a (MILESTONE-CONTEXT.md):** Add `## Selected Approach` section with the chosen approach name and description.
 
-**Input:** Receives `<test-review-input>` XML block from the command with diff, changed files, test count, test config, and test file list.
+### 3. `commands/gsd/linear.md`
 
-**6-step process:**
-1. Parse diff (extract changed files, functions, modules)
-2. Coverage gap analysis (check for corresponding test files)
-3. Staleness detection (test refs to changed/deleted code)
-4. Consolidation analysis (duplicate/overlapping tests in diff scope)
-5. Generate structured recommendations
-6. Compile markdown report
+**Change:** Update `<objective>` text to mention interview phase. No tool changes -- AskUserQuestion is already allowed.
 
-**Output:** Structured markdown report returned to orchestrator.
+### 4. Success criteria in `workflows/linear.md`
 
-### 3. `init.cjs` cmdInitTestReview() (init function)
+**Remove:**
+- "Routing heuristic scores on issue count, sub-issues, description, labels, relations (WKFL-03)"
+- "Score >= 3 routes to milestone, < 3 routes to quick (WKFL-03)"
 
-Near-identical to `cmdInitPrReview()`. Resolves: planner_model, executor_model, checker_model, verifier_model, commit_docs, next_num, date, timestamp, paths, file existence.
-
-**Why a separate init function vs reusing pr-review init:** The design doc states the command is "purely additive" with no modifications to existing files beyond docs. A separate init function keeps the concerns clean and allows future divergence (e.g., test-review might need test-specific config data that pr-review doesn't).
-
-### 4. `gsd-tools.cjs` dispatch entries
-
-Two additions:
-- `case 'test-review':` under the `init` switch -- routes to `cmdInitTestReview`
-- Update the error message's "Available:" list to include `test-review`
+**Add:**
+- "Interview asks 3-5 adaptive questions, skipping answered ones"
+- "Route determined from interview complexity signal"
+- "Quick route shows confirmation, milestone route shows approach proposals"
+- "Interview summary posted to Linear before execution"
 
 ## Existing Components Reused (No Modification)
 
 | Component | What's Reused | How |
 |-----------|---------------|-----|
-| `testing.cjs` findTestFiles() | Discover all test files in project | Called via gsd-tools test-count or directly in agent |
-| `testing.cjs` getTestConfig() | Get test budget/config for context | Called via gsd-tools test-config |
-| `gsd-tools.cjs` test-count | CLI access to test counts | Bash call in command |
-| `gsd-tools.cjs` test-config | CLI access to test config | Bash call in command |
-| `gsd-tools.cjs` commit | Commit report file | Bash call in command |
-| `gsd-tools.cjs` generate-slug | Generate directory slug for quick tasks | Bash call in routing |
-| `gsd-tools.cjs` resolve-model | Resolve agent model from config | Bash call in command |
-| Quick task infrastructure | .planning/quick/{N}-{slug}/ directory, STATE.md update | Pattern from pr-review.md steps 8a-8i |
-| Milestone infrastructure | MILESTONE-CONTEXT.md, /gsd:new-milestone --auto | Pattern from pr-review.md step 9 |
-| .planning/reviews/ directory | Report storage alongside pr-review reports | Shared directory |
+| AskUserQuestion | Interview questions + confirmation/selection | Already in allowed-tools |
+| mcp create_comment | Pre-execution comment-back | Same API, second call point |
+| mcp get_issue + list_comments | Ticket data for pre-scan | Already fetched in Step 2 |
+| Quick task infrastructure | Steps 5b-5i (init, planner, executor, STATE.md) | Unchanged |
+| Milestone infrastructure | MILESTONE-CONTEXT.md, new-milestone steps 1-11 | Unchanged except content |
+| gsd-tools.cjs (init, commit, slug) | All CLI tooling | No changes |
+| Completion comment-back (Step 8) | Post-execution summary | Unchanged |
+| Cleanup (Step 9) | Delete linear-context.md | Unchanged |
 
 ## Architectural Patterns
 
-### Pattern 1: Direct Agent Spawn (audit-tests pattern)
+### Pattern 1: Adaptive Skip (interview design)
 
-**What:** Command gathers data, spawns a single agent via Task(), displays results. No workflow file.
-**When to use:** Linear flow with no complex branching. The command IS the orchestrator.
-**Trade-offs:** Simpler (fewer files), but routing logic must be inline in the command.
+**What:** Each question checks a precondition before asking. If the answer is already known from ticket data or previous answers, skip it.
+**When to use:** When gathering information that may already be partially available from context.
 
-This is the right pattern for test-review because:
-- Data gathering is straightforward (git diff + gsd-tools calls)
-- Agent does all the analysis work
-- Routing is a simple 3-way user choice, not computed scoring
+**Implementation approach:**
+```
+For each question:
+  1. Check if ticket data already answers this
+  2. Check if a previous answer covers this
+  3. If either YES, log "Skipping Q{N}: already answered by {source}"
+  4. If NO, ask via AskUserQuestion
+  5. After answer, update $INTERVIEW_CONTEXT
+```
 
-### Pattern 2: XML Context Block (pr-review/linear pattern)
+### Pattern 2: Dual-Mode Presentation (hybrid output)
 
-**What:** Command passes structured data to agent/planner via XML blocks (`<test-review-input>`, `<test-review-findings>`).
-**When to use:** When structured data needs to cross the command-to-agent boundary.
-**Trade-offs:** Verbose but unambiguous. Agents parse XML blocks reliably.
+**What:** Present different UI based on the routing decision -- lightweight confirmation for simple tasks, rich proposals for complex tasks.
+**When to use:** When the same workflow serves both low-complexity and high-complexity paths with fundamentally different user needs.
 
-### Pattern 3: User-Choice Routing (linear pattern, NOT pr-review scoring)
+### Pattern 3: Pre-Execution Comment-Back (audit trail)
 
-**What:** After analysis, ask user what to do (quick/milestone/done) rather than auto-scoring.
-**When to use:** When the decision requires human judgment about scope. Test recommendations don't have a natural numeric scoring heuristic like pr-review findings do.
-**Trade-offs:** Requires human interaction (blocks autopilot), but test review is explicitly an on-demand tool, not part of the autonomous pipeline.
+**What:** Post understanding to the external system before starting work, not just after completion.
+**When to use:** When work takes significant time and stakeholders need visibility into what will happen.
 
 ## Data Flow
 
-### Primary Flow
+### Full Flow (Interview Path)
 
 ```
-User runs /gsd:test-review [--report-only]
+User: /gsd:linear LIN-123
     |
     v
-Command: git diff main...HEAD --name-only
-    |
-    v (if empty, exit "No changes")
-    |
-Command: git diff main...HEAD (full diff)
-    |
-Command: gsd-tools test-count, test-config
-    |
-Command: resolve-model gsd-test-reviewer
+Step 1: Parse "LIN-123", no flags
     |
     v
-Task(gsd-test-reviewer) with <test-review-input>
+Step 2: MCP get_issue + list_comments -> $ISSUES
     |
     v
-Agent: 6-step analysis
+Step 3: Pre-scan ticket data
+    |   -> Goal clear? Scope bounded? Criteria stated? Approach indicated?
     |
-    v (returns structured report)
+    v
+Step 3: AskUserQuestion loop (3-5 questions, skipping answered)
+    |   -> $INTERVIEW_CONTEXT accumulated
     |
-Command: Write .planning/reviews/YYYY-MM-DD-test-review.md
-Command: gsd-tools commit
+    v
+Step 4: Route from complexity signal answer
+    |   -> $ROUTE = "quick" | "milestone"
+    |   -> $FULL_MODE = true (if "Medium")
     |
-    v (if --report-only, exit)
+    +--- quick -----------------+
+    |                           |
+    v                           v
+Step 5: Confirmation        Step 5: Approach proposals (2-3)
+    |   "Does this look         |   "Which approach?"
+    |    right?" -> Yes/No      |   -> Selected approach
+    |                           |
+    v                           v
+Step 5.5: MCP create_comment (interview summary)
     |
-AskUserQuestion: "quick / milestone / done"
+    v
+Step 6: Write linear-context.md (with interview_summary)
     |
-    ├── done: exit
+    v
+Step 7: Execute route
+    |   Quick: enriched $DESCRIPTION from interview
+    |   Milestone: MILESTONE-CONTEXT.md with selected approach
     |
-    ├── quick: gsd-tools init test-review -> spawn planner -> executor -> STATE.md update
+    v
+Step 8: MCP create_comment (completion summary)
     |
-    └── milestone: write MILESTONE-CONTEXT.md -> /gsd:new-milestone --auto
+    v
+Step 9: Cleanup linear-context.md
 ```
 
-### Quick Route Data Flow (reuses pr-review pattern)
+### Flag Override Data Flow
 
 ```
-User selects "quick"
+User: /gsd:linear LIN-123 --quick
     |
     v
-gsd-tools init test-review -> {models, next_num, paths}
-    |
-gsd-tools generate-slug "{description}"
-    |
-mkdir .planning/quick/{N}-{slug}/
-    |
-Task(gsd-planner) with <test-review-findings> XML
-    |  -> creates {N}-PLAN.md (one task per recommendation group)
-    |
-Task(gsd-executor) with plan
-    |  -> executes tasks, creates {N}-SUMMARY.md
-    |
-Update STATE.md quick tasks table (Source: test-review)
-    |
-gsd-tools commit
-```
-
-### Milestone Route Data Flow
-
-```
-User selects "milestone"
+Steps 1-2: Same as above
     |
     v
-Write .planning/MILESTONE-CONTEXT.md from report findings
-    |  (each category becomes a feature section)
+Step 3: Pre-scan + Questions Q1, Q2, Q3, Q5 (SKIP Q4 -- route predetermined)
+    |   -> $INTERVIEW_CONTEXT still gathered
     |
-Delegate to /gsd:new-milestone --auto
-    |  (consumes MILESTONE-CONTEXT.md, creates roadmap)
+    v
+Step 4: $ROUTE = "quick" (flag override, no complexity question needed)
+    |
+    v
+Steps 5-9: Same as above (confirmation summary path)
 ```
+
+### Key Data Structures
+
+**$INTERVIEW_CONTEXT** (string, accumulated):
+```
+Goal: Fix the login redirect loop for OAuth providers
+Scope: auth module (src/auth/) -- specifically the callback handler
+Success criteria: All three OAuth providers (Google, GitHub, GitLab) redirect correctly after login
+Complexity: Quick task (hours)
+Additional: The issue only affects the production environment, not local dev
+```
+
+**linear-context.md frontmatter** (modified):
+```yaml
+---
+issue_ids: [LIN-123]
+route: quick
+interview_summary: "Goal: Fix login redirect loop. Scope: auth module. Criteria: All OAuth providers redirect correctly."
+fetched: 2026-03-22T10:30:00Z
+---
+```
+
+**MILESTONE-CONTEXT.md** (enriched for milestone route):
+```markdown
+# Milestone Context
+...existing content...
+
+## Selected Approach
+**Approach 2: Event-Driven Refactor**
+Restructure the notification pipeline to use an event bus pattern,
+decoupling producers from consumers and enabling per-channel configuration.
+```
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Extracting Interview into a Separate Agent
+
+**What people do:** Create a `gsd-interviewer` agent spawned via Task() that handles the question-asking.
+**Why it's wrong:** AskUserQuestion cannot be called from within a Task() subagent -- it must be called from the top-level workflow. The interview is a direct user conversation, not analysis work. Spawning an agent would fail at runtime.
+**Do this instead:** Keep interview logic inline in the workflow step.
+
+### Anti-Pattern 2: Keeping the Scoring Heuristic as Fallback
+
+**What people do:** Retain the $MILESTONE_SCORE calculation as a fallback when interview is inconclusive.
+**Why it's wrong:** Two routing mechanisms create ambiguity and maintenance burden. The scoring heuristic was the problem being solved.
+**Do this instead:** Remove the scoring table completely. If the interview is inconclusive, ask a follow-up question.
+
+### Anti-Pattern 3: Storing Interview State in a Separate File
+
+**What people do:** Write `.planning/interview-context.md` as a temporary file consumed later.
+**Why it's wrong:** The interview data is consumed immediately within the same workflow execution. Writing to disk adds file lifecycle management for data that never leaves the workflow's scope.
+**Do this instead:** Keep `$INTERVIEW_CONTEXT` as an in-memory variable. Persist only the summary into linear-context.md's frontmatter.
+
+### Anti-Pattern 4: Making All Questions Mandatory
+
+**What people do:** Always ask all 5 questions regardless of ticket clarity.
+**Why it's wrong:** Well-written tickets already contain goal, scope, and criteria. Forcing users to re-state what is written creates friction.
+**Do this instead:** Pre-scan the ticket and skip questions whose answers are already clear.
 
 ## Integration Points
 
@@ -240,93 +303,39 @@ Delegate to /gsd:new-milestone --auto
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Command -> Agent | Task() spawn with XML input block | Agent returns markdown report as text |
-| Command -> gsd-tools | Bash calls to gsd-tools.cjs | test-count, test-config, commit, generate-slug, init, resolve-model |
-| Command -> git | Direct bash calls | git diff main...HEAD, git diff main...HEAD --name-only |
-| Command -> Quick infra | Follows pr-review Steps 8a-8i inline | Same planner/executor spawn pattern |
-| Command -> Milestone infra | Writes MILESTONE-CONTEXT.md, calls /gsd:new-milestone | Same as pr-review Step 9 |
-| Agent -> codebase | Read, Grep, Glob tools | Agent reads test files and source files to analyze coverage |
-| Report -> reviews/ dir | Shared with pr-review reports | Different filename suffix: -test-review.md vs -pr-review.md |
-| STATE.md Source column | "test-review" value | Uses existing generic Source column (already renamed from "Linear") |
+| Step 2 -> Step 3 | $ISSUES data feeds pre-scan | Pre-scan reads title, description, labels, comments from already-fetched data |
+| Step 3 -> Step 4 | $INTERVIEW_CONTEXT string | Complexity signal answer is primary routing input |
+| Step 3 -> Step 5 | $INTERVIEW_CONTEXT string | Goal, scope, criteria feed confirmation/proposals |
+| Step 5 -> Step 5.5 | Confirmed understanding or selected approach | Comment body built from confirmed interview answers |
+| Step 5 -> Step 6 | interview_summary field | Persisted to linear-context.md frontmatter |
+| Step 3 -> Step 7 (quick) | $INTERVIEW_CONTEXT enriches $DESCRIPTION | Replaces truncated ticket text with structured interview output |
+| Step 5 -> Step 7 (milestone) | Selected approach name + description | Added to MILESTONE-CONTEXT.md as new section |
+
+### External Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Workflow -> User | AskUserQuestion (3-5 times in interview + 1 in hybrid output) | More user interaction than current workflow (which has 0-1 questions) |
+| Workflow -> Linear MCP | create_comment (Step 5.5, NEW) | Second comment-back call; first is pre-execution, existing is post-execution |
 
 ### No Interaction Points
 
 | Component | Why No Integration |
 |-----------|-------------------|
-| gsd-test-steward | Independent agent. Same vocabulary but different trigger (milestone audit vs on-demand diff review). No code sharing needed. |
-| audit-milestone workflow | test-review is on-demand, not part of milestone audit pipeline |
-| autopilot.mjs | test-review is interactive (user prompt), not part of autonomous pipeline |
-| execute-plan workflow | Quick task routing uses direct planner/executor spawns, not the full execute-plan workflow |
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Sharing Agent Logic Between Steward and Reviewer
-
-**What people do:** Extract shared analysis functions into a common module used by both gsd-test-steward and gsd-test-reviewer.
-**Why it's wrong:** Both are LLM agents defined in markdown prompt files, not code modules. Their analysis happens in-context, not in shared functions. The strategy vocabulary (prune/parameterize/promote/merge) is carried in each agent's prompt independently.
-**Do this instead:** Keep agents fully self-contained. Duplicate the strategy definitions in the reviewer's prompt. This is not DRY violation -- it is prompt engineering best practice.
-
-### Anti-Pattern 2: Auto-Scoring for Route Decision
-
-**What people do:** Copy pr-review's numeric scoring heuristic to auto-route test recommendations.
-**Why it's wrong:** PR review findings have natural severity levels (critical/important/suggestion) that map to numeric scores. Test recommendations don't -- a single missing test for a critical function is more important than 10 consolidation suggestions. The decision requires human judgment.
-**Do this instead:** Use AskUserQuestion for the routing decision. The report gives the user enough context to decide.
-
-### Anti-Pattern 3: Creating a Workflow File for Simple Linear Flow
-
-**What people do:** Create a workflow .md file because other complex commands (pr-review, linear) have them.
-**Why it's wrong:** test-review's flow is linear: gather, analyze, report, route. No complex branching, no multi-step capture/parse/dedup pipeline. A workflow file adds indirection without value.
-**Do this instead:** Keep all logic in the command spec. Follow the audit-tests.md pattern (direct agent spawn).
-
-### Anti-Pattern 4: Modifying testing.cjs for Diff-Aware Functions
-
-**What people do:** Add diff-aware test analysis functions to testing.cjs so the agent can call them.
-**Why it's wrong:** The agent's analysis is LLM-powered (reading diffs, understanding code semantics). CJS utility functions can't do semantic analysis. Adding functions would create dead code or incomplete heuristics.
-**Do this instead:** Let the agent do the analysis using its Read/Grep/Glob tools. testing.cjs provides data (test counts, config, file lists), the agent provides intelligence.
-
-## Suggested Build Order
-
-Based on dependency analysis and the ability to test incrementally:
-
-### Phase 1: Agent Definition + Command Spec (core functionality)
-
-1. **`agents/gsd-test-reviewer.md`** -- No dependencies. Can be written and reviewed standalone. The 6-step analysis process is the intellectual core of the feature.
-
-2. **`commands/gsd/test-review.md`** -- Depends on agent existing. This is the orchestrator that gathers data, spawns the agent, writes the report, and handles --report-only exit. Routing (quick/milestone/done) is also here but can be tested last.
-
-**Why together:** These two files are the minimum viable feature. With just these, a user can run `/gsd:test-review` and get a report. The init function is only needed for the quick task route.
-
-### Phase 2: Init + Dispatch (routing infrastructure)
-
-3. **`init.cjs` cmdInitTestReview()** -- Near-copy of cmdInitPrReview. Needed for quick task routing.
-
-4. **`gsd-tools.cjs` init test-review case** -- One-line dispatch entry. Needed for the command to call init.
-
-**Why after Phase 1:** Routing is only needed when the user selects "quick task" or "milestone". The report-only flow works without init.
-
-### Phase 3: Documentation
-
-5. **`commands/gsd/help.md`** -- Add test-review to command reference table.
-
-6. **`USER-GUIDE.md`** -- Add usage section.
-
-7. **`README.md`** -- Add to command table.
-
-**Why last:** Documentation doesn't block functionality. Update after the command works end-to-end.
-
-### Phase 4: Tests
-
-8. **Tests for new functionality** -- Init function tests (mirrors pr-review init tests), command behavior validation.
-
-**Why separate:** Tests validate the implementation. Write after the implementation is stable.
+| gsd-tools.cjs | No new CLI commands needed; interview is pure workflow logic |
+| init.cjs | No new init functions; routing infrastructure unchanged |
+| autopilot.mjs | Linear workflow is interactive (AskUserQuestion); not part of autonomous pipeline |
+| testing.cjs | No test-related changes |
+| brainstorm.md | Approach proposals pattern is replicated, not imported |
 
 ## Sources
 
-- Design doc: `.planning/designs/2026-03-20-pr-test-review-command-design.md` (HIGH confidence -- approved design)
-- Existing patterns: `commands/gsd/audit-tests.md`, `commands/gsd/pr-review.md`, `agents/gsd-test-steward.md` (HIGH confidence -- production code)
-- Infrastructure: `get-shit-done/bin/lib/testing.cjs`, `get-shit-done/bin/lib/init.cjs`, `get-shit-done/bin/gsd-tools.cjs` (HIGH confidence -- production code)
-- PROJECT.md active requirements (HIGH confidence -- canonical source)
+- Design doc: `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` (HIGH confidence)
+- Existing workflow: `get-shit-done/workflows/linear.md` (HIGH confidence)
+- Command spec: `commands/gsd/linear.md` (HIGH confidence)
+- PROJECT.md v3.0 requirements (HIGH confidence)
+- brainstorm.md approach proposals pattern (HIGH confidence)
 
 ---
-*Architecture research for: /gsd:test-review integration with GSD Autopilot framework*
-*Researched: 2026-03-21*
+*Architecture research for: /gsd:linear interview phase integration*
+*Researched: 2026-03-22*

@@ -1,192 +1,159 @@
 # Feature Landscape
 
-**Domain:** PR diff-aware test review command for autonomous development framework
-**Researched:** 2026-03-21
-**Confidence:** HIGH (primary sources are existing GSD codebase patterns, active PROJECT.md requirements, and domain research)
+**Domain:** Interview-driven routing refactor for Linear issue workflow in autonomous development framework
+**Researched:** 2026-03-22
+**Confidence:** HIGH (primary sources are the approved design document, existing GSD codebase patterns, and brainstorm workflow as proven interview model)
 
 ## Context: What Already Exists
 
-This milestone adds a NEW command to an established system. The following are already built and available as dependencies:
+This milestone REFACTORS an existing command, not building from scratch. The following are already built and operational:
 
-- **Test steward agent** (`gsd-test-steward.md`) — redundancy detection, staleness detection, budget enforcement, consolidation proposals (4 strategies). Read-only analysis agent.
-- **`/gsd:audit-tests` command** — on-demand steward spawning with banner/report presentation pattern.
-- **`/gsd:pr-review` command** — PR diff capture, finding parsing, deduplication, scoring, routing to quick task or milestone. Report written to `.planning/reviews/`.
-- **`testing.cjs`** — `findTestFiles`, `countTestsInProject`, `getTestConfig`, `detectFramework`, `parseTestOutput`. Test file discovery with `EXCLUDE_DIRS` set.
-- **Quick task and milestone routing infrastructure** — `gsd-tools.cjs init`, slug generation, STATE.md updates, executor/planner spawning.
-- **Consolidation bridge** (v2.8) — `gaps.test_consolidation` schema, budget gating, strategy-to-task mapping.
+- **`/gsd:linear` command + workflow** (`linear.md`) -- argument parsing, issue fetching via MCP, scoring heuristic (6-factor), quick/milestone routing with override flags, comment-back after completion, cleanup
+- **`AskUserQuestion` tool** -- already in `allowed-tools` for the linear command spec; used for missing issue ID prompts
+- **Brainstorm workflow** (`brainstorm.md`) -- 3-5 adaptive clarifying questions, approach proposals with pros/cons, AskUserQuestion-driven flow. This is the proven pattern for interview-style interaction
+- **Linear MCP tools** -- `get_issue`, `list_comments`, `create_comment`, `list_issues` all available and tested
+- **`linear-context.md`** -- temporary tracking file with YAML frontmatter, written during workflow and cleaned up after
+- **Quick task infrastructure** -- slug generation, directory creation, planner/executor spawning, STATE.md updates
+- **Milestone infrastructure** -- MILESTONE-CONTEXT.md bridge, new-milestone workflow delegation
+- **Override flags** -- `--quick`, `--milestone`, `--full` already parsed and respected
 
-The NEW `/gsd:test-review` command is specifically about **diff-aware** test analysis: given code changes (from a PR or recent commits), what tests need attention?
+The refactor REMOVES the numeric scoring heuristic and REPLACES it with an interview phase that captures richer context.
 
 ## Table Stakes
 
-Features users expect. Missing = command feels incomplete or broken.
+Features the user expects from this refactor. Missing = the refactor feels incomplete or regressive.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Map changed source files to related test files | The core value proposition. If the command cannot connect `src/foo.js` to `tests/foo.test.js`, it provides nothing beyond what `audit-tests` already does. Users invoke this command because they changed code and want to know which tests are affected. | MEDIUM | Heuristic-based: naming convention matching (foo.js -> foo.test.js, foo.spec.js), import/require tracing (which test files `require('./foo')`), directory structure convention. No instrumentation needed — LLM agent reads the files. Depends on: `findTestFiles` from `testing.cjs`. |
-| Detect coverage gaps in changed code | Changed or added functions that have no corresponding test assertions. The most common question after a code change: "did I write tests for what I changed?" | MEDIUM | Agent reads diff hunks, identifies new/modified exported functions, checks if related test files exercise them. Not line-level coverage (that requires instrumentation) — function/export-level gap detection via static analysis by the agent. |
-| Detect stale tests from changed code | When code changes rename, remove, or refactor functions, existing tests may reference deleted exports. Must flag tests that will fail or silently pass with wrong assertions. | LOW | Steward already does staleness detection globally. The diff-aware twist: scope staleness checks to only test files related to changed source files, making it faster and more relevant. |
-| Structured markdown report output | Every GSD analysis command produces a persistent report. Users expect to find it at `.planning/reviews/YYYY-MM-DD-test-review.md` following the `pr-review` pattern. | LOW | Follows `pr-review` report pattern: YAML frontmatter with counts + markdown body with sections. Depends on: `.planning/reviews/` directory (already created by pr-review). |
-| `--report-only` flag for analysis without routing | Not every test review needs to create tasks. Users may want to see the report, decide themselves, then optionally route later. The command must support "just tell me" mode. | LOW | When `--report-only` is set, skip routing step entirely. Display report, write file, exit. Follows the pattern of `--ingest` in pr-review (mode flags alter flow). |
-| User-choice routing after report | Unlike pr-review (which auto-scores and routes), test review findings are more nuanced. Let the user decide: create a quick task, start a milestone, or just take the report and go. | LOW | AskUserQuestion with 3 options: (1) Quick task, (2) Milestone, (3) Done. Depends on: quick task infrastructure, milestone infrastructure (both exist from pr-review). |
-| Read-only analysis (no file modifications) | Established pattern from steward and pr-review: analysis agents never modify source or test files. Users trust the command because it cannot break anything. | LOW | Agent constraint in spec: "You NEVER modify test files, source files, or create new tests." Same constraint as `gsd-test-steward`. |
+| Feature | Why Expected | Complexity | Depends On |
+|---------|--------------|------------|------------|
+| 3-5 adaptive interview questions via AskUserQuestion | The core value proposition of the refactor. The numeric heuristic is being removed specifically because it cannot capture nuance. If the interview is not adaptive (skipping answered questions, adjusting based on prior answers), it is just a static form -- worse than the heuristic it replaces. | MEDIUM | AskUserQuestion (exists), fetched issue data (Step 2, exists) |
+| Pre-scan of ticket content before questioning | Without pre-scan, the interview asks questions the ticket already answers (e.g., asking about scope when the ticket names specific files). This is what makes the interview "smart" vs "annoying." The design document specifies checking goal, scope, success criteria, and approach preference from ticket data before asking anything. | LOW | Fetched issue data including description, labels, comments (exists) |
+| Complexity signal question as primary routing input | The design replaces the 6-factor scoring table with a single direct question: "Does this feel like a quick fix or a multi-phase effort?" with three options mapping to routes. This is the routing mechanism -- without it, there is no way to determine quick vs milestone. | LOW | AskUserQuestion (exists), routing infrastructure (exists) |
+| Override flags still bypass interview routing | `--quick` and `--milestone` flags must still force routing. The design specifies they skip only the complexity question, not the entire interview -- other questions still run to gather context for execution. Removing flag support would be a regression. | LOW | Flag parsing (exists in Step 1) |
+| Confirmation summary for quick route | After routing to quick, the user sees a structured summary (issue, goal, scope, success criteria, route) and confirms or requests clarification. Without this, the user cannot validate that the interview captured their intent correctly before execution starts. | LOW | Interview Q&A answers ($INTERVIEW_CONTEXT), AskUserQuestion (exists) |
+| Approach proposals for milestone route | After routing to milestone, the user sees 2-3 brainstorm-style approaches with pros/cons and a recommendation. Without this, milestone routing loses the "what approach should we take?" step that brainstorm provides. The design explicitly references brainstorm Step 4 as the model. | MEDIUM | Interview Q&A answers, brainstorm approach proposal pattern (proven in brainstorm.md) |
+| Interview summary posted to Linear before execution | Two-comment pattern: one before work (interview summary) and one after (completion summary). The pre-execution comment documents what was understood and agreed to. Without it, the Linear ticket has no record of the interview, making the conversation invisible to other team members. | LOW | `create_comment` MCP tool (exists), interview Q&A data |
+| Non-blocking comment-back failure handling | Existing pattern: MCP failures for comment posting show a warning but do not block execution. The design explicitly specifies this: "Warning only -- do not block execution." Breaking this contract would make the workflow fragile. | LOW | Error handling pattern (exists in Step 6) |
+| `$INTERVIEW_CONTEXT` stored and threaded through workflow | Interview answers must flow into: (1) routing decision, (2) confirmation/proposal output, (3) Linear comment-back, (4) linear-context.md frontmatter, (5) enriched task descriptions for quick route, (6) MILESTONE-CONTEXT.md for milestone route. Without context threading, the interview is wasted -- answers captured but not used. | MEDIUM | All downstream steps that consume interview data |
+| Enriched task descriptions replacing raw truncation | Current quick route truncates `title + description[:1500]` for the planner. The refactor replaces this with interview-synthesized goal, scope, and success criteria. Without this, the interview improves routing but not execution quality -- half the value. | LOW | Interview Q&A answers, quick route planner prompt (exists, needs modification) |
 
 ## Differentiators
 
-Features that set this command apart from just running `audit-tests`.
+Features that make this refactor genuinely better than the heuristic it replaces, beyond just "works differently."
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Diff-scoped analysis (not whole-suite) | `audit-tests` analyzes the entire test suite. For a 826-test project, that is slow and noisy. `/gsd:test-review` analyzes only tests related to what changed, making results immediately actionable. The diff is the scope filter. | MEDIUM | Agent receives list of changed files (from git diff or PR diff), maps to related test files, analyzes only those. Report sections are organized by changed file, not by test file. |
-| Consolidation recommendations scoped to changed area | When you touch a module, you might notice its tests are redundant or bloated. Surfacing consolidation opportunities in the area you are already working is more actionable than a global report. | LOW | Reuse steward's 4-strategy framework (prune, parameterize, promote, merge) but scoped to test files related to the diff. Not a full steward run — just the intersection. |
-| Missing test file detection | Beyond coverage gaps within existing tests: detect when a changed source file has NO corresponding test file at all. "You modified `lib/parser.cjs` but `tests/parser.test.cjs` does not exist." | LOW | Check naming conventions and import patterns. If no test file maps to a changed source file, flag it as a gap. Simple but high-signal finding. |
-| Integration with existing test infrastructure data | Report includes budget context: "Project is at 103% budget. Adding tests for these gaps would increase count by ~N." Helps users make informed decisions about whether to add tests or consolidate first. | LOW | Pull budget data from `getTestConfig` and `countTestsInProject` (both exist in `testing.cjs`). Include as context section in report, not as a gate. |
+| Feature | Value Proposition | Complexity | Depends On |
+|---------|-------------------|------------|------------|
+| Inferred routing with confirmation when complexity question is skipped | When the ticket is explicit enough that the complexity question gets skipped, Claude infers the route from ticket content (single-file bug fix -> quick, multi-component feature -> milestone) and asks for confirmation. This handles the edge case where the most important question is not asked. | LOW | Pre-scan results, AskUserQuestion (exists) |
+| Re-ask loop on confirmation rejection | Quick route confirmation includes "No, let me clarify" option that re-enters the relevant interview question rather than restarting the whole interview. Feels conversational rather than form-like. | LOW | AskUserQuestion (exists), interview state |
+| Selected approach embedded in MILESTONE-CONTEXT.md | For milestone route, the user-selected approach name and description are written under a `## Selected Approach` section in MILESTONE-CONTEXT.md. This seeds the new-milestone workflow with a specific direction rather than leaving it to re-discover during requirements/roadmap. | LOW | Approach selection from milestone output step, MILESTONE-CONTEXT.md writing (exists) |
+| `interview_summary` field in linear-context.md frontmatter | The temporary tracking file gains a text field summarizing interview Q&A. This provides a single-source record of what was discussed, accessible to any downstream step that reads the file. | LOW | linear-context.md writing (exists, needs field addition) |
 
 ## Anti-Features
 
-Features to explicitly NOT build.
+Features to explicitly NOT build for this refactor.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Automatic test generation from diff | Generating test code requires understanding business logic, edge cases, and assertion semantics. AI-generated tests tend to be repetitive happy-path tests that inflate coverage without catching regressions. The `add-tests` workflow already handles test generation with human-guided acceptance criteria. | Report gaps with enough context (function signature, expected behavior hints) that the user or `add-tests` workflow can write meaningful tests. |
-| Line-level coverage analysis (Istanbul/c8 integration) | Requires instrumentation, build tooling integration, and coverage report parsing. Adds a hard dependency on the project having coverage tooling configured. The GSD approach is agent-driven static analysis, not tooling-driven dynamic analysis. | Function/export-level gap detection via LLM reading source and test files. Good enough for "did you test this?" without requiring coverage infrastructure. |
-| Auto-scoring and routing (like pr-review) | PR review findings have clear severity (critical/important/suggestion) that maps to a score. Test review findings are more subjective — a missing test for a utility function is different from a missing test for a critical auth module. Auto-routing would make wrong decisions. | Present findings, let user choose: quick task, milestone, or done. User has context about which gaps matter. |
-| Git blame / change frequency analysis | "Files that change often should have more tests" is true but adds complexity (git log parsing, frequency thresholds) for marginal value in a single review session. | Focus on the current diff. Historical analysis is a future consideration. |
-| Running tests as part of the review | The review command is analysis-only. Running tests conflates "what should be tested?" with "do tests pass?" — different questions with different workflows. Test execution belongs in the hard gate (execute-plan) and `ui-test`. | Report identifies gaps and staleness. User runs tests separately via the existing hard gate or manual invocation. |
-| Cross-repository test mapping | Some monorepos have tests in separate packages. Supporting arbitrary test-to-source mappings across package boundaries adds significant complexity. | Support single-repo conventions. If test files are in a `tests/` or `__tests__/` directory following naming conventions, that covers the common case. |
-| Watching for file changes (daemon mode) | A persistent watcher that re-runs test review on every save. Adds process management complexity and continuous resource usage. | On-demand invocation via `/gsd:test-review`. User runs it when they want a review, not continuously. |
+| More than 5 interview questions | The design caps at 3-5 adaptive questions. Going beyond 5 turns the workflow from "quick interview" into "interrogation." The brainstorm pattern proves 3-5 is the sweet spot for balancing context capture vs user patience. | Stick to 5-question max. Pre-scan handles the rest. |
+| Interview question configuration/customization | Adding config options for which questions to ask, question text, or question order adds complexity without clear value. The questions are designed to cover the universal dimensions of any task (goal, scope, criteria, complexity, context). | Hardcode the question flow in the workflow. Adapt via skipping, not configuration. |
+| Persisting interview history across sessions | Storing past interviews for "learning" what a user typically wants adds state management complexity and raises questions about staleness. Each ticket is its own context. | Each invocation starts fresh. The Linear comment-back serves as the persistent record. |
+| Auto-answering interview questions from ticket data | Instead of skipping questions that the ticket answers, auto-filling answers and presenting them for confirmation. This doubles the interaction surface (user must confirm each auto-answer) without adding value beyond the confirmation summary at the end. | Skip answered questions entirely. Present the synthesized confirmation summary once at the end. |
+| Numeric scoring as fallback | Keeping the heuristic as a backup "in case the interview doesn't work." Two routing mechanisms means two code paths to maintain and explain. The whole point is that the interview is better. | Remove the scoring heuristic entirely. The complexity signal question is the replacement. |
+| Interview for multi-issue batches | The current workflow supports multiple issue IDs. Interviewing about each issue individually would be tedious. The design does not address multi-issue interviews. | For multiple issues forced to quick via `--quick`, use first issue only (current behavior). For multiple issues that would route to milestone, the interview covers the batch as a unit, not per-issue. |
+| Streaming/typing-indicator UX during interview | Adding visual feedback while Claude "thinks" about the next question. The interview questions are computed instantly from the pre-scan -- there is no meaningful computation delay to indicate. | Let AskUserQuestion handle its own UX. No additional indicators needed. |
 
 ## Feature Dependencies
 
 ```
-Git diff / changed files list (input)
+Step 1: Parse arguments (EXISTS - unchanged)
     |
     v
-Source-to-test file mapping (heuristic)
-    |-- naming convention: foo.cjs -> foo.test.cjs
-    |-- import tracing: which test files require('./foo')
-    |-- directory convention: src/foo -> tests/foo.test
-    |
-    +---> Coverage gap detection (per changed file)
-    |         |-- reads changed functions/exports
-    |         |-- checks if test file exercises them
-    |         |-- reports missing coverage
-    |
-    +---> Staleness detection (scoped to related tests)
-    |         |-- checks test references against current source
-    |         |-- flags deleted/renamed exports
-    |
-    +---> Consolidation opportunities (scoped)
-    |         |-- redundancy in related test files
-    |         |-- parameterization candidates
-    |
-    +---> Missing test file detection
-              |-- changed source file with no test file at all
+Step 2: Fetch issue data (EXISTS - unchanged)
     |
     v
-Structured report (.planning/reviews/YYYY-MM-DD-test-review.md)
+Step 3: Pre-scan ticket content (NEW)
+    |-- Reads title, description, labels, comments
+    |-- Builds internal checklist: goal, scope, criteria, approach
+    |-- Determines which questions to skip
     |
     v
-User routing choice (--report-only skips this)
-    |-- Quick task -> existing quick task infrastructure
-    |-- Milestone -> existing milestone infrastructure
-    |-- Done -> exit
+Step 3 continued: Interview questions (NEW)
+    |-- Q1: Goal clarification (skip if clear from description)
+    |-- Q2: Scope boundaries (skip if files/components named)
+    |-- Q3: Success criteria (skip if acceptance criteria exist)
+    |-- Q4: Complexity signal (skip if --quick or --milestone flag)
+    |-- Q5: Additional context (only if ambiguity surfaced)
+    |-- Each answer informs next question (adaptive)
+    |-- Store all Q&A as $INTERVIEW_CONTEXT
+    |
+    v
+Step 4: Routing decision (REPLACES Step 3 heuristic)
+    |-- Complexity signal answer -> route
+    |-- If Q4 skipped: infer from ticket content + confirm
+    |-- Override flags still respected
+    |
+    +---> Quick route: Step 5a confirmation summary (NEW)
+    |         |-- Synthesized task understanding
+    |         |-- "Does this look right?" with yes/no
+    |         |-- "No" -> re-ask relevant question
+    |
+    +---> Milestone route: Step 5b approach proposals (NEW)
+              |-- 2-3 approaches with pros/cons
+              |-- Recommendation with reasoning
+              |-- AskUserQuestion to select approach
+    |
+    v
+Step 5.5: Comment-back before execution (NEW)
+    |-- Build comment body from $INTERVIEW_CONTEXT + route
+    |-- Post via create_comment MCP
+    |-- Warning on failure, do not block
+    |
+    v
+Step 6: Write linear-context.md (EXISTS - MODIFIED)
+    |-- Add interview_summary field to frontmatter
+    |
+    v
+Step 7: Execute route (EXISTS - MODIFIED)
+    |-- Quick: enriched description from interview (replaces truncation)
+    |-- Milestone: MILESTONE-CONTEXT.md includes selected approach
+    |
+    v
+Step 8: Completion comment-back (EXISTS - unchanged)
+    |
+    v
+Step 9: Cleanup (EXISTS - unchanged)
 ```
 
-### Dependency on Existing Infrastructure
+### No New Files Required
 
-| Dependency | Module | What It Provides |
-|------------|--------|-----------------|
-| `findTestFiles` | `testing.cjs` | Discovers all test files in project |
-| `countTestsInProject` | `testing.cjs` | Budget context for report |
-| `getTestConfig` | `testing.cjs` | Budget thresholds, steward enabled flag |
-| `detectFramework` | `testing.cjs` | Framework identification for report context |
-| `gsd-tools.cjs init` | `gsd-tools.cjs` | Quick task / milestone initialization |
-| `gsd-tools.cjs resolve-model` | `gsd-tools.cjs` | Agent model resolution |
-| `gsd-tools.cjs generate-slug` | `gsd-tools.cjs` | Directory slug for quick tasks |
-| `.planning/reviews/` | pr-review workflow | Report output directory (already exists) |
-| Quick task creation pattern | pr-review workflow | STATE.md update, directory creation, executor spawning |
-
-### New Components Required
-
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `gsd-test-reviewer` agent | Agent spec (`.md`) | 6-step diff-aware analysis agent, read-only |
-| `/gsd:test-review` command | Command spec (`.md`) | Argument parsing, data gathering, agent spawning, routing |
-| Report template | Within agent spec | Structured markdown output format |
+This refactor modifies two existing files (workflow + command spec). No new agents, commands, or modules are created. The interview logic lives inline in the workflow, following the brainstorm pattern where question logic is embedded in the workflow file rather than extracted to a separate agent.
 
 ## MVP Recommendation
 
-### Launch With (v2.9)
+### Launch With (v3.0)
 
-Prioritize in this order:
+All features are part of a single workflow refactor. Prioritize implementation in this order:
 
-1. **`/gsd:test-review` command spec** — argument parsing (`--report-only` flag), diff capture (git diff or user-provided), agent spawning, report presentation, user routing choice. Follows `audit-tests` pattern (command is thin orchestrator).
-2. **`gsd-test-reviewer` agent** — 6-step read-only analysis:
-   - Step 1: Receive diff / changed files list
-   - Step 2: Map changed source files to test files (naming + import heuristics)
-   - Step 3: Detect coverage gaps (new/changed exports without test assertions)
-   - Step 4: Detect stale tests (references to deleted/renamed exports in related test files)
-   - Step 5: Identify consolidation opportunities (scoped redundancy, parameterization candidates)
-   - Step 6: Compile structured report
-3. **Structured report output** — written to `.planning/reviews/YYYY-MM-DD-test-review.md` with YAML frontmatter
-4. **User-choice routing** — quick task, milestone, or done (after report is presented)
-5. **Documentation** — help.md, USER-GUIDE.md, README.md updates
+1. **Pre-scan + interview questions (Step 3)** -- the core new behavior
+2. **Routing decision from interview (Step 4)** -- replace the scoring heuristic
+3. **Hybrid output: confirmation + proposals (Step 5)** -- user-facing payoff
+4. **Pre-execution comment-back (Step 5.5)** -- simple MCP call
+5. **Workflow modifications (Steps 6-7)** -- enriched context threading
+6. **Step renumbering + success criteria updates** -- structural cleanup
+7. **Command spec update** -- objective description change
 
-### Defer (post-v2.9)
+### Defer (post-v3.0)
 
-- Integration with `audit-milestone` (auto-run test-review during milestone audit) — let users validate the command standalone first
-- Custom source-to-test mapping configuration — naming conventions cover the common case
-- Budget impact projection ("adding these tests would bring you to N%") — nice but not essential
-
-## Feature Prioritization Matrix
-
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Source-to-test file mapping | HIGH | MEDIUM | P1 |
-| Coverage gap detection | HIGH | MEDIUM | P1 |
-| Stale test detection (diff-scoped) | HIGH | LOW | P1 |
-| Structured report output | HIGH | LOW | P1 |
-| `--report-only` flag | MEDIUM | LOW | P1 |
-| User-choice routing | HIGH | LOW | P1 |
-| Read-only constraint | HIGH | LOW | P1 |
-| Missing test file detection | MEDIUM | LOW | P1 |
-| Diff-scoped consolidation recs | MEDIUM | LOW | P1 |
-| Budget context in report | LOW | LOW | P1 |
-| Documentation updates | MEDIUM | LOW | P1 |
-| Budget impact projection | LOW | MEDIUM | P2 |
-| Auto-run during milestone audit | LOW | MEDIUM | P2 |
-| Custom source-to-test mapping config | LOW | MEDIUM | P3 |
-
-**Priority key:**
-- P1: Must have for launch (v2.9)
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
-
-## Comparison: Test Review Approaches
-
-The domain offers two fundamental approaches to diff-aware test analysis. GSD uses the heuristic/LLM approach because it requires no instrumentation.
-
-| Approach | How It Works | Pros | Cons | GSD Fit |
-|----------|-------------|------|------|---------|
-| **Instrumented coverage** (Istanbul, c8, JaCoCo) | Run tests with coverage, track which lines each test covers, diff against changed lines | Precise line-level mapping, definitive gap identification | Requires instrumentation setup, slow (runs full suite), project-specific config | Poor — adds hard dependency, violates zero-config principle |
-| **Heuristic + LLM static analysis** | Naming conventions, import tracing, agent reads source + test files | Zero-config, works across frameworks, understands semantic gaps | Approximate (may miss indirect dependencies), no runtime data | Good — matches GSD's agent-driven, read-only, zero-config pattern |
-
-**Recommendation:** Heuristic + LLM approach. Consistent with every other GSD analysis tool (steward, pr-review). The agent reads files and applies judgment — no build tooling integration required.
+- **Multi-issue interview strategy** -- how to interview when multiple issue IDs are provided
+- **Interview analytics** -- tracking which questions get skipped most often
 
 ## Sources
 
-- [diff_cover](https://github.com/Bachmann1234/diff_cover) — Open source tool for finding diff lines needing test coverage; demonstrates the diff-to-coverage mapping pattern
-- [Teamscale Test Gap Analysis](https://teamscale.com/features/test-gap-analysis) — Commercial tool for identifying untested code changes; demonstrates the "changed code without tests" detection pattern
-- [Test Impact Analysis (Martin Fowler)](https://martinfowler.com/articles/rise-test-impact-analysis.html) — Canonical reference for mapping source files to test cases; describes static vs dynamic TIA approaches
-- [Codacy Diff Coverage](https://blog.codacy.com/diff-coverage) — PR-level coverage metrics; demonstrates the "coverage delta on PR" pattern
-- [minware Test Impact Analysis](https://www.minware.com/guide/best-practices/test-impact-analysis) — Best practices for TIA without instrumentation; describes file-level dependency mapping
-- `/Users/seanspade/Documents/Source/get-more-shit-done/.planning/PROJECT.md` — v2.9 active requirements, existing architecture, constraints
-- `/Users/seanspade/Documents/Source/get-more-shit-done/agents/gsd-test-steward.md` — Steward analysis patterns (redundancy, staleness, consolidation)
-- `/Users/seanspade/Documents/Source/get-more-shit-done/commands/gsd/audit-tests.md` — On-demand agent spawning pattern (command as thin orchestrator)
-- `/Users/seanspade/Documents/Source/get-more-shit-done/commands/gsd/pr-review.md` — PR review command pattern (argument parsing, routing, report output)
-- `/Users/seanspade/Documents/Source/get-more-shit-done/get-shit-done/bin/lib/testing.cjs` — Existing test infrastructure (findTestFiles, countTestsInProject, getTestConfig)
+- `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` -- Approved design document
+- `.planning/PROJECT.md` -- v3.0 active requirements
+- `get-shit-done/workflows/linear.md` -- Current linear workflow
+- `get-shit-done/workflows/brainstorm.md` -- Proven adaptive question + approach proposal pattern
+- `commands/gsd/linear.md` -- Current command spec
 
 ---
-*Feature research for: /gsd:test-review — PR Diff-Aware Test Review (GSD v2.9)*
-*Researched: 2026-03-21*
+*Feature research for: /gsd:linear interview-driven routing refactor (GSD v3.0)*
+*Researched: 2026-03-22*
