@@ -259,7 +259,9 @@ Plans:
   3. `tests/dispatcher.test.cjs` routing tests replaced with parameterized smoke table (~8 tests, -21)
   4. All tests pass after consolidation (`npm test`)
   5. Test count is at or below 811 (from 847)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 97-01-PLAN.md — Delete verify-health.test.cjs, remove autopilot pre-flight block, parameterize dispatcher tests
 
 ## Phase Details
 
