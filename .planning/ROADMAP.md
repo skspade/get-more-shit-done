@@ -20,6 +20,7 @@
 - ✅ **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (shipped 2026-03-20)
 - ✅ **v2.9 Test Review Command** — Phases 78-83 (shipped 2026-03-21)
 - ✅ **v3.0 Linear Interview Refactor** — Phases 84-90 (shipped 2026-03-22)
+- 🚧 **v3.1 Automated UAT Session** — Phases 91-95 (in progress)
 
 ## Phases
 
@@ -221,7 +222,78 @@
 
 </details>
 
+### 🚧 v3.1 Automated UAT Session (In Progress)
+
+**Milestone Goal:** Automated UAT using Chrome MCP (primary) and Playwright (fallback) so the autopilot can verify user-facing web UI behavior at the milestone level before completion.
+
+- [ ] **Phase 91: Foundation** - Artifact schemas, config format, command spec, js-yaml dependency
+- [ ] **Phase 92: Chrome MCP Engine and Test Discovery** - uat-auto.md workflow, Chrome MCP execution, test discovery from UAT.md and SUMMARY.md
+- [ ] **Phase 93: Playwright Fallback Engine** - Playwright headless path, ephemeral scripts, Chromium availability check
+- [ ] **Phase 94: Autopilot Integration** - runAutomatedUAT(), gap closure wiring, app startup, evidence and reporting
+- [ ] **Phase 95: Documentation** - help.md, USER-GUIDE.md, README.md updates
+
+## Phase Details
+
+### Phase 91: Foundation
+**Goal**: All artifact formats and configuration schemas are defined so subsequent phases have concrete contracts to build against
+**Depends on**: Nothing (first phase of v3.1)
+**Requirements**: CFG-01, CFG-02, CFG-03
+**Success Criteria** (what must be TRUE):
+  1. A `uat-config.yaml` file can be parsed with js-yaml and validated against the defined schema (base_url, startup_command, startup_wait_seconds, browser, fallback_browser, timeout_minutes)
+  2. When no `uat-config.yaml` exists in a project, the UAT step is skipped silently and the project proceeds to milestone completion
+  3. MILESTONE-UAT.md format is defined with YAML frontmatter (status, counts, browser, timestamps) and a results table, with gaps using the identical schema as MILESTONE-AUDIT.md
+  4. The `/gsd:uat-auto` command spec exists and defines arguments, flags, and workflow delegation
+**Plans**: TBD
+
+### Phase 92: Chrome MCP Engine and Test Discovery
+**Goal**: The uat-auto.md workflow can discover tests and execute them against a live web application using Chrome MCP as the primary browser engine
+**Depends on**: Phase 91
+**Requirements**: DISC-01, DISC-02, CMCP-01, CMCP-02, CMCP-03, CMCP-04, CMCP-05, WKFL-01, WKFL-02, WKFL-04
+**Success Criteria** (what must be TRUE):
+  1. The workflow discovers UAT tests by scanning phase directories for `*-UAT.md` files with status:complete, and falls back to generating test scenarios from SUMMARY.md files when no UAT.md files exist
+  2. The workflow navigates to pages, interacts with elements, captures screenshots, and reads DOM content using Chrome MCP tools
+  3. The workflow judges pass/fail by comparing observed DOM state against expected behavior descriptions, with screenshots as supplementary evidence
+  4. Chrome MCP availability is verified via a full round-trip probe, and the workflow falls back to Playwright on probe failure
+  5. The workflow runs fully autonomously with a configurable timeout (default 10 minutes) preventing stuck sessions
+**Plans**: TBD
+
+### Phase 93: Playwright Fallback Engine
+**Goal**: When Chrome MCP is unavailable, the uat-auto workflow can execute the same tests using Playwright with headless Chromium
+**Depends on**: Phase 92
+**Requirements**: PWRT-01, PWRT-02, PWRT-03, PWRT-04
+**Success Criteria** (what must be TRUE):
+  1. When Chrome MCP probe fails, the workflow automatically falls back to Playwright headless Chromium execution
+  2. The workflow generates ephemeral inline Playwright scripts per test (no persistent .spec.ts files)
+  3. Chromium binary availability is checked and installed if missing via `npx playwright install chromium`
+  4. Output format (screenshots saved to evidence directory, results in MILESTONE-UAT.md) is identical between Chrome MCP and Playwright modes
+**Plans**: TBD
+
+### Phase 94: Autopilot Integration
+**Goal**: The autopilot pipeline runs automated UAT after milestone audit passes and routes results into completion or gap closure
+**Depends on**: Phase 92, Phase 93
+**Requirements**: EVID-01, EVID-02, EVID-03, EVID-04, WKFL-03, AUTO-01, AUTO-02, AUTO-03, AUTO-04, AUTO-05
+**Success Criteria** (what must be TRUE):
+  1. `runAutomatedUAT()` in autopilot.mjs triggers after milestone audit passes and before milestone completion
+  2. UAT pass (all tests pass) proceeds directly to `runMilestoneCompletion()`; UAT gaps feed into `runGapClosureLoop()` for automatic fix cycles; UAT crash is handled by existing debug retry
+  3. Each test produces a screenshot saved to `.planning/uat-evidence/{milestone}/`, and failed tests include observed vs expected descriptions
+  4. MILESTONE-UAT.md is committed to git after test execution, and `plan-milestone-gaps` recognizes it as a gap source alongside MILESTONE-AUDIT.md
+  5. App startup management starts the dev server if not running (detected by fetching base_url) and skips if already up
+**Plans**: TBD
+
+### Phase 95: Documentation
+**Goal**: Users can discover and understand the automated UAT capability through updated documentation
+**Depends on**: Phase 94
+**Requirements**: DOCS-01, DOCS-02, DOCS-03
+**Success Criteria** (what must be TRUE):
+  1. help.md includes the `/gsd:uat-auto` command with description, arguments, and flags
+  2. USER-GUIDE.md includes an automated UAT usage guide explaining configuration, test discovery, browser engines, and pipeline integration
+  3. README.md command table includes the uat-auto entry
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -243,3 +315,8 @@
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
+| 91. Foundation | v3.1 | 0/0 | Not started | - |
+| 92. Chrome MCP Engine | v3.1 | 0/0 | Not started | - |
+| 93. Playwright Fallback | v3.1 | 0/0 | Not started | - |
+| 94. Autopilot Integration | v3.1 | 0/0 | Not started | - |
+| 95. Documentation | v3.1 | 0/0 | Not started | - |
