@@ -227,7 +227,7 @@
 **Milestone Goal:** Automated UAT using Chrome MCP (primary) and Playwright (fallback) so the autopilot can verify user-facing web UI behavior at the milestone level before completion.
 
 - [x] **Phase 91: Foundation** - Artifact schemas, config format, command spec, js-yaml dependency (completed 2026-03-22)
-- [ ] **Phase 92: Chrome MCP Engine and Test Discovery** - uat-auto.md workflow, Chrome MCP execution, test discovery from UAT.md and SUMMARY.md
+- [x] **Phase 92: Chrome MCP Engine and Test Discovery** - uat-auto.md workflow, Chrome MCP execution, test discovery from UAT.md and SUMMARY.md (completed 2026-03-22)
 - [ ] **Phase 93: Playwright Fallback Engine** - Playwright headless path, ephemeral scripts, Chromium availability check
 - [ ] **Phase 94: Autopilot Integration** - runAutomatedUAT(), gap closure wiring, app startup, evidence and reporting
 - [ ] **Phase 95: Documentation** - help.md, USER-GUIDE.md, README.md updates
@@ -321,7 +321,7 @@ Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
 | 91. Foundation | 2/2 | Complete    | 2026-03-22 | - |
-| 92. Chrome MCP Engine | v3.1 | 0/0 | Not started | - |
+| 92. Chrome MCP Engine | 1/1 | Complete    | 2026-03-22 | - |
 | 93. Playwright Fallback | v3.1 | 0/0 | Not started | - |
 | 94. Autopilot Integration | v3.1 | 0/0 | Not started | - |
 | 95. Documentation | v3.1 | 0/0 | Not started | - |
