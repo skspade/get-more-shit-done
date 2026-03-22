@@ -3,6 +3,7 @@ phase: 91-foundation
 plan: 02
 subsystem: infra
 tags: [uat, milestone-template, command-spec]
+requirements-completed: [CFG-03]
 
 requires: []
 provides:

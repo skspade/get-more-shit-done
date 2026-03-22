@@ -3,6 +3,7 @@ phase: 93-playwright-fallback-engine
 plan: 01
 subsystem: testing
 tags: [playwright, chromium, uat, browser-automation]
+requirements-completed: [PWRT-01, PWRT-02, PWRT-03, PWRT-04]
 
 requires:
   - phase: 92-chrome-mcp-engine-and-test-discovery

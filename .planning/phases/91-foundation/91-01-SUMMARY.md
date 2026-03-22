@@ -3,6 +3,7 @@ phase: 91-foundation
 plan: 01
 subsystem: testing
 tags: [js-yaml, uat, config-validation, node-test]
+requirements-completed: [CFG-01, CFG-02]
 
 requires: []
 provides:
