@@ -271,10 +271,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `commands/gsd/linear.md` objective description mentions the interview phase and does not reference scoring or heuristic
   2. Success criteria in the command spec reference interview-driven routing and interview context threading
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 87-01: TBD
+- [ ] 87-01-PLAN.md — Update command spec objective and process sections with interview-driven language
 
 ## Progress
 
