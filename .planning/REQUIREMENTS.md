@@ -15,16 +15,16 @@ Requirements for v3.1 Automated UAT Session. Each maps to roadmap phases.
 
 ### Test Discovery
 
-- [ ] **DISC-01**: Agent discovers UAT tests by scanning phase directories for `*-UAT.md` files with status:complete
-- [ ] **DISC-02**: When no UAT.md files exist, agent generates test scenarios from SUMMARY.md files across milestone phases
+- [x] **DISC-01**: Agent discovers UAT tests by scanning phase directories for `*-UAT.md` files with status:complete *(Phase 92)*
+- [x] **DISC-02**: When no UAT.md files exist, agent generates test scenarios from SUMMARY.md files across milestone phases *(Phase 92)*
 
 ### Chrome MCP Engine
 
-- [ ] **CMCP-01**: Agent navigates to pages using Chrome MCP `chrome_navigate`
-- [ ] **CMCP-02**: Agent interacts with elements via `chrome_click_element`, `chrome_fill_or_select`, `chrome_keyboard`
-- [ ] **CMCP-03**: Agent captures screenshots via `chrome_screenshot` and reads DOM via `chrome_get_web_content`
-- [ ] **CMCP-04**: Agent judges pass/fail by comparing observed state against expected behavior description using DOM content as primary signal and screenshot as supplementary
-- [ ] **CMCP-05**: Chrome MCP availability verified via full round-trip probe (not just `tabs_context_mcp`), with fallback to Playwright on failure
+- [x] **CMCP-01**: Agent navigates to pages using Chrome MCP `mcp__claude-in-chrome__navigate` *(Phase 92)*
+- [x] **CMCP-02**: Agent interacts with elements via `mcp__claude-in-chrome__computer`, `mcp__claude-in-chrome__form_input`, `mcp__claude-in-chrome__shortcuts_execute` *(Phase 92)*
+- [x] **CMCP-03**: Agent captures screenshots via `mcp__claude-in-chrome__read_page` and reads DOM via `mcp__claude-in-chrome__get_page_text` *(Phase 92)*
+- [x] **CMCP-04**: Agent judges pass/fail by comparing observed state against expected behavior description using DOM content as primary signal and screenshot as supplementary *(Phase 92)*
+- [x] **CMCP-05**: Chrome MCP availability verified via full round-trip probe (not just `mcp__claude-in-chrome__tabs_context_mcp`), with fallback to Playwright on failure *(Phase 92)*
 
 ### Playwright Fallback
 
@@ -35,25 +35,25 @@ Requirements for v3.1 Automated UAT Session. Each maps to roadmap phases.
 
 ### Evidence & Reporting
 
-- [ ] **EVID-01**: Each test produces a screenshot saved to `.planning/uat-evidence/{milestone}/`
-- [ ] **EVID-02**: Failed tests include observed vs expected description in results
-- [ ] **EVID-03**: MILESTONE-UAT.md gaps section uses identical YAML schema to MILESTONE-AUDIT.md gaps (truth, status, reason, severity)
-- [ ] **EVID-04**: MILESTONE-UAT.md committed to git after test execution
+- [x] **EVID-01**: Each test produces a screenshot saved to `.planning/uat-evidence/{milestone}/` *(Phase 94)*
+- [x] **EVID-02**: Failed tests include observed vs expected description in results *(Phase 94)*
+- [x] **EVID-03**: MILESTONE-UAT.md gaps section uses identical YAML schema to MILESTONE-AUDIT.md gaps (truth, status, reason, severity) *(Phase 94)*
+- [x] **EVID-04**: MILESTONE-UAT.md committed to git after test execution *(Phase 94)*
 
 ### UAT-Auto Workflow
 
-- [ ] **WKFL-01**: `/gsd:uat-auto` workflow orchestrates: load config → discover tests → detect browser → start app → execute tests → write results → commit → exit
-- [ ] **WKFL-02**: Workflow is fully autonomous — no user interaction required
-- [ ] **WKFL-03**: App startup management: starts dev server if not running (detected by fetching base_url), skips if already up
-- [ ] **WKFL-04**: Configurable timeout (default 10 minutes) prevents stuck sessions from blocking pipeline
+- [x] **WKFL-01**: `/gsd:uat-auto` workflow orchestrates: load config → discover tests → detect browser → start app → execute tests → write results → commit → exit *(Phase 92)*
+- [x] **WKFL-02**: Workflow is fully autonomous — no user interaction required *(Phase 92)*
+- [x] **WKFL-03**: App startup management: starts dev server if not running (detected by fetching base_url), skips if already up *(Phase 94)*
+- [x] **WKFL-04**: Configurable timeout (default 10 minutes) prevents stuck sessions from blocking pipeline *(Phase 92)*
 
 ### Autopilot Integration
 
-- [ ] **AUTO-01**: `runAutomatedUAT()` function in autopilot.mjs triggered after milestone audit passes, before milestone completion
-- [ ] **AUTO-02**: UAT pass (exit 0 + all tests pass) proceeds to `runMilestoneCompletion()`
-- [ ] **AUTO-03**: UAT failures (exit 0 + gaps found) feed into `runGapClosureLoop()` for automatic fix cycles
-- [ ] **AUTO-04**: UAT crash (exit non-zero) handled by existing debug retry mechanism
-- [ ] **AUTO-05**: `plan-milestone-gaps` recognizes MILESTONE-UAT.md as a gap source alongside MILESTONE-AUDIT.md
+- [x] **AUTO-01**: `runAutomatedUAT()` function in autopilot.mjs triggered after milestone audit passes, before milestone completion *(Phase 94)*
+- [x] **AUTO-02**: UAT pass (exit 0 + all tests pass) proceeds to `runMilestoneCompletion()` *(Phase 94)*
+- [x] **AUTO-03**: UAT failures (exit 0 + gaps found) feed into `runGapClosureLoop()` for automatic fix cycles *(Phase 94)*
+- [x] **AUTO-04**: UAT crash (exit non-zero) handled by existing debug retry mechanism *(Phase 94)*
+- [x] **AUTO-05**: `plan-milestone-gaps` recognizes MILESTONE-UAT.md as a gap source alongside MILESTONE-AUDIT.md *(Phase 94)*
 
 ### Documentation
 
@@ -92,33 +92,33 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | Phase 91 | Pending |
-| CFG-02 | Phase 91 | Pending |
-| CFG-03 | Phase 91 | Pending |
-| DISC-01 | Phase 92 | Pending |
-| DISC-02 | Phase 92 | Pending |
-| CMCP-01 | Phase 92 | Pending |
-| CMCP-02 | Phase 92 | Pending |
-| CMCP-03 | Phase 92 | Pending |
-| CMCP-04 | Phase 92 | Pending |
-| CMCP-05 | Phase 92 | Pending |
+| CFG-01 | Phase 91 | Complete |
+| CFG-02 | Phase 91 | Complete |
+| CFG-03 | Phase 91 | Complete |
+| DISC-01 | Phase 92 | Complete |
+| DISC-02 | Phase 92 | Complete |
+| CMCP-01 | Phase 92 | Complete |
+| CMCP-02 | Phase 92 | Complete |
+| CMCP-03 | Phase 92 | Complete |
+| CMCP-04 | Phase 92 | Complete |
+| CMCP-05 | Phase 92 | Complete |
 | PWRT-01 | Phase 93 | Complete |
 | PWRT-02 | Phase 93 | Complete |
 | PWRT-03 | Phase 93 | Complete |
 | PWRT-04 | Phase 93 | Complete |
-| EVID-01 | Phase 94 | Pending |
-| EVID-02 | Phase 94 | Pending |
-| EVID-03 | Phase 94 | Pending |
-| EVID-04 | Phase 94 | Pending |
-| WKFL-01 | Phase 92 | Pending |
-| WKFL-02 | Phase 92 | Pending |
-| WKFL-03 | Phase 94 | Pending |
-| WKFL-04 | Phase 92 | Pending |
-| AUTO-01 | Phase 94 | Pending |
-| AUTO-02 | Phase 94 | Pending |
-| AUTO-03 | Phase 94 | Pending |
-| AUTO-04 | Phase 94 | Pending |
-| AUTO-05 | Phase 94 | Pending |
+| EVID-01 | Phase 94 | Complete |
+| EVID-02 | Phase 94 | Complete |
+| EVID-03 | Phase 94 | Complete |
+| EVID-04 | Phase 94 | Complete |
+| WKFL-01 | Phase 92 | Complete |
+| WKFL-02 | Phase 92 | Complete |
+| WKFL-03 | Phase 94 | Complete |
+| WKFL-04 | Phase 92 | Complete |
+| AUTO-01 | Phase 94 | Complete |
+| AUTO-02 | Phase 94 | Complete |
+| AUTO-03 | Phase 94 | Complete |
+| AUTO-04 | Phase 94 | Complete |
+| AUTO-05 | Phase 94 | Complete |
 | DOCS-01 | Phase 95 | Complete |
 | DOCS-02 | Phase 95 | Complete |
 | DOCS-03 | Phase 95 | Complete |
