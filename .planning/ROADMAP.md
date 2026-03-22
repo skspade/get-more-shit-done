@@ -318,7 +318,7 @@ Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
-| 91. Foundation | 2/2 | Complete   | 2026-03-22 | - |
+| 91. Foundation | 2/2 | Complete    | 2026-03-22 | - |
 | 92. Chrome MCP Engine | v3.1 | 0/0 | Not started | - |
 | 93. Playwright Fallback | v3.1 | 0/0 | Not started | - |
 | 94. Autopilot Integration | v3.1 | 0/0 | Not started | - |

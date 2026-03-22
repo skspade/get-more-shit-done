@@ -9,9 +9,9 @@ Requirements for v3.1 Automated UAT Session. Each maps to roadmap phases.
 
 ### Configuration
 
-- [ ] **CFG-01**: `uat-config.yaml` schema defines base_url, startup_command, startup_wait_seconds, browser, fallback_browser, timeout_minutes
-- [ ] **CFG-02**: Missing `uat-config.yaml` causes UAT to be skipped silently (non-web projects proceed to completion)
-- [ ] **CFG-03**: MILESTONE-UAT.md format defined with YAML frontmatter (status, counts, browser, timestamps) and results table
+- [x] **CFG-01**: `uat-config.yaml` schema defines base_url, startup_command, startup_wait_seconds, browser, fallback_browser, timeout_minutes *(Phase 91)*
+- [x] **CFG-02**: Missing `uat-config.yaml` causes UAT to be skipped silently (non-web projects proceed to completion) *(Phase 91)*
+- [x] **CFG-03**: MILESTONE-UAT.md format defined with YAML frontmatter (status, counts, browser, timestamps) and results table *(Phase 91)*
 
 ### Test Discovery
 
