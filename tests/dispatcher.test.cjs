@@ -66,82 +66,28 @@ describe('dispatcher error paths', () => {
     assert.ok(result.error.includes('Invalid --cwd'), `Expected "Invalid --cwd" in stderr, got: ${result.error}`);
   });
 
-  // Unknown subcommand: template
-  test('template unknown subcommand errors', () => {
-    const result = runGsdTools('template bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown template subcommand'), `Expected "Unknown template subcommand" in stderr, got: ${result.error}`);
-  });
+  // Unknown subcommand errors — parameterized
+  const unknownSubcommandCases = [
+    { command: 'template bogus', expected: 'Unknown template subcommand' },
+    { command: 'frontmatter bogus file.md', expected: 'Unknown frontmatter subcommand' },
+    { command: 'verify bogus', expected: 'Unknown verify subcommand' },
+    { command: 'phases bogus', expected: 'Unknown phases subcommand' },
+    { command: 'roadmap bogus', expected: 'Unknown roadmap subcommand' },
+    { command: 'requirements bogus', expected: 'Unknown requirements subcommand' },
+    { command: 'phase bogus', expected: 'Unknown phase subcommand' },
+    { command: 'milestone bogus', expected: 'Unknown milestone subcommand' },
+    { command: 'validate bogus', expected: 'Unknown validate subcommand' },
+    { command: 'todo bogus', expected: 'Unknown todo subcommand' },
+    { command: 'init bogus', expected: 'Unknown init workflow' },
+  ];
 
-  // Unknown subcommand: frontmatter
-  test('frontmatter unknown subcommand errors', () => {
-    const result = runGsdTools('frontmatter bogus file.md', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown frontmatter subcommand'), `Expected "Unknown frontmatter subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: verify
-  test('verify unknown subcommand errors', () => {
-    const result = runGsdTools('verify bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown verify subcommand'), `Expected "Unknown verify subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: phases
-  test('phases unknown subcommand errors', () => {
-    const result = runGsdTools('phases bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown phases subcommand'), `Expected "Unknown phases subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: roadmap
-  test('roadmap unknown subcommand errors', () => {
-    const result = runGsdTools('roadmap bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown roadmap subcommand'), `Expected "Unknown roadmap subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: requirements
-  test('requirements unknown subcommand errors', () => {
-    const result = runGsdTools('requirements bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown requirements subcommand'), `Expected "Unknown requirements subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: phase
-  test('phase unknown subcommand errors', () => {
-    const result = runGsdTools('phase bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown phase subcommand'), `Expected "Unknown phase subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: milestone
-  test('milestone unknown subcommand errors', () => {
-    const result = runGsdTools('milestone bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown milestone subcommand'), `Expected "Unknown milestone subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: validate
-  test('validate unknown subcommand errors', () => {
-    const result = runGsdTools('validate bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown validate subcommand'), `Expected "Unknown validate subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: todo
-  test('todo unknown subcommand errors', () => {
-    const result = runGsdTools('todo bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown todo subcommand'), `Expected "Unknown todo subcommand" in stderr, got: ${result.error}`);
-  });
-
-  // Unknown subcommand: init
-  test('init unknown workflow errors', () => {
-    const result = runGsdTools('init bogus', tmpDir);
-    assert.strictEqual(result.success, false, 'Should exit non-zero');
-    assert.ok(result.error.includes('Unknown init workflow'), `Expected "Unknown init workflow" in stderr, got: ${result.error}`);
-  });
+  for (const { command, expected } of unknownSubcommandCases) {
+    test(`${command.split(' ')[0]} unknown subcommand errors`, () => {
+      const result = runGsdTools(command, tmpDir);
+      assert.strictEqual(result.success, false, 'Should exit non-zero');
+      assert.ok(result.error.includes(expected), `Expected "${expected}" in stderr, got: ${result.error}`);
+    });
+  }
 });
 
 // ─── Dispatcher Routing Branches ─────────────────────────────────────────────
@@ -157,123 +103,105 @@ describe('dispatcher routing branches', () => {
     cleanup(tmpDir);
   });
 
-  // find-phase
-  test('find-phase locates phase directory by number', () => {
-    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test-phase');
-    fs.mkdirSync(phaseDir, { recursive: true });
+  // Routing smoke tests — parameterized
+  const routingCases = [
+    {
+      name: 'find-phase locates phase directory by number',
+      command: 'find-phase 01',
+      setup: (dir) => {
+        fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-test-phase'), { recursive: true });
+      },
+      validate: (result) => {
+        assert.ok(result.output.includes('01-test-phase'), `Expected "01-test-phase" in output, got: ${result.output}`);
+      },
+    },
+    {
+      name: 'init resume returns valid JSON',
+      command: 'init resume',
+      setup: (dir) => {
+        fs.writeFileSync(
+          path.join(dir, '.planning', 'STATE.md'),
+          '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
+        );
+      },
+      validate: (result) => {
+        const parsed = JSON.parse(result.output);
+        assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
+      },
+    },
+    {
+      name: 'init verify-work returns valid JSON',
+      command: 'init verify-work 01',
+      setup: (dir) => {
+        fs.writeFileSync(
+          path.join(dir, '.planning', 'STATE.md'),
+          '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
+        );
+        fs.writeFileSync(
+          path.join(dir, '.planning', 'ROADMAP.md'),
+          '# Roadmap\n\n## Milestone: v1.0 Test\n\n### Phase 1: Test Phase\n**Goal**: Test goal\n**Depends on**: None\n**Requirements**: TEST-01\n**Success Criteria**:\n  1. Tests pass\n**Plans**: 1 plan\nPlans:\n- [x] 01-01-PLAN.md\n\n## Progress\n\n| Phase | Plans | Status | Date |\n|-------|-------|--------|------|\n| 1 | 1/1 | Complete | 2026-01-01 |\n'
+        );
+        fs.mkdirSync(path.join(dir, '.planning', 'phases', '01-test'), { recursive: true });
+      },
+      validate: (result) => {
+        const parsed = JSON.parse(result.output);
+        assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
+      },
+    },
+    {
+      name: 'roadmap update-plan-progress updates phase progress',
+      command: 'roadmap update-plan-progress 1',
+      setup: (dir) => {
+        fs.writeFileSync(
+          path.join(dir, '.planning', 'ROADMAP.md'),
+          '# Roadmap\n\n## Milestone: v1.0 Test\n\n### Phase 1: Test Phase\n**Goal**: Test goal\n**Depends on**: None\n**Requirements**: TEST-01\n**Success Criteria**:\n  1. Tests pass\n**Plans**: 1 plan\nPlans:\n- [ ] 01-01-PLAN.md\n\n## Progress\n\n| Phase | Plans | Status | Date |\n|-------|-------|--------|------|\n| 1 | 0/1 | Not Started | - |\n'
+        );
+        const phaseDir = path.join(dir, '.planning', 'phases', '01-test-phase');
+        fs.mkdirSync(phaseDir, { recursive: true });
+        fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '---\nphase: 01-test-phase\nplan: "01"\n---\n\n# Plan\n');
+        fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '---\nphase: 01-test-phase\nplan: "01"\n---\n\n# Summary\n');
+      },
+      validate: () => {},
+    },
+    {
+      name: 'state with no subcommand calls cmdStateLoad',
+      command: 'state',
+      setup: (dir) => {
+        fs.writeFileSync(
+          path.join(dir, '.planning', 'STATE.md'),
+          '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
+        );
+      },
+      validate: (result) => {
+        const parsed = JSON.parse(result.output);
+        assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
+      },
+    },
+    {
+      name: 'summary-extract parses SUMMARY.md frontmatter',
+      command: 'summary-extract .planning/phases/01-test/01-01-SUMMARY.md',
+      setup: (dir) => {
+        const phaseDir = path.join(dir, '.planning', 'phases', '01-test');
+        fs.mkdirSync(phaseDir, { recursive: true });
+        fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '---\nphase: 01-test\nplan: "01"\nsubsystem: testing\ntags: [node, test]\nduration: 5min\ncompleted: "2026-01-01"\nkey-decisions:\n  - "Used node:test"\nrequirements-completed: [TEST-01]\n---\n\n# Phase 1 Plan 01: Test Summary\n\n**Tests added for core module**\n');
+      },
+      validate: (result) => {
+        const parsed = JSON.parse(result.output);
+        assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
+        assert.strictEqual(parsed.path, '.planning/phases/01-test/01-01-SUMMARY.md');
+        assert.deepStrictEqual(parsed.requirements_completed, ['TEST-01']);
+      },
+    },
+  ];
 
-    const result = runGsdTools('find-phase 01', tmpDir);
-    assert.strictEqual(result.success, true, `find-phase failed: ${result.error}`);
-    assert.ok(result.output.includes('01-test-phase'), `Expected output to contain "01-test-phase", got: ${result.output}`);
-  });
-
-  // init resume
-  test('init resume returns valid JSON', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
-    );
-
-    const result = runGsdTools('init resume', tmpDir);
-    assert.strictEqual(result.success, true, `init resume failed: ${result.error}`);
-    const parsed = JSON.parse(result.output);
-    assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
-  });
-
-  // init verify-work
-  test('init verify-work returns valid JSON', () => {
-    // Create STATE.md
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
-    );
-
-    // Create ROADMAP.md with phase section
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '# Roadmap\n\n## Milestone: v1.0 Test\n\n### Phase 1: Test Phase\n**Goal**: Test goal\n**Depends on**: None\n**Requirements**: TEST-01\n**Success Criteria**:\n  1. Tests pass\n**Plans**: 1 plan\nPlans:\n- [x] 01-01-PLAN.md\n\n## Progress\n\n| Phase | Plans | Status | Date |\n|-------|-------|--------|------|\n| 1 | 1/1 | Complete | 2026-01-01 |\n'
-    );
-
-    // Create phase dir
-    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
-    fs.mkdirSync(phaseDir, { recursive: true });
-
-    const result = runGsdTools('init verify-work 01', tmpDir);
-    assert.strictEqual(result.success, true, `init verify-work failed: ${result.error}`);
-    const parsed = JSON.parse(result.output);
-    assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
-  });
-
-  // roadmap update-plan-progress
-  test('roadmap update-plan-progress updates phase progress', () => {
-    // Create ROADMAP.md with progress table
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'ROADMAP.md'),
-      '# Roadmap\n\n## Milestone: v1.0 Test\n\n### Phase 1: Test Phase\n**Goal**: Test goal\n**Depends on**: None\n**Requirements**: TEST-01\n**Success Criteria**:\n  1. Tests pass\n**Plans**: 1 plan\nPlans:\n- [ ] 01-01-PLAN.md\n\n## Progress\n\n| Phase | Plans | Status | Date |\n|-------|-------|--------|------|\n| 1 | 0/1 | Not Started | - |\n'
-    );
-
-    // Create phase dir with PLAN and SUMMARY
-    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test-phase');
-    fs.mkdirSync(phaseDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(phaseDir, '01-01-PLAN.md'),
-      '---\nphase: 01-test-phase\nplan: "01"\n---\n\n# Plan\n'
-    );
-    fs.writeFileSync(
-      path.join(phaseDir, '01-01-SUMMARY.md'),
-      '---\nphase: 01-test-phase\nplan: "01"\n---\n\n# Summary\n'
-    );
-
-    const result = runGsdTools('roadmap update-plan-progress 1', tmpDir);
-    assert.strictEqual(result.success, true, `roadmap update-plan-progress failed: ${result.error}`);
-  });
-
-  // state (no subcommand) — default load
-  test('state with no subcommand calls cmdStateLoad', () => {
-    fs.writeFileSync(
-      path.join(tmpDir, '.planning', 'STATE.md'),
-      '# Project State\n\n## Current Position\n\nPhase: 1 of 1 (Test)\nPlan: 01-01 complete\nStatus: Ready\nLast activity: 2026-01-01\n\nProgress: [##########] 100%\n\n## Session Continuity\n\nLast session: 2026-01-01\nStopped at: Test\nResume file: None\n'
-    );
-
-    const result = runGsdTools('state', tmpDir);
-    assert.strictEqual(result.success, true, `state load failed: ${result.error}`);
-    const parsed = JSON.parse(result.output);
-    assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
-  });
-
-  // summary-extract
-  test('summary-extract parses SUMMARY.md frontmatter', () => {
-    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
-    fs.mkdirSync(phaseDir, { recursive: true });
-
-    const summaryContent = `---
-phase: 01-test
-plan: "01"
-subsystem: testing
-tags: [node, test]
-duration: 5min
-completed: "2026-01-01"
-key-decisions:
-  - "Used node:test"
-requirements-completed: [TEST-01]
----
-
-# Phase 1 Plan 01: Test Summary
-
-**Tests added for core module**
-`;
-
-    const summaryPath = path.join(phaseDir, '01-01-SUMMARY.md');
-    fs.writeFileSync(summaryPath, summaryContent);
-
-    // Use relative path from tmpDir
-    const result = runGsdTools(`summary-extract .planning/phases/01-test/01-01-SUMMARY.md`, tmpDir);
-    assert.strictEqual(result.success, true, `summary-extract failed: ${result.error}`);
-    const parsed = JSON.parse(result.output);
-    assert.ok(typeof parsed === 'object', 'Output should be valid JSON object');
-    assert.strictEqual(parsed.path, '.planning/phases/01-test/01-01-SUMMARY.md', 'Path should match input');
-    assert.deepStrictEqual(parsed.requirements_completed, ['TEST-01'], 'requirements_completed should contain TEST-01');
-  });
+  for (const { name, command, setup, validate } of routingCases) {
+    test(name, () => {
+      setup(tmpDir);
+      const result = runGsdTools(command, tmpDir);
+      assert.strictEqual(result.success, true, `${command} failed: ${result.error}`);
+      validate(result);
+    });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
