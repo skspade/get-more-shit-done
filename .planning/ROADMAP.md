@@ -271,7 +271,9 @@ Plans:
   2. The workflow generates ephemeral inline Playwright scripts per test (no persistent .spec.ts files)
   3. Chromium binary availability is checked and installed if missing via `npx playwright install chromium`
   4. Output format (screenshots saved to evidence directory, results in MILESTONE-UAT.md) is identical between Chrome MCP and Playwright modes
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 93-01-PLAN.md — Playwright fallback engine in uat-auto.md (Chromium check + ephemeral script execution)
 
 ### Phase 94: Autopilot Integration
 **Goal**: The autopilot pipeline runs automated UAT after milestone audit passes and routes results into completion or gap closure
@@ -322,6 +324,6 @@ Phases execute in numeric order: 91 → 92 → 93 → 94 → 95
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
 | 91. Foundation | 2/2 | Complete    | 2026-03-22 | - |
 | 92. Chrome MCP Engine | 1/1 | Complete    | 2026-03-22 | - |
-| 93. Playwright Fallback | v3.1 | 0/0 | Not started | - |
+| 93. Playwright Fallback | v3.1 | 0/1 | In progress | - |
 | 94. Autopilot Integration | v3.1 | 0/0 | Not started | - |
 | 95. Documentation | v3.1 | 0/0 | Not started | - |
