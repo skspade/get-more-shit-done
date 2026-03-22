@@ -216,7 +216,7 @@
 - [x] **Phase 85: Hybrid Output** - User-facing confirmation summary (quick) and approach proposals (milestone) with re-ask capability (completed 2026-03-22)
 - [x] **Phase 86: Comment-Back and Enriched Context** - Pre-execution Linear comment, enriched downstream context in frontmatter, descriptions, and MILESTONE-CONTEXT.md (completed 2026-03-22)
 - [x] **Phase 87: Command Spec and Documentation** - Update command spec and success criteria to reflect interview-driven routing (completed 2026-03-22)
-- [ ] **Phase 88: Fix Step 5→6 Routing** - Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of skipping to Step 7 (Gap Closure)
+- [x] **Phase 88: Fix Step 5→6 Routing** - Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of skipping to Step 7 (Gap Closure) (completed 2026-03-22)
 
 ## Phase Details
 
@@ -319,4 +319,4 @@ Phases execute in numeric order: 84 → 85 → 86 → 87 → 88
 | 85. Hybrid Output | 2/2 | Complete    | 2026-03-22 | - |
 | 86. Comment-Back and Enriched Context | 2/2 | Complete    | 2026-03-22 | - |
 | 87. Command Spec and Documentation | 1/1 | Complete    | 2026-03-22 | - |
-| 88. Fix Step 5→6 Routing (Gap Closure) | 0/1 | Pending | - | - |
+| 88. Fix Step 5→6 Routing (Gap Closure) | 1/1 | Complete   | 2026-03-22 | - |
