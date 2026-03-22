@@ -119,7 +119,11 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+- `/gsd:linear` interview phase — always-on 3-5 adaptive questions after ticket fetch, replacing complexity scoring heuristic — v3.0
+- Interview-driven routing — complexity signal question determines quick/milestone route instead of numeric score — v3.0
+- Hybrid output — quick tasks get confirmation summary, milestone tasks get brainstorm-style approach proposals — v3.0
+- Linear comment-back before execution — post interview summary to ticket before work starts — v3.0
+- Workflow restructuring — renumber steps, enrich descriptions with interview context, update command spec and success criteria — v3.0
 
 ### Out of Scope
 
@@ -228,7 +232,7 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ## Context
 
-Shipped v2.9 with `/gsd:test-review` command. 17 milestones shipped (v1.0-v2.9) across 83 phases, 120 plans. 826 tests (budget at 103.25% — over budget, 3 consolidation proposals pending with estimated reduction to 809). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete works without human input. Test steward consolidation proposals wire into actionable gap closure phases during milestone audit. Test review command provides PR diff-aware analysis with user-choice routing.
+Shipped v2.9 with `/gsd:test-review` command. 17 milestones shipped (v1.0-v2.9) across 83 phases, 120 plans. 826 tests (budget at 103.25% — over budget, 3 consolidation proposals pending with estimated reduction to 809). Full autonomous pipeline from brainstorm → new-milestone → discuss → plan → execute → verify → audit → complete works without human input. Test steward consolidation proposals wire into actionable gap closure phases during milestone audit. Test review command provides PR diff-aware analysis with user-choice routing. v3.0 refactors `/gsd:linear` to replace the numeric complexity scoring heuristic with an always-on interview phase — 3-5 adaptive questions determine routing, hybrid output scales to complexity, and enriched context is posted back to Linear before execution.
 
 **Architecture:** zx-based autopilot (`autopilot.mjs`) with direct CJS imports for phase navigation, verification status, and config defaults. All Claude CLI invocations route through `runClaudeStreaming()` with NDJSON parsing and stall detection. Legacy bash autopilot preserved as `autopilot-legacy.sh`. `gsd` CLI binary with 6 deterministic commands. Unified `validation.cjs` with 21 checks across 4 categories (structure, state, navigation, readiness), auto-repair, and 3 consumer paths (CLI, autopilot, gsd-tools). `/gsd:linear` for issue-driven workflows. `/gsd:brainstorm` for collaborative design sessions with auto-route to `/gsd:new-milestone --auto`. `/gsd:pr-review` for PR review capture, deduplication, scoring, and routing. `/gsd:test-review` for PR diff-aware test analysis with `gsd-test-reviewer` agent and user-choice routing. `/gsd:audit-tests` for on-demand test health checks. Dual-layer test architecture: acceptance tests (human-owned, Given/When/Then/Verify) + hard test gate (baseline comparison, TDD awareness) + test steward agent (redundancy, budget, consolidation). Test steward consolidation bridge: `gaps.test_consolidation` schema → budget gating → strategy-to-task mapping → gap closure phase creation. `/gsd:ui-test` for on-demand Playwright E2E testing with `gsd-playwright` agent lifecycle.
 **Tech stack:** Node.js (CJS + zx/ESM), Bash (legacy), Claude Code CLI, markdown-based state, Linear MCP, Playwright (E2E)
@@ -236,4 +240,4 @@ Shipped v2.9 with `/gsd:test-review` command. 17 milestones shipped (v1.0-v2.9) 
 **Known tech debt:** Test budget at 103.25% (826/800) — 3 consolidation proposals pending (estimated reduction to 809); `extractFrontmatter` does not parse nested YAML array-of-objects (gaps.test_consolidation entries parsed as strings, not objects — LLM path unaffected); `playwright-detect --raw` documented as JSON in 3 consumers but returns plain string; SUMMARY frontmatter references non-existent `parsePlaywrightOutput()` (actual: `parseTestOutput` with 'playwright' arg); scaffolding templates omit `webServer` block; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys); Phase 82 missing VERIFICATION.md and SUMMARY.md (documentation gap, functionally complete)
 
 ---
-*Last updated: 2026-03-21 after v2.9 milestone completed*
+*Last updated: 2026-03-22 after v3.0 milestone started*

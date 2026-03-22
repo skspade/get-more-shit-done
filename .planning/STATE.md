@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.9
-milestone_name: Test Review Command
-status: unknown
-last_updated: "2026-03-21T15:11:30.429Z"
+milestone: v3.0
+milestone_name: Linear Interview Refactor
+status: defining_requirements
+last_updated: "2026-03-22T00:00:00.000Z"
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 7
-  completed_plans: 6
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-21)
+See: .planning/PROJECT.md (updated 2026-03-22)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** v2.9 complete — planning next milestone
+**Current focus:** v3.0 Linear Interview Refactor — defining requirements
 
 ## Current Position
 
-Milestone: v2.9 Test Review Command — SHIPPED 2026-03-21
-Phase: All 6 phases complete (78-83)
-Status: Milestone complete, archived
-Last activity: 2026-03-21 — v2.9 milestone archived
+Milestone: v3.0 Linear Interview Refactor
+Phase: Not started (defining requirements)
+Status: Defining requirements
+Last activity: 2026-03-22 — Milestone v3.0 started
 
-Progress: [██████████] 100% — SHIPPED
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -59,7 +59,7 @@ Progress: [██████████] 100% — SHIPPED
 | 78-81 (v2.9) | 5 | --- | --- |
 
 **Recent Trend:**
-- Trend: v2.9 milestone shipped — /gsd:test-review command with diff-aware analysis and user-choice routing
+- Trend: v3.0 milestone started — refactoring /gsd:linear with interview-driven routing
 
 *Updated after each plan completion*
 
@@ -94,6 +94,6 @@ See PROJECT.md Key Decisions table for full history.
 
 ## Session Continuity
 
-Last session: 2026-03-21
-Stopped at: v2.9 milestone archived — ready for /gsd:new-milestone
+Last session: 2026-03-22
+Stopped at: v3.0 milestone started — defining requirements
 Resume file: None
