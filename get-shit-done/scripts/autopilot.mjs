@@ -921,6 +921,57 @@ async function runMilestoneAudit() {
   }
 }
 
+async function runAutomatedUAT() {
+  const configPath = path.join(PROJECT_DIR, '.planning', 'uat-config.yaml');
+  if (!fs.existsSync(configPath)) {
+    logMsg('UAT: skipped (no uat-config.yaml)');
+    console.log('No uat-config.yaml found. Skipping automated UAT.');
+    return 0;
+  }
+
+  printBanner('AUTOMATED UAT');
+  logMsg('UAT: starting automated UAT session');
+
+  const uatExit = await runStepWithRetry('/gsd:uat-auto', 'automated-uat');
+  if (uatExit !== 0) {
+    logMsg(`UAT: workflow failed exit=${uatExit}`);
+    return 1;
+  }
+
+  const uatFile = path.join(PROJECT_DIR, '.planning', 'MILESTONE-UAT.md');
+  if (!fs.existsSync(uatFile)) {
+    logMsg('UAT: no MILESTONE-UAT.md produced');
+    return 1;
+  }
+
+  const uatStatus = (await gsdTools(
+    'frontmatter', 'get', uatFile, '--field', 'status', '--raw'
+  )).trim();
+  logMsg(`UAT: result=${uatStatus}`);
+  console.log(`UAT result: ${uatStatus}`);
+
+  switch (uatStatus) {
+    case 'passed':
+      printBanner('UAT PASSED \u2713');
+      console.log('All UAT tests passed. Ready for milestone completion.');
+      return 0;
+    case 'gaps_found':
+      printBanner('UAT: FAILURES FOUND');
+      console.log('UAT found failures that need fixing.');
+      return 10;
+    default:
+      console.error(`ERROR: Unknown UAT status '${uatStatus}'`);
+      return 1;
+  }
+}
+
+async function auditAndUAT() {
+  const auditResult = await runMilestoneAudit();
+  if (auditResult !== 0) return auditResult;
+  const uatResult = await runAutomatedUAT();
+  return uatResult;
+}
+
 async function runGapClosureLoop() {
   const maxIterations = getConfig('autopilot.max_audit_fix_iterations', 3);
   let iteration = 0;
@@ -1001,16 +1052,16 @@ async function runGapClosureLoop() {
     // Re-audit after fix phases
     printBanner(`RE-AUDIT: After iteration ${iteration}`);
 
-    const auditResult = await runMilestoneAudit();
+    const auditResult = await auditAndUAT();
     if (auditResult === 0) {
       printBanner('GAP CLOSURE COMPLETE \u2713');
-      console.log(`Audit passed after ${iteration} iteration(s).`);
+      console.log(`Audit and UAT passed after ${iteration} iteration(s).`);
       return;
     } else if (auditResult === 10) {
       console.log(`Gaps remain after iteration ${iteration}. Continuing...`);
       continue;
     } else {
-      console.error('ERROR: Milestone audit encountered an error during re-audit');
+      console.error('ERROR: Milestone audit or UAT encountered an error during re-audit');
       process.exit(1);
     }
   }
@@ -1085,16 +1136,16 @@ if (FROM_PHASE) {
     console.log('All phases in the milestone are already complete.');
     console.log('');
 
-    const auditResult = await runMilestoneAudit();
-    if (auditResult === 0) {
+    const result = await auditAndUAT();
+    if (result === 0) {
       await runMilestoneCompletion();
       process.exit(0);
-    } else if (auditResult === 10) {
+    } else if (result === 10) {
       await runGapClosureLoop();
       await runMilestoneCompletion();
       process.exit(0);
     } else {
-      console.error('ERROR: Milestone audit encountered an error');
+      console.error('ERROR: Milestone audit or UAT encountered an error');
       process.exit(1);
     }
   }
@@ -1162,16 +1213,16 @@ while (true) {
       if (!nextPhase) {
         printFinalReport();
 
-        const auditResult = await runMilestoneAudit();
-        if (auditResult === 0) {
+        const result = await auditAndUAT();
+        if (result === 0) {
           await runMilestoneCompletion();
           process.exit(0);
-        } else if (auditResult === 10) {
+        } else if (result === 10) {
           await runGapClosureLoop();
           await runMilestoneCompletion();
           process.exit(0);
         } else {
-          console.error('ERROR: Milestone audit encountered an error');
+          console.error('ERROR: Milestone audit or UAT encountered an error');
           process.exit(1);
         }
       }
