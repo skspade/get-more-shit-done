@@ -285,7 +285,10 @@ Plans:
   3. Each test produces a screenshot saved to `.planning/uat-evidence/{milestone}/`, and failed tests include observed vs expected descriptions
   4. MILESTONE-UAT.md is committed to git after test execution, and `plan-milestone-gaps` recognizes it as a gap source alongside MILESTONE-AUDIT.md
   5. App startup management starts the dev server if not running (detected by fetching base_url) and skips if already up
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 94-01-PLAN.md — runAutomatedUAT() and auditAndUAT() in autopilot.mjs
+- [ ] 94-02-PLAN.md — Gap source wiring and structural tests
 
 ### Phase 95: Documentation
 **Goal**: Users can discover and understand the automated UAT capability through updated documentation
