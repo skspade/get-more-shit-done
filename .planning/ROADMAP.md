@@ -317,7 +317,7 @@ Plans:
   2. SUMMARY frontmatter in phases 84-86 includes `requirements-completed` fields
   3. WKFL-01 success criterion in linear.md says "10 steps" not "9 steps"
   4. Phase 88 VERIFICATION.md corrected to note the fix did not land
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 90-01-PLAN.md — Update traceability artifacts and fix tech debt
@@ -352,4 +352,4 @@ Phases execute in numeric order: 84 → 85 → 86 → 87 → 88 → 89 → 90
 | 87. Command Spec and Documentation | 1/1 | Complete    | 2026-03-22 | - |
 | 88. Fix Step 5→6 Routing (Gap Closure) | 1/1 | Complete    | 2026-03-22 | - |
 | 89. Fix Step 5→6 Routing (Actual File Fix) (Gap Closure) | 0/0 | Complete    | 2026-03-22 | - |
-| 90. Traceability and Tech Debt Cleanup (Gap Closure) | 0/0 | Pending | - | - |
+| 90. Traceability and Tech Debt Cleanup (Gap Closure) | 0/1 | Planned | - | - |
