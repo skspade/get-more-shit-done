@@ -1,5 +1,28 @@
 # Milestones
 
+## v3.0 Linear Interview Refactor (Shipped: 2026-03-22)
+
+**Phases completed:** 7 phases, 10 plans
+**Timeline:** 1 day (2026-03-22, ~3 hours)
+**Git range:** docs(84) → docs(phase-90) (43 commits)
+**Files changed:** 44 (4,878 insertions, 128 deletions)
+
+**Key accomplishments:**
+- Built interview engine with 3-5 adaptive questions via AskUserQuestion replacing the 6-factor numeric scoring heuristic — pre-scans ticket content and skips answered dimensions
+- Complexity signal question determines quick/milestone route; override flags (--quick/--milestone) skip only complexity question while still running interview
+- Added hybrid output: quick route shows confirmation summary with re-ask loop; milestone route shows 2-3 approach proposals with pros/cons and AskUserQuestion selection
+- Inserted pre-execution comment-back step (Step 6) posting interview summary to Linear via MCP `create_comment` before work starts — non-blocking on MCP failure
+- Enriched downstream context: linear-context.md frontmatter gains `interview_summary`, quick route descriptions use interview-enriched goal/scope/criteria, MILESTONE-CONTEXT.md gains `## Selected Approach`
+- Updated command spec and success criteria for interview-driven routing language; fixed Step 5→6 routing bug across 3 exit paths; cleaned all traceability artifacts
+
+**Known Tech Debt:**
+- SUMMARY 87-01 missing `requirements-completed` frontmatter for WKFL-05, WKFL-06
+- SUMMARY 89-01 missing `requirements-completed` frontmatter for CMNT-01–04
+- Phase 88 invalidated (changes did not persist to file; superseded by Phase 89)
+- Test budget at 826/800 (103.25%) — 3 consolidation proposals pending
+
+---
+
 ## v2.9 Test Review Command (Shipped: 2026-03-21)
 
 **Phases completed:** 6 phases, 7 plans

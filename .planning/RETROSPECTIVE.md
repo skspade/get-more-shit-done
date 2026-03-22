@@ -720,6 +720,46 @@
 
 ---
 
+## Milestone: v3.0 — Linear Interview Refactor
+
+**Shipped:** 2026-03-22
+**Phases:** 7 | **Plans:** 10 | **Commits:** 43
+
+### What Was Built
+- Interview engine: 3-5 adaptive questions via AskUserQuestion after ticket fetch, with pre-scan skip logic and `$INTERVIEW_CONTEXT` assembly
+- Routing decision: complexity signal question replaces 6-factor numeric scoring heuristic; override flags skip only complexity question
+- Hybrid output: quick route confirmation summary with re-ask loop; milestone route approach proposals with AskUserQuestion selection
+- Pre-execution comment-back: Step 6 posts interview summary to Linear via MCP before work starts (non-blocking on failure)
+- Enriched context: interview data threaded to linear-context.md, task descriptions, and MILESTONE-CONTEXT.md
+- Command spec and success criteria updated for interview-driven routing
+
+### What Worked
+- Autopilot-driven execution: all 7 phases (including 3 gap closure) completed in ~3 hours with zero human intervention
+- Conservative skip criteria: only skips questions when ticket has explicit markdown sections — avoids false confidence
+- Pattern reuse from brainstorm workflow: approach proposals (Step 5d-e) mirrors brainstorm Step 4 design, reducing design decisions
+- Audit-gap-closure cycle: audit found Step 5→6 routing bug and SUMMARY frontmatter gaps; Phases 88-90 closed them
+
+### What Was Inefficient
+- Phase 88 invalidated: claimed to fix routing but changes did not persist to file — required Phase 89 to actually apply the fix
+- SUMMARY frontmatter (`requirements-completed`) not added during execution for phases 84-86 — required Phase 90 tech debt cleanup
+- REQUIREMENTS.md checkboxes not checked during phase execution — Phase 90 had to check all 23 at once (recurring issue from v2.9)
+
+### Patterns Established
+- Interview-first routing: gather context via structured questions before deciding complexity route
+- Two-comment pattern: pre-execution summary + post-execution completion gives Linear tickets full lifecycle visibility
+- Dimension-based re-ask: "No, let me clarify" routes to specific dimension picker rather than full restart
+
+### Key Lessons
+1. File changes must be verified by reading the file after edit — Phase 88's "fix" didn't persist because the edit was not verified
+2. REQUIREMENTS.md checkboxes and SUMMARY frontmatter should be updated as each phase completes, not batched at the end
+3. Workflow step renumbering is error-prone — three separate renumber passes (Steps 5→6, 6→7, etc.) each required cross-reference updates
+
+### Cost Observations
+- Sessions: 1 (autopilot run)
+- Notable: 7 phases in ~3 hours — fastest per-phase execution yet; gap closure phases (88-90) were tiny scoped fixes
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -743,12 +783,13 @@
 | v2.7 | ~20 | 4 | Playwright UI testing — three-tier detection, agent lifecycle, command, workflow integration, zero gap closure |
 | v2.8 | 11 | 3 | Test steward consolidation bridge — workflow-only milestone, gap type addition, budget gating, zero gap closure |
 | v2.9 | 28 | 6 | Test review command — direct agent spawn pattern, user-choice routing, dual-signal test mapping |
+| v3.0 | 43 | 7 | Linear interview refactor — interview-first routing, hybrid output, comment-back, enriched context |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 14 of 17 milestones (v2.1, v2.7, v2.8 are clean passes)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 13 of 17 milestones; v2.1, v2.7, v2.8 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 13 of 17 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 15 of 18 milestones (v2.1, v2.7, v2.8 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 14 of 18 milestones; v2.1, v2.7, v2.8 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 14 of 18 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -764,3 +805,5 @@
 16. Static vs runtime test counts can diverge — always use the tooling's count, not manual assertions from execution summaries
 17. Research insights must be explicitly propagated to implementation — flagging a pitfall in research doesn't guarantee it appears in the delivered artifacts (v2.7 webServer block)
 18. Three-tier detection (configured/installed/not-detected) is superior to boolean for stateful tools — enables differentiated guidance at each tier (v2.7)
+19. Verify file changes by reading the file after edit — v3.0 Phase 88 claimed a fix but the edit didn't persist, requiring Phase 89 to actually apply it
+20. REQUIREMENTS.md checkboxes must be updated as each phase completes, not batched — recurring issue in v2.9 and v3.0
