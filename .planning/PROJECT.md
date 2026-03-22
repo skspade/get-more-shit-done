@@ -125,7 +125,17 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(None — planning next milestone)
+## Current Milestone: v3.1 Automated UAT Session
+
+**Goal:** Implement automated UAT using Chrome MCP (primary) and Playwright (fallback) so the autopilot can automatically verify user-facing web UI behavior at the milestone level before completion.
+
+**Target features:**
+- UAT test discovery from existing UAT.md files with uat-config.yaml configuration
+- Chrome MCP execution engine — Claude subagent navigates, interacts, screenshots, judges pass/fail
+- Playwright fallback engine for headless/CI environments
+- Autopilot integration — runAutomatedUAT() after milestone audit, before completion
+- UAT-Auto workflow — fully autonomous test execution and reporting
+- Evidence and reporting — screenshots, MILESTONE-UAT.md with gaps format
 
 ### Out of Scope
 
@@ -245,4 +255,4 @@ Shipped v3.0 with Linear interview refactor. 18 milestones shipped (v1.0-v3.0) a
 **Known tech debt:** Test budget at 103.25% (826/800) — 3 consolidation proposals pending (estimated reduction to 809); `extractFrontmatter` does not parse nested YAML array-of-objects (gaps.test_consolidation entries parsed as strings, not objects — LLM path unaffected); `playwright-detect --raw` documented as JSON in 3 consumers but returns plain string; SUMMARY frontmatter references non-existent `parsePlaywrightOutput()` (actual: `parseTestOutput` with 'playwright' arg); scaffolding templates omit `webServer` block; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys); Phase 82 missing VERIFICATION.md and SUMMARY.md (documentation gap, functionally complete); v3.0 SUMMARY frontmatter gaps (phases 87, 89 missing `requirements-completed`)
 
 ---
-*Last updated: 2026-03-22 after v3.0 milestone*
+*Last updated: 2026-03-22 after v3.1 milestone started*
