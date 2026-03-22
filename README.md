@@ -85,6 +85,7 @@ For one-off work that doesn't need full planning:
 | `/gsd:new-milestone` | Start next version |
 | `/gsd:quick` | Fast-track task with GSD guarantees |
 | `/gsd:ui-test` | Generate and run Playwright E2E tests |
+| `/gsd:uat-auto` | Run automated UAT session (Chrome MCP + Playwright fallback) |
 | `/gsd:add-tests` | Add unit and E2E tests to a phase |
 | `/gsd:pr-review` | Route PR review findings to quick task or milestone |
 | `/gsd:test-review` | Analyze test coverage gaps for current branch diff |
