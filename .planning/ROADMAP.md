@@ -301,6 +301,6 @@ Phases execute in numeric order: 84 → 85 → 86 → 87
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
 | 84. Interview Engine and Route Decision | v3.0 | Complete    | 2026-03-22 | - |
-| 85. Hybrid Output | 2/2 | Complete   | 2026-03-22 | - |
+| 85. Hybrid Output | 2/2 | Complete    | 2026-03-22 | - |
 | 86. Comment-Back and Enriched Context | v3.0 | 0/0 | Not started | - |
 | 87. Command Spec and Documentation | v3.0 | 0/0 | Not started | - |
