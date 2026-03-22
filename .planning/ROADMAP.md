@@ -19,6 +19,7 @@
 - ✅ **v2.7 Playwright UI Testing Integration** — Phases 71-74 (shipped 2026-03-20)
 - ✅ **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (shipped 2026-03-20)
 - ✅ **v2.9 Test Review Command** — Phases 78-83 (shipped 2026-03-21)
+- [ ] **v3.0 Linear Interview Refactor** — Phases 84-87 (in progress)
 
 ## Phases
 
@@ -207,7 +208,78 @@
 
 </details>
 
+### v3.0 Linear Interview Refactor (In Progress)
+
+**Milestone Goal:** Replace the numeric complexity scoring heuristic in `/gsd:linear` with an always-on interview phase that captures richer context via adaptive questions, routes based on complexity signal, and posts enriched summaries back to Linear before execution.
+
+- [ ] **Phase 84: Interview Engine and Route Decision** - Core behavioral change: adaptive interview questions replace scoring heuristic, complexity signal drives routing
+- [ ] **Phase 85: Hybrid Output** - User-facing confirmation summary (quick) and approach proposals (milestone) with re-ask capability
+- [ ] **Phase 86: Comment-Back and Enriched Context** - Pre-execution Linear comment, enriched downstream context in frontmatter, descriptions, and MILESTONE-CONTEXT.md
+- [ ] **Phase 87: Command Spec and Documentation** - Update command spec and success criteria to reflect interview-driven routing
+
+## Phase Details
+
+### Phase 84: Interview Engine and Route Decision
+**Goal**: Users answer adaptive interview questions after ticket fetch, and their complexity signal answer determines the quick/milestone route
+**Depends on**: Nothing (first phase of v3.0)
+**Requirements**: INTV-01, INTV-02, INTV-03, INTV-04, INTV-05, ROUT-01, ROUT-02, ROUT-03, ROUT-04, WKFL-01
+**Success Criteria** (what must be TRUE):
+  1. After fetching a Linear ticket, the workflow asks 3-5 adaptive questions via AskUserQuestion, skipping questions already answered by the ticket content
+  2. The complexity signal question ("Quick task / Medium / Milestone") determines the routing decision, and the old numeric scoring heuristic is fully removed
+  3. Override flags (`--quick`, `--milestone`) skip only the complexity question while still running other interview questions
+  4. When the complexity question is skipped because the ticket explicitly states scope, Claude infers the route and asks for confirmation
+  5. All interview Q&A is stored as `$INTERVIEW_CONTEXT` and the workflow steps are renumbered from 7 to 9 steps
+**Plans**: TBD
+
+Plans:
+- [ ] 84-01: TBD
+- [ ] 84-02: TBD
+
+### Phase 85: Hybrid Output
+**Goal**: Users see a confirmation summary for quick tasks or approach proposals for milestones, with the ability to clarify or select
+**Depends on**: Phase 84
+**Requirements**: OUTP-01, OUTP-02, OUTP-03, OUTP-04
+**Success Criteria** (what must be TRUE):
+  1. Quick route displays a confirmation summary (issue, goal, scope, criteria, route) with "Yes, proceed" / "No, let me clarify" options
+  2. Selecting "No, let me clarify" re-enters the relevant interview question rather than restarting the entire interview
+  3. Milestone route displays 2-3 approach proposals with pros/cons and a recommendation, and the user selects one via AskUserQuestion
+  4. The selected approach is written to MILESTONE-CONTEXT.md under a `## Selected Approach` section
+**Plans**: TBD
+
+Plans:
+- [ ] 85-01: TBD
+
+### Phase 86: Comment-Back and Enriched Context
+**Goal**: Interview summary is posted to Linear before execution starts, and all downstream consumers use interview-enriched context instead of raw ticket truncation
+**Depends on**: Phase 85
+**Requirements**: CMNT-01, CMNT-02, CMNT-03, CMNT-04, WKFL-02, WKFL-03, WKFL-04
+**Success Criteria** (what must be TRUE):
+  1. A comment containing goal, scope, criteria, route, and selected approach is posted to the Linear ticket via MCP before execution starts
+  2. MCP failure shows a warning but does not block execution
+  3. The existing post-execution completion comment remains unchanged — tickets receive two comments total
+  4. linear-context.md frontmatter includes an `interview_summary` field, and quick route task descriptions use interview-enriched goal/scope/criteria instead of raw title+description truncation
+  5. Milestone MILESTONE-CONTEXT.md includes the `## Selected Approach` section from the approach proposals
+**Plans**: TBD
+
+Plans:
+- [ ] 86-01: TBD
+
+### Phase 87: Command Spec and Documentation
+**Goal**: The command spec and success criteria accurately describe interview-driven routing with no remaining references to the scoring heuristic
+**Depends on**: Phase 86
+**Requirements**: WKFL-05, WKFL-06
+**Success Criteria** (what must be TRUE):
+  1. `commands/gsd/linear.md` objective description mentions the interview phase and does not reference scoring or heuristic
+  2. Success criteria in the command spec reference interview-driven routing and interview context threading
+**Plans**: TBD
+
+Plans:
+- [ ] 87-01: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 84 → 85 → 86 → 87
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -228,3 +300,7 @@
 | 71-74 | v2.7 | 5/5 | Complete | 2026-03-20 |
 | 75-77 | v2.8 | 3/3 | Complete | 2026-03-20 |
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
+| 84. Interview Engine and Route Decision | v3.0 | 0/0 | Not started | - |
+| 85. Hybrid Output | v3.0 | 0/0 | Not started | - |
+| 86. Comment-Back and Enriched Context | v3.0 | 0/0 | Not started | - |
+| 87. Command Spec and Documentation | v3.0 | 0/0 | Not started | - |

@@ -67,35 +67,35 @@ Requirements for the Linear Interview Refactor milestone. Each maps to roadmap p
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INTV-01 | Pending | Pending |
-| INTV-02 | Pending | Pending |
-| INTV-03 | Pending | Pending |
-| INTV-04 | Pending | Pending |
-| INTV-05 | Pending | Pending |
-| ROUT-01 | Pending | Pending |
-| ROUT-02 | Pending | Pending |
-| ROUT-03 | Pending | Pending |
-| ROUT-04 | Pending | Pending |
-| OUTP-01 | Pending | Pending |
-| OUTP-02 | Pending | Pending |
-| OUTP-03 | Pending | Pending |
-| OUTP-04 | Pending | Pending |
-| CMNT-01 | Pending | Pending |
-| CMNT-02 | Pending | Pending |
-| CMNT-03 | Pending | Pending |
-| CMNT-04 | Pending | Pending |
-| WKFL-01 | Pending | Pending |
-| WKFL-02 | Pending | Pending |
-| WKFL-03 | Pending | Pending |
-| WKFL-04 | Pending | Pending |
-| WKFL-05 | Pending | Pending |
-| WKFL-06 | Pending | Pending |
+| INTV-01 | Phase 84 | Pending |
+| INTV-02 | Phase 84 | Pending |
+| INTV-03 | Phase 84 | Pending |
+| INTV-04 | Phase 84 | Pending |
+| INTV-05 | Phase 84 | Pending |
+| ROUT-01 | Phase 84 | Pending |
+| ROUT-02 | Phase 84 | Pending |
+| ROUT-03 | Phase 84 | Pending |
+| ROUT-04 | Phase 84 | Pending |
+| OUTP-01 | Phase 85 | Pending |
+| OUTP-02 | Phase 85 | Pending |
+| OUTP-03 | Phase 85 | Pending |
+| OUTP-04 | Phase 85 | Pending |
+| CMNT-01 | Phase 86 | Pending |
+| CMNT-02 | Phase 86 | Pending |
+| CMNT-03 | Phase 86 | Pending |
+| CMNT-04 | Phase 86 | Pending |
+| WKFL-01 | Phase 84 | Pending |
+| WKFL-02 | Phase 86 | Pending |
+| WKFL-03 | Phase 86 | Pending |
+| WKFL-04 | Phase 86 | Pending |
+| WKFL-05 | Phase 87 | Pending |
+| WKFL-06 | Phase 87 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-22*
-*Last updated: 2026-03-22 after initial definition*
+*Last updated: 2026-03-22 after roadmap creation*
