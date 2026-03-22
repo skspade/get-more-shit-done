@@ -80,10 +80,10 @@ Requirements for the Linear Interview Refactor milestone. Each maps to roadmap p
 | OUTP-02 | Phase 85 | Pending |
 | OUTP-03 | Phase 85 | Pending |
 | OUTP-04 | Phase 85 | Pending |
-| CMNT-01 | Phase 86 | Pending |
+| CMNT-01 | Phase 88 | Pending |
 | CMNT-02 | Phase 86 | Pending |
 | CMNT-03 | Phase 86 | Pending |
-| CMNT-04 | Phase 86 | Pending |
+| CMNT-04 | Phase 88 | Pending |
 | WKFL-01 | Phase 84 | Pending |
 | WKFL-02 | Phase 86 | Pending |
 | WKFL-03 | Phase 86 | Pending |

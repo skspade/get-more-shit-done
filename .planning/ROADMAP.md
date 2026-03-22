@@ -19,7 +19,7 @@
 - ✅ **v2.7 Playwright UI Testing Integration** — Phases 71-74 (shipped 2026-03-20)
 - ✅ **v2.8 Test Steward Consolidation Bridge** — Phases 75-77 (shipped 2026-03-20)
 - ✅ **v2.9 Test Review Command** — Phases 78-83 (shipped 2026-03-21)
-- [ ] **v3.0 Linear Interview Refactor** — Phases 84-87 (in progress)
+- [ ] **v3.0 Linear Interview Refactor** — Phases 84-88 (in progress)
 
 ## Phases
 
@@ -216,6 +216,7 @@
 - [x] **Phase 85: Hybrid Output** - User-facing confirmation summary (quick) and approach proposals (milestone) with re-ask capability (completed 2026-03-22)
 - [x] **Phase 86: Comment-Back and Enriched Context** - Pre-execution Linear comment, enriched downstream context in frontmatter, descriptions, and MILESTONE-CONTEXT.md (completed 2026-03-22)
 - [x] **Phase 87: Command Spec and Documentation** - Update command spec and success criteria to reflect interview-driven routing (completed 2026-03-22)
+- [ ] **Phase 88: Fix Step 5→6 Routing** - Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of skipping to Step 7 (Gap Closure)
 
 ## Phase Details
 
@@ -276,10 +277,24 @@ Plans:
 Plans:
 - [ ] 87-01-PLAN.md — Update command spec objective and process sections with interview-driven language
 
+### Phase 88: Fix Step 5→6 Routing
+**Goal**: Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of skipping to Step 7
+**Depends on**: Phase 87
+**Requirements**: CMNT-01, CMNT-04
+**Gap Closure**: Closes gaps from v3.0 audit — Step 5→6 routing bug
+**Success Criteria** (what must be TRUE):
+  1. All Step 5 exit paths route to Step 6 (pre-execution comment) before continuing to Step 7
+  2. Pre-execution comment is posted to Linear before execution starts
+  3. Tickets receive two comments total (pre-execution + post-execution)
+**Plans**: TBD
+
+Plans:
+- [ ] 88-01-PLAN.md — Fix Step 5 exit routing to include Step 6
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 84 → 85 → 86 → 87
+Phases execute in numeric order: 84 → 85 → 86 → 87 → 88
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -304,3 +319,4 @@ Phases execute in numeric order: 84 → 85 → 86 → 87
 | 85. Hybrid Output | 2/2 | Complete    | 2026-03-22 | - |
 | 86. Comment-Back and Enriched Context | 2/2 | Complete    | 2026-03-22 | - |
 | 87. Command Spec and Documentation | 1/1 | Complete    | 2026-03-22 | - |
+| 88. Fix Step 5→6 Routing (Gap Closure) | 0/1 | Pending | - | - |
