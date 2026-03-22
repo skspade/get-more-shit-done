@@ -8,7 +8,6 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const { execSync } = require('child_process');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { createTempProject, cleanup } = require('./helpers.cjs');
 
