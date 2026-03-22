@@ -2,6 +2,7 @@
 
 **Status:** Complete
 **Duration:** ~5 minutes
+**Requirements completed:** OUTP-01, OUTP-02
 
 ## What was built
 

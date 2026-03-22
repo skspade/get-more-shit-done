@@ -2,6 +2,7 @@
 
 **Status:** Complete
 **Duration:** ~3 minutes (combined with Plan 85-01)
+**Requirements completed:** OUTP-03, OUTP-04
 
 ## What was built
 

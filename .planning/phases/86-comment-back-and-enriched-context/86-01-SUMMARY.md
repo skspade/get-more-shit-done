@@ -2,6 +2,8 @@
 
 Pre-execution comment-back step inserted and all steps renumbered.
 
+**Requirements completed:** CMNT-01, CMNT-02, CMNT-03, CMNT-04
+
 ## Tasks Completed
 
 | # | Task | Status |

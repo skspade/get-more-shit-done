@@ -2,6 +2,8 @@
 
 Downstream context consumers enriched with interview data.
 
+**Requirements completed:** WKFL-02, WKFL-03, WKFL-04
+
 ## Tasks Completed
 
 | # | Task | Status |
