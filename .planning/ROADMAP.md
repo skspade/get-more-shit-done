@@ -243,7 +243,10 @@
   2. When no `uat-config.yaml` exists in a project, the UAT step is skipped silently and the project proceeds to milestone completion
   3. MILESTONE-UAT.md format is defined with YAML frontmatter (status, counts, browser, timestamps) and a results table, with gaps using the identical schema as MILESTONE-AUDIT.md
   4. The `/gsd:uat-auto` command spec exists and defines arguments, flags, and workflow delegation
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 91-01-PLAN.md — UAT config validation module (uat.cjs) + js-yaml dependency (TDD)
+- [ ] 91-02-PLAN.md — MILESTONE-UAT.md template + /gsd:uat-auto command spec
 
 ### Phase 92: Chrome MCP Engine and Test Discovery
 **Goal**: The uat-auto.md workflow can discover tests and execute them against a live web application using Chrome MCP as the primary browser engine
