@@ -1,6 +1,6 @@
 ---
 phase: 88-fix-step5-step6-routing
-status: passed
+status: invalidated
 verified: 2026-03-22
 ---
 
@@ -49,3 +49,9 @@ Fix Step 5 exit paths to route through Step 6 (pre-execution comment) instead of
 ## Score: 8/8 must-haves verified
 
 ## Result: PASSED
+
+## Correction Note (added Phase 90)
+
+This verification originally passed based on reading lines that appeared correct at the time of verification. However, Plan 88-01's changes to linear.md did not persist — the file remained unchanged after execution. Phase 89 was created to apply the actual fix to the three Step 5 exit routing lines. All requirements (CMNT-01, CMNT-04) were ultimately satisfied by Phase 89, not Phase 88.
+
+Status changed from `passed` to `invalidated` to preserve audit trail integrity.
