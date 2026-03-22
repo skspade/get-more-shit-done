@@ -1,313 +1,279 @@
 # Domain Pitfalls
 
-**Domain:** Refactoring Linear ticket flow from numeric scoring heuristic to interview-driven routing (`/gsd:linear` v3.0)
+**Domain:** Automated UAT browser testing in autonomous pipeline (Chrome MCP + Playwright dual-engine)
 **Researched:** 2026-03-22
-**Confidence:** HIGH (direct codebase analysis of design doc, existing workflow, command spec, and all integration points)
+**Confidence:** HIGH (design doc analysis, codebase pattern review, web-verified Chrome MCP behavior, Playwright best practices)
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, broken workflows, or silent behavioral regressions.
+Mistakes that cause rewrites or major issues.
 
-### Pitfall 1: Scoring Heuristic Removal Breaks Override Flag Semantics
+### Pitfall 1: Chrome MCP Availability Detection Gives False Positives
 
-**What goes wrong:**
-The design says "Removed: The entire `$MILESTONE_SCORE` calculation." But the existing workflow uses `$FORCE_QUICK` and `$FORCE_MILESTONE` flags that bypass the scoring entirely (Step 3 of current workflow). The design says override flags should "skip complexity question but still run other interview questions." If the refactor deletes the scoring step and rebuilds routing from scratch, the flag-skip logic must be reimplemented in the interview step. A common mistake is removing the old routing branch, building the new interview-based routing, and forgetting to wire the flags back in correctly -- resulting in flags that either skip the entire interview (losing context enrichment) or that still ask the complexity question despite the flag (confusing UX).
+**What goes wrong:** The design calls for `tabs_context_mcp` as the availability probe. Chrome MCP can appear "available" (the tool resolves) but the browser session is stale, on the wrong machine, or the extension has lost connection. The agent proceeds with Chrome MCP mode, then every subsequent `chrome_navigate` or `chrome_click_element` call silently fails or times out, wasting the entire test session before falling back.
 
-**Why it happens:**
-The old code has a clean three-way branch: `FORCE_QUICK` -> quick, `FORCE_MILESTONE` -> milestone, else -> score. The new code needs flags to selectively skip question #4 but still run questions #1-3 and #5. This is a partial-skip pattern that is harder to implement than full-skip. Developers tend to either preserve the old full-skip pattern (losing interview context when flags are used) or forget the flags entirely in the new interview flow.
+**Why it happens:** Chrome MCP availability is not binary. The MCP bridge can be connected but the Chrome tab closed, Chrome can be running headless without the extension, or (per real-world reports) the extension can route to a different machine's Chrome instance when multiple machines have it installed. A single `tabs_context_mcp` probe does not exercise the full tool chain. GitHub issue #27492 documents the MCP client failing to establish connections to bridge-type MCP servers even when Chrome is running.
 
-**Consequences:**
-- `--quick` skips entire interview: quick tasks get no enriched context, descriptions fall back to raw truncation, Linear comment-back has nothing useful to post
-- `--milestone` skips entire interview: milestone MILESTONE-CONTEXT.md has no interview data, approach proposals have no user input to anchor on
-- Flags do nothing: user passes `--quick` but still gets asked "Quick fix or multi-phase?" -- defeats the purpose of the flag
+**Consequences:** Entire UAT session burns 10+ minutes of context window on Chrome MCP calls that silently fail. The fallback to Playwright never triggers because the initial probe passed. The autopilot stall detector may eventually catch this, but by then the context window is wasted.
 
 **Prevention:**
-Implement interview questions as an array/list with a `skip_if` condition per question. The complexity signal question (#4) has `skip_if: $FORCE_QUICK || $FORCE_MILESTONE`. Other questions have `skip_if` based on ticket content analysis. The routing step reads `$FORCE_QUICK`/`$FORCE_MILESTONE` first, falls back to interview answer for question #4, falls back to ticket inference. This three-tier fallback (flag -> interview -> inference) should be explicit in the workflow step, not implicit.
+1. Probe must be a full round-trip: call `tabs_context_mcp`, then `tabs_create_mcp` to open a new tab, then `chrome_navigate` to the actual `base_url`, and verify a non-error response. Only then confirm Chrome MCP is working.
+2. Implement per-test engine fallback, not just per-session. If any Chrome MCP call returns an error or times out mid-session, switch to Playwright for remaining tests rather than failing the whole session.
+3. Set a hard timeout (5 seconds as designed) but on the full probe sequence, not just `tabs_context_mcp`.
 
-**Detection:**
-- Test with `--quick` flag: verify all 4 non-complexity questions are still asked (or skipped due to ticket content), and route is "quick"
-- Test with `--milestone` flag: same check, route is "milestone"
-- Test with no flags: verify question #4 is asked and answer drives routing
+**Detection:** First sign is Chrome MCP tests all failing with timeout or connection errors while the probe reported success.
 
-**Phase to address:**
-Phase 1 (workflow restructuring) -- flag semantics must be defined in the new step structure before any interview logic is written.
+**Phase:** Must be addressed in the Chrome MCP engine implementation phase. The probe logic is the first thing to get right.
 
----
+**Confidence:** HIGH -- multiple sources confirm Chrome MCP connection instability ([GitHub issue #27492](https://github.com/anthropics/claude-code/issues/27492), [wrong-machine routing report](https://mikestephenson.me/2026/03/13/claude-cowork-browser-automation-wrong-machine/)).
 
-### Pitfall 2: Interview Question Skipping Creates Silent Context Gaps
+### Pitfall 2: AI-Driven Pass/Fail Judgment is Non-Deterministic
 
-**What goes wrong:**
-The design says "After each answer: Incorporate into understanding, skip remaining questions that are now answered." This adaptive skipping is powerful but dangerous. If the pre-scan concludes that "Goal/purpose" is "clear from title + description" but the title is ambiguous (e.g., "Fix auth flow"), question #1 gets skipped and `$INTERVIEW_CONTEXT` has a synthesized goal that may be wrong. The user never sees it, never corrects it. The wrong goal propagates to: the confirmation summary (quick route), the approach proposals (milestone route), the Linear comment-back, and the task description or MILESTONE-CONTEXT.md. All downstream artifacts are anchored to a misinterpreted goal.
+**What goes wrong:** The design has Claude judge pass/fail by comparing screenshots + DOM content against natural language expected behavior descriptions. This judgment is inherently non-deterministic -- the same screenshot and expected text can produce different pass/fail verdicts across runs, across context windows, or based on surrounding context in the conversation. A test that "passes" on Tuesday "fails" on Wednesday with identical application state.
 
-**Why it happens:**
-The pre-scan is Claude reading the ticket and making a judgment call about whether information is "clear." LLMs are overconfident about ambiguous text. A title like "Update dashboard" could mean updating data, updating UI, updating both, or updating the deployment dashboard. Claude reads this as "clearly about the dashboard" and skips the goal question. The user assumed they'd be asked and never notices the skip.
+**Why it happens:** LLM inference is stochastic. The expected behavior descriptions in UAT.md are natural language ("Comment appears immediately after submission") which have ambiguous thresholds. "Immediately" could mean visible in the screenshot or present in the DOM. A loading spinner might be interpreted as "not yet appeared" or "in progress, will appear." The model's confidence varies with context length and prior conversation content.
 
-**Consequences:**
-- Quick task: planner builds a plan for the wrong scope, executor implements wrong thing
-- Milestone: approach proposals address wrong problem, user picks an approach that doesn't match their intent
-- Linear comment: posted to ticket says "Goal: update the dashboard UI" when user meant "update the dashboard data pipeline"
-- Silent failure: no error, no warning, everything proceeds smoothly with wrong assumptions
+**Consequences:** UAT results are not reproducible. Failed tests trigger gap closure phases that "fix" things that are not broken. Passed tests miss regressions that a stricter check would catch. The autopilot enters fix-reaudit-re-UAT loops chasing phantom failures, burning context windows and potentially making unnecessary code changes.
 
 **Prevention:**
-Make question skipping conservative. The pre-scan should only skip a question when the ticket has explicit, unambiguous information for that dimension. Heuristic: skip if the ticket's description contains a dedicated section (e.g., "## Goal", "## Acceptance Criteria", "## Scope") or if a specific label provides the answer (e.g., label "bug" + clear repro steps = skip goal question). Do NOT skip based on Claude's confidence that the title is self-explanatory.
+1. Require the agent to output a structured confidence score (1-5) alongside each pass/fail verdict. Only count tests with confidence < 3 as "needs human review" rather than hard failures.
+2. Implement a confirmation re-test for failures: if a test fails, re-run it once before recording the failure. Two consecutive failures = confirmed failure. Single failure = flaky, log but do not create gaps.
+3. Use DOM content assertions (text presence, element existence) as the primary signal, with screenshot judgment as supplementary evidence. DOM checks are deterministic; screenshots are not.
+4. Write expected behaviors in UAT.md with concrete observable criteria ("page contains text 'Comment posted successfully'") not vague descriptions ("comment appears").
+5. Include explicit failure criteria in the workflow prompt: "A test fails if: the expected element is not visible, an error message appears, the page shows a loading spinner after the wait period, or the observed behavior contradicts the expected behavior description. When in doubt, fail the test."
 
-Additionally: after all questions are answered (or skipped), present the synthesized understanding to the user for confirmation. The quick route already does this ("Does this look right?"), but the confirmation must also cover skipped questions by showing what was inferred. If the user says "No, let me clarify," re-ask the skipped questions.
+**Detection:** UAT results flip between runs with no code changes. Gap closure phases produce "fixes" that do not change application behavior.
 
-**Detection:**
-- Run with a deliberately ambiguous ticket (title only, no description): verify all 5 questions are asked
-- Run with a detailed ticket (description, acceptance criteria, labels): verify 2-3 questions are skipped and the confirmation summary shows correct inferred answers
+**Phase:** Must be addressed in the UAT-Auto workflow design phase. The judgment protocol is the core of the testing logic.
 
-**Phase to address:**
-Phase 2 (interview implementation) -- skipping logic must be conservative from the start. Loosening skip criteria later is easy; tightening them after users have experienced wrong inferences is a trust problem.
+**Confidence:** HIGH -- this is an inherent property of LLM-based judgment, well-documented in AI testing literature.
 
----
+### Pitfall 3: App Startup Race Condition
 
-### Pitfall 3: Step Renumbering Breaks Success Criteria References
+**What goes wrong:** The design runs `startup_command` (e.g., `npm run dev`) and waits `startup_wait_seconds` (default 10) before testing. But dev servers have wildly variable startup times depending on cold cache, dependency installation, compilation, and port availability. The wait is either too short (app not ready, all tests fail with connection refused) or too long (wasting 30+ seconds every run).
 
-**What goes wrong:**
-The current workflow has 7 steps (1-7) with success criteria referencing `WKFL-01` through `WKFL-08`. The design renumbers to 9 steps (1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9). If success criteria tags are updated to match new step numbers but the actual step content shifts, the criteria-to-step mapping becomes wrong. Worse: the command spec (`commands/gsd/linear.md`) says "Preserve all workflow gates (issue fetch, complexity scoring, routing, execution, Linear status updates)" -- the phrase "complexity scoring" must also be updated or it instructs Claude to preserve the old scoring logic.
+**Why it happens:** Fixed wait times are a known anti-pattern in browser testing. Playwright's own docs state: "Never wait for timeout in production. Tests that wait for time are inherently flaky." Dev servers (Next.js, Vite, webpack-dev-server) have non-linear startup: fast on warm cache, slow on cold start. Port conflicts can cause the startup command to fail silently (exits with error but the agent already moved on). The agent cannot distinguish "server starting" from "server failed to start."
 
-**Why it happens:**
-Success criteria tags (WKFL-01, WKFL-03, etc.) are referenced in the command spec, the workflow file, and potentially in test assertions. A refactor that changes step numbering but doesn't update ALL reference points leaves dangling references. The design document maps old-to-new steps, but the actual implementation must trace every WKFL-XX reference across the codebase.
-
-**Consequences:**
-- Command spec still says "complexity scoring" -> Claude running the workflow tries to implement a scoring heuristic alongside the interview, producing a hybrid mess
-- Success criteria reference old step numbers -> verification against criteria becomes meaningless
-- Autopilot phase loop references workflow step numbers -> could break if step detection is positional
+**Consequences:** If too short: every test fails with connection refused, creating false gap closure cycles. The failure categorization (app-level vs test-level from v2.7) should catch this, but only if the error messages are recognized. If too long: wasted time in every UAT session, compounding across milestones.
 
 **Prevention:**
-Before changing any step numbers:
-1. Grep the entire codebase for `WKFL-0` to find all success criteria references
-2. Grep for "complexity scoring" and "scoring heuristic" to find all textual references to the old routing
-3. Create a mapping table (old WKFL tag -> new WKFL tag -> new content) and update all references atomically in a single phase
-4. Update the command spec's objective and process descriptions to say "interview-driven routing" instead of "complexity scoring"
+1. Replace fixed wait with HTTP polling: after starting the dev server, poll `base_url` every 2 seconds with a hard timeout of 60 seconds. Only proceed when HTTP 200 (or any non-error response) is received.
+2. Capture the startup command's stderr/stdout. If it exits before the wait completes, check the exit code. Non-zero = startup failed, skip UAT with a clear error.
+3. Check if `base_url` is already responding BEFORE starting the startup command. If it is, skip startup entirely (user may have the app running).
+4. If using Playwright, leverage its built-in `webServer` config block which handles startup, port detection, and readiness checking natively. (Note: scaffolding templates currently omit `webServer` block -- known v2.7 tech debt.)
+5. Register a `process.on('exit')` handler in autopilot.mjs that kills the dev server PID. Also register `SIGINT` and `SIGTERM` handlers to prevent orphan processes.
 
-**Detection:**
-- Grep for `WKFL-03` (old scoring step) after refactor -- should return zero matches
-- Grep for "scoring" or "heuristic" in the workflow and command spec -- should return zero matches (or only in comments explaining the change)
-- Read command spec after refactor: should mention interview, not scoring
+**Detection:** All tests fail with "connection refused" or "navigation timeout." Startup command in process but server not yet listening.
 
-**Phase to address:**
-Phase 1 (workflow restructuring) -- renumbering and reference updates must happen first, as a clean structural change, before any behavioral changes are made.
+**Phase:** Must be addressed in the autopilot integration phase (where `runAutomatedUAT()` is implemented). The startup management is autopilot's responsibility, not the workflow's.
 
----
+**Confidence:** HIGH -- universally known issue in browser testing. [Playwright docs](https://betterstack.com/community/guides/testing/avoid-flaky-playwright-tests/) and [BrowserStack](https://www.browserstack.com/guide/playwright-flaky-tests) explicitly warn against fixed waits.
 
-### Pitfall 4: Pre-Execution Comment-Back Fails and Blocks Execution
+### Pitfall 4: Gap Format Incompatibility Breaks Closure Loop
 
-**What goes wrong:**
-The design adds a new "Step 5.5" that posts interview summary to Linear before execution starts. The design says "On MCP failure: Warning only -- do not block execution." But the implementation detail matters: if the MCP call is synchronous (as all MCP calls are in the workflow), a timeout or network error could take 30+ seconds before failing. If the error handling is a try/catch around the MCP call, the workflow recovers. But if the MCP call throws in a way that the workflow markdown doesn't explicitly handle (e.g., MCP server disconnected, tool not available), the entire workflow aborts.
+**What goes wrong:** The design introduces `MILESTONE-UAT.md` with a YAML gap format that must be consumed by `plan-milestone-gaps`. If the gap format from UAT differs even slightly from what the gap planner expects (different field names, different severity values, missing required fields), the gap closure loop silently produces empty or malformed fix phases.
 
-**Why it happens:**
-The existing completion comment-back (current Step 6) has the same "warning only" pattern and the same vulnerability. But it fires AFTER execution, so a failure there loses only the comment -- the work is done. The new pre-execution comment-back fires BEFORE execution, so a failure that isn't properly caught means no work gets done at all. The stakes are asymmetric despite identical code patterns.
+**Why it happens:** The existing gap format is defined by `MILESTONE-AUDIT.md` and the audit workflow. The UAT gap format in the design uses fields like `truth`, `evidence`, `observed` that may not exist in the audit gap schema. The gap planner may not know how to parse UAT-specific fields. YAML parsing in the codebase already has a known tech debt issue (`extractFrontmatter` does not parse nested YAML array-of-objects).
 
-**Consequences:**
-- MCP timeout: user waits 30+ seconds, then workflow aborts. No execution happens. User must re-run.
-- MCP server not available: workflow fails at step 5.5 every time. Users learn to avoid the workflow or disconnect from Linear.
-- Partial failure: comment posts but workflow crashes on the response parsing, leaving a "Execution starting..." comment on a ticket where execution never started.
+**Consequences:** UAT failures are detected but never fixed. The gap closure loop creates phases but the plans are empty or nonsensical because the planner could not parse the gap descriptions. The autopilot loops through audit-UAT-gap closure without making progress, eventually hitting the circuit breaker.
 
 **Prevention:**
-The workflow must explicitly state that the pre-execution comment-back is wrapped in error handling that catches ANY failure (not just MCP-returned errors, but also tool-not-available and timeout errors). The display pattern should be:
-1. Attempt MCP call
-2. On success: display checkmark
-3. On ANY failure: display warning, store `$COMMENT_BACK_FAILED = true`, continue to execution
-4. Never let a comment-back failure propagate up
+1. Use the exact same gap schema as `MILESTONE-AUDIT.md`. Map UAT failures to the existing schema rather than inventing a new one. The `truth`/`status`/`reason`/`severity` fields should match what `plan-milestone-gaps` already parses.
+2. Write an integration test that feeds a sample `MILESTONE-UAT.md` through the gap planning workflow and verifies it produces valid fix phases.
+3. Keep the gap format as simple YAML that `extractFrontmatter` can actually parse -- avoid nested array-of-objects given the known parsing limitation.
+4. The `evidence` and `observed` fields are additive metadata; they should not be required fields for gap planning.
 
-Additionally: consider a shorter MCP timeout for the pre-execution comment (5s vs default) since this is a non-critical enhancement step. If MCP is slow, skip and move on.
+**Detection:** Gap closure phases have empty or generic plans. The planner's output does not reference specific UAT test failures.
 
-**Detection:**
-- Disconnect Linear MCP server, run workflow: verify execution proceeds with warning message
-- Simulate MCP timeout (if testable): verify workflow doesn't hang
-- Check that "Execution starting..." is not posted without execution actually starting (i.e., the comment and execution are not separated by other failure points)
+**Phase:** Must be addressed in the evidence and reporting phase. Gap format must be validated against existing consumers before implementation.
 
-**Phase to address:**
-Phase 3 (comment-back implementation) -- error handling must be tested against actual MCP failure modes, not just happy path.
+**Confidence:** HIGH -- the `extractFrontmatter` limitation is documented tech debt, and the gap format is the integration contract between UAT and the existing closure loop.
 
----
+### Pitfall 5: Subagent Cannot Spawn Subagent
 
-### Pitfall 5: Hybrid Output Creates Two Divergent Code Paths That Drift
+**What goes wrong:** The workflow tries to spawn a nested subagent (e.g., a Playwright-specific agent from within the UAT agent).
 
-**What goes wrong:**
-The design introduces a fork after routing: quick route gets a "confirmation summary" (simple yes/no), milestone route gets "approach proposals" (brainstorm-style with 2-3 approaches). These are fundamentally different UX flows that share the same step number (Step 5). Over time, bug fixes or enhancements to one path don't get applied to the other. The quick confirmation grows richer (adding scope details, adding a "change route" option), while the milestone approach proposals stay static. Or vice versa: milestone proposals get polished while quick confirmation remains basic.
+**Why it happens:** GSD has a hard constraint documented in PROJECT.md: "Subagents cannot spawn subagents -- the orchestrator must be the top-level spawner." The `/gsd:uat-auto` workflow is spawned by autopilot as a subagent. Any `Task()` calls inside it would create subagent-spawning-subagent, which silently fails.
 
-**Why it happens:**
-The single workflow file contains both paths as branches within one step. Unlike the quick/milestone execution split (which delegates to separate workflow patterns), the hybrid output is inline. Developers fixing a bug in the quick confirmation don't realize the milestone path has the same bug. The paths look similar enough that you think changes to one apply to both, but they don't -- they have different structures, different AskUserQuestion options, and different re-prompt behaviors.
+**Consequences:** Task() calls silently fail or error out, breaking the entire UAT session.
 
-**Consequences:**
-- Quick path allows "No, let me clarify" re-prompt but milestone path doesn't (or vice versa)
-- Quick confirmation shows synthesized goal but milestone proposals don't show it (or show it differently)
-- Interview context is formatted differently for quick vs milestone, making the Linear comment-back inconsistent
+**Prevention:** The `/gsd:uat-auto` workflow must handle BOTH Chrome MCP and Playwright paths in a single agent session. Do not try to spawn separate agents for each browser mode. The workflow detects the browser mode and branches internally. All browser interaction happens through tool calls (Chrome MCP tools or Bash for Playwright scripts), not through additional agent spawning.
 
-**Prevention:**
-Extract shared interview context formatting into a single template before the fork. Both paths should render the same `$INTERVIEW_CONTEXT` block, then diverge only in what they add:
-- Quick: add "Does this look right?" prompt
-- Milestone: add approach proposals and selection prompt
+**Detection:** Agent errors about Task() or subagent spawning.
 
-The shared context template ensures goal, scope, success criteria, and route are always presented identically regardless of path. Only the decision mechanism (confirm vs select) differs.
+**Phase:** Must be addressed in the UAT-Auto workflow architecture phase. This is a fundamental constraint that shapes the entire implementation.
 
-**Detection:**
-- Compare the interview summary section in both quick and milestone Linear comments -- they should be identical in structure
-- After any change to either path, check the other path for the same issue
-- Track divergence by diffing the two branches in the workflow file periodically
-
-**Phase to address:**
-Phase 2 (hybrid output implementation) -- extract the shared template at implementation time, not as a later refactor.
-
----
+**Confidence:** HIGH -- documented codebase constraint, well-established pattern.
 
 ## Moderate Pitfalls
 
-### Pitfall 6: Interview Context Variable Not Consumed by Downstream Steps
+### Pitfall 6: Screenshot Evidence Bloats Git Repository
 
-**What goes wrong:**
-The design stores interview Q&A as `$INTERVIEW_CONTEXT`. The linear-context.md file gets a new `interview_summary` field. The quick route description synthesis (Step 7/5a) replaces raw truncation with "interview-enriched context." But if any of these consumption points reference the variable by a different name, or if the variable is stored in a format that doesn't parse cleanly into the downstream template, the enriched context is silently lost and the old truncation behavior returns as a fallback.
+**What goes wrong:** The design commits PNG screenshots to git for every UAT test, every milestone. Over 10 milestones with 12 tests each, that is 120+ PNGs accumulating in git history. PNGs are binary; git stores them as full copies on every change. Repository clone time and size grow linearly. Per industry reports, thirty screenshots updated weekly can result in 156MB of history per year.
 
-**Prevention:**
-Define `$INTERVIEW_CONTEXT` structure explicitly: a markdown block with labeled sections (Goal, Scope, Success Criteria, Complexity, Additional). Each consumption point references specific sections, not the entire blob. Test by checking that linear-context.md contains the interview_summary field after a run, and that the quick task description contains goal/scope from the interview (not from raw ticket truncation).
-
-**Phase to address:** Phase 2 (interview implementation) -- define the variable structure before building consumers.
-
----
-
-### Pitfall 7: Inferred Route Confirmation UX Is Confusing
-
-**What goes wrong:**
-The design says: "If complexity question was skipped (because the ticket explicitly stated scope): Claude infers the route from the ticket content -- single-file bug fix -> quick, multi-component feature -> milestone. Display the inferred route and ask for confirmation." But the confirmation is another AskUserQuestion, meaning the user gets asked about routing even when the ticket was clear enough to skip the question. This feels contradictory: "The ticket is clear enough to skip the question, but unclear enough that I need you to confirm my inference."
+**Why it happens:** The design explicitly states "Evidence PNGs are committed to git" and "Old evidence is cleaned up during milestone archival." But git history is permanent -- archival removes files from the working tree but not from pack files.
 
 **Prevention:**
-Only trigger confirmation if the inference has low confidence. If the ticket has a "bug" label and references a single file, route to quick without confirmation. If the ticket is ambiguous (no clear labels, mixed signals), show the inference with a confirmation prompt. Add a confidence threshold to the inference: high confidence -> auto-route, low confidence -> confirm.
+1. Add `.planning/uat-evidence/` to `.gitignore` and store evidence as ephemeral artifacts. Only commit the `MILESTONE-UAT.md` results file, not the screenshots. If evidence is needed for debugging, it is available in the local filesystem until archival.
+2. If screenshots must be committed, enforce max dimensions (1280x720), use JPEG at 80% quality instead of PNG (evidence, not pixel-perfect baselines), and consider git LFS.
+3. At minimum, clean up evidence PNGs from git history (not just working tree) during milestone archival.
 
-**Phase to address:** Phase 2 (routing decision) -- define confidence threshold for auto-routing vs confirmation.
+**Phase:** Should be addressed in the evidence and reporting phase.
 
----
+**Confidence:** MEDIUM -- the design handles archival cleanup, but [git history bloat](https://dev.to/omachala/your-screenshot-automation-is-bloating-your-git-repo-3lgc) is a known long-term issue with binary files.
 
-### Pitfall 8: Milestone Route Approach Proposals Duplicate Brainstorm Workflow
+### Pitfall 7: Playwright Fallback Produces Different Results Than Chrome MCP
 
-**What goes wrong:**
-The design says milestone route shows "approach proposals (brainstorm-style)" with 2-3 approaches, pros/cons, and a recommendation. The brainstorm workflow (`brainstorm.md`) does exactly this in its Step 4, but with full project context exploration (Step 2), clarifying questions (Step 3), and section-by-section design approval (Steps 5-8). The linear workflow's approach proposals are a lightweight version that skips all that context. If the user selects an approach and it feeds into MILESTONE-CONTEXT.md, the subsequent `/gsd:new-milestone --auto` creates a milestone without the depth that brainstorm provides.
+**What goes wrong:** The dual-engine approach means the same test suite can produce different results depending on which engine runs. Chrome MCP uses a real headed Chrome with extensions and user-agent; Playwright uses headless Chromium with a different user-agent and no extensions. Applications that detect headless mode, bot user-agents, or depend on Chrome extensions will behave differently.
 
-The risk: users who should use `/gsd:brainstorm` for complex features end up in the linear workflow's shallow approach proposals because the interview routed them to "milestone." The resulting milestone has weak context and the discuss-phase generates a thin CONTEXT.md.
-
-**Prevention:**
-For milestone route, include an explicit option in the approach proposals: "This seems complex enough for a full brainstorm session. Would you like to: 1) Pick an approach and create a milestone, 2) Start a brainstorm session for deeper exploration." This gives the user an escape hatch to the richer flow when the linear workflow's lightweight proposals aren't sufficient.
-
-**Phase to address:** Phase 3 (hybrid output / milestone path) -- add brainstorm escape hatch during approach proposal step.
-
----
-
-### Pitfall 9: Two Comment-Backs Per Ticket Create Noise
-
-**What goes wrong:**
-The design adds a pre-execution comment (interview summary) alongside the existing post-execution comment (completion summary). For quick tasks that take 2-5 minutes, the ticket gets two GSD comments in rapid succession. For milestone tasks, the first comment says "Milestone creation starting..." and the second says "Milestone initialized" -- two comments for what is effectively one action from the user's perspective. Linear's notification system fires twice. Teammates watching the ticket see two bot comments and may be confused about status.
+**Why it happens:** Chrome MCP operates on the user's actual Chrome browser with full state (cookies, extensions, logged-in sessions). Playwright creates an isolated browser context with no state. The design says "Output format: Identical to Chrome MCP mode" but the browser behavior is not identical.
 
 **Prevention:**
-For quick tasks: consider combining both comments into a single post-execution comment that includes the interview summary at the top and the completion summary below. This is a judgment call -- the design wants the pre-execution comment for visibility into what GSD understood before it acts. If the pre-execution comment is kept, ensure the post-execution comment does not repeat the same information. Reference the earlier comment: "See interview summary above. Execution complete."
+1. Document that UAT tests must not depend on pre-existing browser state (cookies, login sessions). If authentication is required, the UAT test must include login steps.
+2. Set Playwright's user-agent to match Chrome's to avoid bot detection differences.
+3. Record which engine was used in `MILESTONE-UAT.md` (the design already does this) and do not compare results across engines. A test that passes in Chrome MCP and fails in Playwright is an engine difference, not a regression.
 
-**Phase to address:** Phase 3 (comment-back implementation) -- decide on one-comment vs two-comment strategy before implementing.
+**Phase:** Should be addressed in both engine implementation phases with a shared test contract.
 
----
+**Confidence:** MEDIUM -- known issue in dual-browser testing strategies.
+
+### Pitfall 8: Timeout Management Across Nested Loops
+
+**What goes wrong:** The design adds a new step (`runAutomatedUAT()`) between audit and completion in a pipeline that already has nested timeout management: stall detection in `runClaudeStreaming()` (5 min default), debug retry limits, gap closure iteration limits (configurable max), and the progress circuit breaker. The UAT session has its own 10-minute timeout. If UAT triggers gap closure, which triggers re-audit, which triggers re-UAT, the total wall-clock time can exceed any reasonable expectation.
+
+**Why it happens:** Each layer manages its own timeout independently. There is no top-level wall-clock budget for the entire audit-UAT-gap-reaudit cycle.
+
+**Prevention:**
+1. Add a top-level wall-clock timeout for the post-audit phase (audit + UAT + gap closure combined). Default 30 minutes. If exceeded, halt and escalate.
+2. Limit UAT-triggered gap closure to 1 iteration. If UAT fails after gap closure, escalate to human rather than looping again. Reasoning: if the first fix did not resolve the UAT failure, subsequent automated attempts are unlikely to succeed.
+3. Make the UAT timeout configurable in `uat-config.yaml` and scale it by test count (10 minutes for 5 tests is fine; 10 minutes for 30 tests is not).
+
+**Phase:** Should be addressed in the autopilot integration phase where `runAutomatedUAT()` is wired into the main flow.
+
+**Confidence:** HIGH -- the existing pipeline already has multiple timeout layers; adding another without coordination is a known integration risk.
+
+### Pitfall 9: UAT Test Discovery Produces Zero Tests or Fabricated Tests
+
+**What goes wrong:** If no phases in the current milestone produced UAT.md files (infrastructure-only milestone), the fallback is to "generate test scenarios from SUMMARY.md files." This fallback produces AI-generated tests that may have no relationship to actual user-facing behavior.
+
+**Why it happens:** Not every milestone has web UI changes. The UAT.md files are produced by `verify-work` which only runs when there is something to verify manually.
+
+**Prevention:**
+1. When zero UAT.md files are found AND no SUMMARY.md files describe UI changes, skip UAT entirely with a clear "No UAT-testable changes in this milestone" message. Do not fabricate tests.
+2. The `uat-config.yaml` presence is already the opt-in gate. Reinforce: no config = no UAT, no exceptions.
+3. Follow the precedent from v2.7 where the `gsd-playwright` agent returns BLOCKED status when acceptance tests are missing. Same pattern: no testable content = BLOCKED, not "generate something."
+
+**Phase:** Should be addressed in the test discovery phase.
+
+**Confidence:** HIGH -- the BLOCKED pattern from v2.7 is an established codebase precedent.
+
+### Pitfall 10: Context Window Exhaustion During Multi-Test Sessions
+
+**What goes wrong:** The Chrome MCP agent processes all UAT tests sequentially in a single Claude session. Each test involves navigation, interaction, screenshot capture (which consumes tokens as image data), DOM content extraction, and judgment. With 12+ tests, the context window fills. Claude's Chrome documentation itself warns about increased context consumption with browser tools enabled.
+
+**Why it happens:** Screenshots are multimodal input that consume significant tokens. DOM content can be large (especially for SPAs). The design runs all tests in one session with no batching.
+
+**Prevention:**
+1. Batch tests: run no more than 5 tests per Claude session. Between batches, spawn a new session with results-so-far and remaining tests.
+2. Minimize DOM capture: extract only relevant DOM elements rather than full `chrome_get_web_content`.
+3. Do not accumulate screenshots in conversation history -- take the screenshot, judge it, record the result, move on. Evidence is saved to disk; it does not need to persist in context.
+4. Set a test count limit in `uat-config.yaml` (default: 20 tests max per session).
+
+**Phase:** Should be addressed in the UAT-Auto workflow implementation phase.
+
+**Confidence:** MEDIUM -- depends on actual token consumption per test, which varies by application complexity. [Claude Chrome docs](https://code.claude.com/docs/en/chrome) confirm increased context usage.
+
+### Pitfall 11: Playwright Fallback Chromium Not Installed
+
+**What goes wrong:** Playwright is in devDependencies (`@playwright/test` installed) but Chromium browser binary is not downloaded (`npx playwright install chromium` never ran). The existing `detectPlaywright()` returns `installed` if the package exists, but that does not guarantee the binary.
+
+**Prevention:** The Playwright fallback path must check for the browser binary, not just the npm package. Add `npx playwright install chromium` as part of the fallback initialization path. This is an existing gap in the three-tier detection from v2.7.
+
+**Detection:** Playwright scripts fail with "browser not found" errors.
+
+**Phase:** Playwright fallback engine phase.
+
+**Confidence:** HIGH -- known limitation of `detectPlaywright()`.
 
 ## Minor Pitfalls
 
-### Pitfall 10: `$FULL_MODE` Semantics Change with Interview
+### Pitfall 12: Port Conflicts When Starting Dev Server
 
-**What goes wrong:**
-Currently, `$FULL_MODE` is set by the `--full` flag. The design adds a new meaning: "Medium (1-2 sessions)" in the complexity signal also sets `$FULL_MODE = true`. This means `$FULL_MODE` can now be set without the user explicitly passing `--full`. If any downstream logic checks `$FULL_MODE` alongside `$FORCE_QUICK` (assuming `$FULL_MODE` always implies user intent for verification), it may behave unexpectedly when `$FULL_MODE` was set implicitly by an interview answer.
+**What goes wrong:** The startup command binds to a port already in use (from a previous failed UAT run or another dev server). The startup command fails or binds to an alternate port, but UAT tests navigate to the original `base_url` port.
 
-**Prevention:**
-Distinguish between explicit `$FULL_MODE` (from flag) and implicit `$FULL_MODE` (from interview). Or simpler: document that `$FULL_MODE` means "run with plan-checking and verification" regardless of source, and ensure all consumers treat it identically. Don't add conditional logic based on how `$FULL_MODE` was set.
+**Prevention:** Before running the startup command, check if `base_url` port is already responding. If so, either use the existing server or warn. After startup, verify the server is on the expected port by hitting `base_url` directly.
 
-**Phase to address:** Phase 1 (workflow restructuring) -- clarify `$FULL_MODE` semantics in the step definitions.
+**Phase:** Autopilot integration phase.
 
----
+### Pitfall 13: Chrome MCP ~5s Per Call Latency Compounds
 
-### Pitfall 11: AskUserQuestion Overhead for Quick Tickets
+**What goes wrong:** Each Chrome MCP tool call has approximately 5 seconds of MCP protocol overhead. A single test with 5 tool calls = 25 seconds. Twelve tests = 5 minutes just in MCP overhead, before any actual page load or interaction time.
 
-**What goes wrong:**
-A user runs `/gsd:linear BUG-123 --quick` for a clear bug fix. The old workflow skipped scoring and went straight to execution. The new workflow still asks 3-4 interview questions (goal, scope, success criteria, additional context). For a 5-minute bug fix, spending 2 minutes answering questions about scope and success criteria feels excessive. Users start passing `--quick` to avoid the interview, which means the interview is only used for ambiguous tickets where the user doesn't know the route -- the opposite of "always-on."
+**Prevention:** Factor MCP latency into timeout calculations. A 10-minute UAT timeout with 12 tests allows only ~50 seconds of actual testing per test after MCP overhead. Increase default timeout or reduce test count expectations. Playwright fallback does not have this overhead and is significantly faster.
 
-**Prevention:**
-The pre-scan should be aggressive about skipping questions for clear tickets. A bug with a stack trace, a specific file mentioned, and a "bug" label should skip goal, scope, and success criteria questions -- leaving only the complexity signal (which `--quick` already skips). Net result: `--quick` on a clear bug = zero questions. `--quick` on an ambiguous ticket = 1-2 questions. This preserves the "always-on" design without creating overhead for trivial tickets.
+**Phase:** Chrome MCP engine implementation phase.
 
-**Phase to address:** Phase 2 (interview implementation) -- pre-scan aggressiveness must be calibrated for the quick-ticket use case.
+**Confidence:** MEDIUM -- [5s per call is reported](https://www.hanifcarroll.com/blog/browser-automation-tools-comparison-2026/) but may vary by setup.
 
----
+### Pitfall 14: YAML Config Type Coercion
+
+**What goes wrong:** `startup_wait_seconds: 10` parsed as string "10" instead of number 10 by hand-rolled parser.
+
+**Prevention:** Use js-yaml for parsing (handles types correctly). If using `extractFrontmatter`, must explicitly parseInt/parseFloat.
+
+**Phase:** Config parsing phase.
+
+### Pitfall 15: Base URL Trailing Slash Inconsistency
+
+**What goes wrong:** Config has `base_url: "http://localhost:3000"` but test descriptions reference "/dashboard". URL concatenation produces double slashes or missing slashes.
+
+**Prevention:** Normalize base_url by stripping trailing slash in the config loader. Use `new URL(path, base)` for path resolution.
+
+**Phase:** Config parsing phase.
+
+### Pitfall 16: Evidence Path Convention Mismatch
+
+**What goes wrong:** The design specifies `{phase}-test-{N}.png` naming but phase identifiers in the codebase use mixed conventions (e.g., `04-comments` vs `04` vs `phase-04`). Known v2.7 tech debt: path convention mismatch.
+
+**Prevention:** Use a consistent, simple naming scheme: `test-{sequential-number}.png`. Do not encode phase information in the filename -- that is already captured in the results table. After writing evidence, verify the file exists at the recorded path.
+
+**Phase:** Evidence and reporting phase.
 
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Workflow restructuring (step renumbering) | Success criteria and command spec reference old step numbers and "scoring heuristic" language | Grep all WKFL-XX references and "scoring"/"heuristic" text; update atomically before behavioral changes |
-| Interview implementation (adaptive questions) | Overeager question skipping on ambiguous tickets | Conservative skip criteria; only skip on explicit ticket sections, not LLM confidence |
-| Interview implementation (context variable) | `$INTERVIEW_CONTEXT` not consumed correctly by downstream steps | Define variable structure explicitly; verify consumption at each downstream point |
-| Routing decision (flag interaction) | `--quick`/`--milestone` flags skip entire interview instead of just complexity question | Implement per-question skip conditions; flags only affect question #4 |
-| Hybrid output (two code paths) | Quick and milestone paths drift in interview context presentation | Extract shared context template; diverge only in decision mechanism |
-| Comment-back (pre-execution) | MCP failure blocks execution | Error handling must catch ALL failure modes; consider shorter timeout |
-| Comment-back (two comments) | Notification noise on Linear tickets | Consider combining into single post-execution comment for quick tasks |
-| linear-context.md changes | `interview_summary` field not read by consumers that parse frontmatter | Verify `extractFrontmatter` handles the new field (note: known tech debt that nested YAML parsing is limited) |
-| Description synthesis replacement | Fallback to raw truncation when interview context is empty | Ensure fallback is explicit and logged, not silent |
+| Chrome MCP engine | Detection false positive (#1), 5s/call latency (#13) | Full round-trip probe, latency-aware timeouts |
+| Playwright fallback engine | Result divergence (#7), Chromium not installed (#11), missing `webServer` block (v2.7 debt) | Shared test contract, binary check, Playwright native startup |
+| UAT-Auto workflow | Non-deterministic judgment (#2), context exhaustion (#10), zero-test discovery (#9), subagent constraint (#5) | Confidence scoring, test batching, BLOCKED status, single-agent design |
+| Autopilot integration | App startup race (#3), timeout cascade (#8), port conflicts (#12), orphan processes | HTTP polling, top-level timeout budget, port check, exit handlers |
+| Evidence and reporting | Gap format incompatibility (#4), git bloat (#6), path mismatches (#16) | Reuse audit gap schema, gitignore evidence, simple naming |
+| Config parsing | Type coercion (#14), URL normalization (#15) | Use js-yaml, use URL constructor |
+| Test phase (unit/integration) | Testing non-deterministic AI output | Test the protocol (structured output, retry logic), not the judgment content |
 
----
+## Existing Tech Debt Interactions
 
-## Integration Gotchas
+These known tech debt items from the codebase directly interact with UAT implementation:
 
-| Integration Point | Common Mistake | Correct Approach |
-|-------------------|----------------|------------------|
-| Interview -> Routing | Routing step re-reads ticket instead of using interview answers | Route from `$INTERVIEW_CONTEXT` only; ticket data was already analyzed in pre-scan |
-| Interview -> linear-context.md | Writing interview Q&A as unstructured text blob | Structure as labeled sections in YAML frontmatter `interview_summary` field |
-| Interview -> Quick description | Appending interview text to old truncated description instead of replacing it | Replace `$DESCRIPTION` synthesis entirely with interview-enriched version |
-| Interview -> MILESTONE-CONTEXT.md | Interview answers not included, only ticket data | Add `## Interview Context` section with goal, scope, criteria from interview |
-| Approach proposals -> MILESTONE-CONTEXT.md | Selected approach name stored but description lost | Store both approach name and full description under `## Selected Approach` |
-| Flag override -> Interview flow | `--quick` sets route and skips ALL questions | `--quick` sets route, skips question #4, runs questions #1-3 and conditionally #5 |
-| Pre-execution comment -> Post-execution comment | Both comments include full interview summary (duplication) | Pre-execution comment has summary; post-execution references it and adds completion data |
-| `$FULL_MODE` from interview -> plan-checker | Plan-checker not spawned because `$FULL_MODE` check only looks at flag, not interview answer | Check `$FULL_MODE` regardless of source (flag or interview answer "Medium") |
-
----
-
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Flag override + interview:** Run with `--quick` -- verify interview questions #1-3 are asked, #4 is skipped, route is quick
-- [ ] **Flag override + interview:** Run with `--milestone` -- verify interview questions #1-3 are asked, #4 is skipped, route is milestone
-- [ ] **No flags, clear ticket:** Run with a detailed bug ticket -- verify some questions skipped, routing inferred correctly
-- [ ] **No flags, vague ticket:** Run with title-only ticket -- verify all 5 questions asked
-- [ ] **Question skipping accuracy:** For each skipped question, verify the inferred answer in the confirmation summary is correct
-- [ ] **Confirmation re-prompt:** Say "No, let me clarify" at confirmation -- verify re-ask works and updated summary reflects changes
-- [ ] **Pre-execution comment-back:** Verify comment appears on Linear ticket before execution starts
-- [ ] **MCP failure handling:** Disconnect Linear MCP, run workflow -- verify execution proceeds with warning
-- [ ] **Quick description enrichment:** Compare quick task plan description with old truncation-based description -- new version should have goal/scope/criteria
-- [ ] **Milestone approach proposals:** Verify proposals reference interview answers (not just ticket text)
-- [ ] **MILESTONE-CONTEXT.md contents:** Verify it includes interview context section and selected approach
-- [ ] **linear-context.md `interview_summary`:** Verify field is present and parseable
-- [ ] **Success criteria tags:** Grep for old WKFL-03 (scoring) -- should be gone. New criteria reference interview and routing.
-- [ ] **Command spec updated:** `commands/gsd/linear.md` mentions interview, not scoring
-- [ ] **Two Linear comments:** Verify pre-execution and post-execution comments are distinct (no duplication)
-- [ ] **`$FULL_MODE` from interview:** Answer "Medium (1-2 sessions)" -- verify plan-checker and verifier are spawned
-
----
-
-## Recovery Strategies
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Flag override skips entire interview | LOW | Add per-question skip conditions; no structural change needed |
-| Wrong question skipped on ambiguous ticket | LOW | Tighten skip criteria in pre-scan; no downstream changes |
-| Success criteria reference old step numbers | LOW | Find-and-replace WKFL tags; update command spec text |
-| Pre-execution comment blocks execution | LOW | Add error handling wrapper; single code change |
-| Hybrid output paths drift | MEDIUM | Extract shared template; requires refactoring both paths |
-| Interview context not consumed downstream | MEDIUM | Trace variable through all consumers; may require format changes in multiple steps |
-| Approach proposals too shallow for complex features | LOW | Add brainstorm escape hatch option to approach selection |
-| Two comments create noise | LOW | Combine into single post-execution comment; remove pre-execution step |
-
----
+| Tech Debt Item | UAT Interaction | Risk |
+|----------------|-----------------|------|
+| `extractFrontmatter` cannot parse nested YAML array-of-objects | MILESTONE-UAT.md gaps section uses YAML arrays | Gap parsing may fail silently |
+| `playwright-detect --raw` returns string not JSON | Fallback detection logic may mis-parse result | False negative on Playwright availability |
+| Scaffolding templates omit `webServer` block | Playwright fallback needs startup management | Must implement startup separately or fix scaffolding |
+| Test budget at 103.25% (826/800) | New UAT infrastructure tests add to count if not excluded | Must add exclusion pattern like existing e2e/ exclusion |
+| v2.7 path convention mismatch | Evidence file paths must be consistent | Use simple sequential naming |
 
 ## Sources
 
-- Direct codebase analysis (HIGH confidence):
-  - `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` -- full design doc specifying interview flow, routing changes, hybrid output, comment-back, and step renumbering
-  - `get-shit-done/workflows/linear.md` -- existing workflow with scoring heuristic, flag handling, description synthesis, comment-back, and success criteria (WKFL tags)
-  - `commands/gsd/linear.md` -- command spec with objective text, allowed tools, and execution context reference
-  - `get-shit-done/workflows/brainstorm.md` -- approach proposals pattern (Step 4) that milestone route replicates
-  - `.planning/PROJECT.md` -- v3.0 active requirements, architecture constraints, known tech debt (extractFrontmatter YAML limitation)
-
----
-*Pitfalls research for: GSD v3.0 Linear interview-driven routing refactor*
-*Researched: 2026-03-22*
+- [Chrome MCP bug: cowork MCP connection issues](https://github.com/anthropics/claude-code/issues/27492) -- Chrome MCP connection instability
+- [Browser automation tool comparison](https://www.hanifcarroll.com/blog/browser-automation-tools-comparison-2026/) -- ~5s per call MCP overhead, form interaction reliability
+- [Wrong-machine browser automation](https://mikestephenson.me/2026/03/13/claude-cowork-browser-automation-wrong-machine/) -- Chrome extension routing to wrong machine
+- [Claude Chrome docs](https://code.claude.com/docs/en/chrome) -- increased context consumption with browser tools
+- [Avoiding flaky Playwright tests](https://betterstack.com/community/guides/testing/avoid-flaky-playwright-tests/) -- timing, selectors, hard waits
+- [Playwright flaky tests guide](https://www.browserstack.com/guide/playwright-flaky-tests) -- race conditions, timeout configuration
+- [17 Playwright testing mistakes](https://elaichenkov.github.io/posts/17-playwright-testing-mistakes-you-should-avoid/) -- common Playwright anti-patterns
+- [Screenshot git repo bloat](https://dev.to/omachala/your-screenshot-automation-is-bloating-your-git-repo-3lgc) -- binary file accumulation in git history
+- [Git LFS for screenshots](https://www.techedubyte.com/stop-git-repo-bloat-automate-screenshots-git-lfs/) -- LFS solution for screenshot management
+- GSD codebase: `.planning/RETROSPECTIVE.md` v2.7 section -- known Playwright tech debt, failure categorization pattern
+- GSD codebase: `.planning/PROJECT.md` -- known tech debt (extractFrontmatter, playwright-detect, scaffolding webServer)
+- GSD codebase: `autopilot.mjs` -- existing timeout layers (stall detection, debug retry, gap closure iterations)

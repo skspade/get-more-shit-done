@@ -1,341 +1,382 @@
 # Architecture Patterns
 
-**Domain:** /gsd:linear interview phase integration with existing workflow
+**Domain:** Automated UAT browser testing integration into GSD autopilot
 **Researched:** 2026-03-22
 **Confidence:** HIGH
 
-## System Overview
+## Recommended Architecture
+
+The automated UAT session integrates as a new step in the existing autopilot milestone-completion flow. It introduces 4 new components and modifies 2 existing ones, while reusing established patterns (runClaudeStreaming, gap closure loop, gsd-tools dispatch, frontmatter-based result communication).
+
+### High-Level Flow (modified autopilot.mjs)
 
 ```
-/gsd:linear Workflow -- Current vs Refactored
-=============================================
-
-CURRENT (7 steps):                    REFACTORED (9 steps):
-
-1. Parse arguments -----------------> 1. Parse arguments        [UNCHANGED]
-2. Fetch issue data ----------------> 2. Fetch issue data       [UNCHANGED]
-3. Route via heuristic ------+        3. Interview (3-5 Qs)     [NEW]
-                             |        4. Route from interview    [NEW -- replaces 3]
-                             x        5. Hybrid output           [NEW]
-                                      5.5 Comment-back (pre)     [NEW]
-4. Write linear-context.md ---------> 6. Write linear-context.md [MODIFIED]
-5. Execute route -------------------> 7. Execute route           [MODIFIED]
-6. Comment-back --------------------> 8. Completion comment-back [UNCHANGED]
-7. Cleanup -------------------------> 9. Cleanup                 [UNCHANGED]
+All phases complete
+  -> runMilestoneAudit() [EXISTING - unchanged]
+    -> Audit passes (exit 0)
+      -> runAutomatedUAT() [NEW]
+        -> UAT passes (0)  -> runMilestoneCompletion() [EXISTING - unchanged]
+        -> UAT gaps (10)   -> runGapClosureLoop() [EXISTING - modified to accept UAT gaps]
+                              -> Re-audit -> Re-UAT -> ...
+        -> UAT error (1)   -> debug retry / halt
+    -> Audit gaps (exit 10)
+      -> runGapClosureLoop() [EXISTING - unchanged]
+        -> Re-audit -> (if passes) -> runAutomatedUAT() -> ...
 ```
 
-### Component Responsibilities
+### Component Boundaries
 
-| Component | Responsibility | Status |
-|-----------|----------------|--------|
-| `workflows/linear.md` Step 3 (old) | Complexity scoring heuristic ($MILESTONE_SCORE) | **DELETE** |
-| `workflows/linear.md` Step 3 (new) | Interview: pre-scan ticket, ask 3-5 adaptive questions via AskUserQuestion | **NEW** |
-| `workflows/linear.md` Step 4 (new) | Route decision from interview complexity signal question | **NEW** |
-| `workflows/linear.md` Step 5 (new) | Hybrid output: confirmation summary (quick) or approach proposals (milestone) | **NEW** |
-| `workflows/linear.md` Step 5.5 (new) | Pre-execution comment-back to Linear via MCP | **NEW** |
-| `workflows/linear.md` Step 6 (was 4) | Write linear-context.md -- add `interview_summary` field | **MODIFIED** |
-| `workflows/linear.md` Step 7 (was 5) | Execute route -- enriched descriptions from interview context | **MODIFIED** |
-| `workflows/linear.md` Steps 8-9 | Completion comment-back + cleanup | **UNCHANGED** |
-| `commands/gsd/linear.md` | Command spec -- update objective description | **MODIFIED** (minor) |
-| `$INTERVIEW_CONTEXT` variable | Stores all Q&A from interview phase | **NEW data structure** |
+| Component | Type | Status | Responsibility | Communicates With |
+|-----------|------|--------|---------------|-------------------|
+| `runAutomatedUAT()` | Function in autopilot.mjs | NEW | Orchestrates UAT: checks config, invokes workflow, parses results | autopilot main loop, uat-auto workflow, gap closure loop |
+| `uat-auto.md` | Workflow file | NEW | Autonomous UAT execution: discover tests, detect browser, execute tests, write results | Chrome MCP tools, Playwright (via Bash), UAT.md files, MILESTONE-UAT.md |
+| `uat-config.yaml` | Config file (per-project) | NEW | Declares app URL, startup command, browser preference, timeouts | runAutomatedUAT(), uat-auto workflow |
+| `MILESTONE-UAT.md` | Results artifact | NEW | Structured test results with YAML gaps for failed tests | runAutomatedUAT() (read), plan-milestone-gaps (consume) |
+| `autopilot.mjs` main loop | Script | MODIFIED | Adds UAT step between audit-pass and milestone-completion | runAutomatedUAT(), runGapClosureLoop() |
+| `plan-milestone-gaps.md` | Workflow | MODIFIED | Must recognize MILESTONE-UAT.md as gap source (alongside MILESTONE-AUDIT.md) | MILESTONE-UAT.md gaps section |
 
-## New Components Required
+### Data Flow
 
-### 1. Interview Phase (New Step 3 in linear.md)
+```
+                                 uat-config.yaml
+                                      |
+                                      v
+autopilot.mjs --[spawns]--> claude -p "/gsd:uat-auto"
+                                      |
+                            +---------+---------+
+                            |                   |
+                     Chrome MCP path      Playwright path
+                     (tabs_context_mcp    (npx playwright
+                      chrome_navigate      inline scripts
+                      chrome_click         bash execution)
+                      chrome_screenshot)        |
+                            |                   |
+                            +--------+----------+
+                                     |
+                                     v
+                          MILESTONE-UAT.md (results + gaps YAML)
+                          uat-evidence/{milestone}/*.png (screenshots)
+                                     |
+                                     v
+                          autopilot.mjs reads status from frontmatter
+                                     |
+                              +------+------+
+                              |             |
+                         status=passed  status=gaps_found
+                              |             |
+                              v             v
+                    runMilestoneCompletion  runGapClosureLoop()
+                                            (plan-milestone-gaps
+                                             reads MILESTONE-UAT.md gaps)
+```
 
-Replaces the `$MILESTONE_SCORE` calculation entirely. This is not a new file -- it is new content within the existing `linear.md` workflow.
+## New Components Detail
 
-**Structure within the step:**
+### 1. `runAutomatedUAT()` in autopilot.mjs
 
-1. **Pre-scan** -- Read ticket title, description, labels, comments. Build internal checklist of what is already clear (goal, scope, criteria, approach).
+**Pattern:** Follows the same structure as `runMilestoneAudit()` (line 862) -- a named async function called from the main flow that spawns a Claude session and interprets results via frontmatter.
 
-2. **Adaptive question loop** -- 3-5 questions via AskUserQuestion, each conditionally skipped:
-   - Q1: Goal clarification (skip if description states goal)
-   - Q2: Scope boundaries (skip if ticket names files/components)
-   - Q3: Success criteria (skip if acceptance criteria exist)
-   - Q4: Complexity signal (skip if --quick or --milestone flag; primary routing input)
-   - Q5: Additional context (only if ambiguity remains)
+```javascript
+async function runAutomatedUAT() {
+  // 1. Gate: Check if uat-config.yaml exists
+  const configPath = path.join(PROJECT_DIR, '.planning', 'uat-config.yaml');
+  if (!fs.existsSync(configPath)) {
+    logMsg('UAT: skipped (no uat-config.yaml)');
+    console.log('No uat-config.yaml found. Skipping automated UAT.');
+    return 0; // Not an error -- project may not have web UI
+  }
 
-3. **Output** -- Accumulate all answers into `$INTERVIEW_CONTEXT` string for downstream consumption.
+  printBanner('AUTOMATED UAT');
 
-**Why inline, not a separate agent:** AskUserQuestion cannot be called from within a Task() subagent -- it must be called from the top-level workflow. The interview is a direct user conversation, not analysis work. Extracting to an agent would fail at runtime.
+  // 2. Invoke workflow via runStepWithRetry (reuses debug retry)
+  const uatExit = await runStepWithRetry('/gsd:uat-auto', 'automated-uat');
+  if (uatExit !== 0) {
+    logMsg(`UAT: workflow failed exit=${uatExit}`);
+    return 1;
+  }
 
-### 2. Route Decision (New Step 4 in linear.md)
+  // 3. Parse results from MILESTONE-UAT.md frontmatter
+  const uatFile = path.join(PROJECT_DIR, '.planning', 'MILESTONE-UAT.md');
+  if (!fs.existsSync(uatFile)) {
+    logMsg('UAT: no MILESTONE-UAT.md produced');
+    return 1;
+  }
 
-Replaces the scoring table with a direct mapping from the complexity signal answer:
+  const uatStatus = (await gsdTools(
+    'frontmatter', 'get', uatFile, '--field', 'status', '--raw'
+  )).trim();
+  logMsg(`UAT: result=${uatStatus}`);
 
-| Answer | Route | Notes |
-|--------|-------|-------|
-| "Quick task (hours)" | quick | Straightforward |
-| "Medium (1-2 sessions)" | quick + $FULL_MODE=true | Triggers plan-checking and verification |
-| "Milestone (multi-phase)" | milestone | Full milestone creation |
+  switch (uatStatus) {
+    case 'passed':
+      printBanner('UAT PASSED');
+      return 0;
+    case 'gaps_found':
+      printBanner('UAT: FAILURES FOUND');
+      return 10; // Same code as audit gaps
+    default:
+      return 1;
+  }
+}
+```
 
-**Override flags still bypass:** `--quick` and `--milestone` skip the complexity question but still run the other interview questions (goal, scope, criteria). Flags skip routing, not understanding.
+**Key design decisions:**
+- Returns `0` / `10` / `1` -- matches `runMilestoneAudit()` return value contract exactly
+- Uses `runStepWithRetry` for debug retry on workflow crashes (same as milestone-audit)
+- Gates on `uat-config.yaml` existence -- projects without web UIs skip silently with `return 0`
+- Reads frontmatter via `gsd-tools frontmatter get` -- same pattern as audit status parsing (line 889)
 
-**Inferred routing fallback:** If Q4 was skipped because the ticket was explicit enough, Claude infers the route and confirms with the user.
+### 2. `uat-auto.md` Workflow
 
-### 3. Hybrid Output (New Step 5 in linear.md)
+**Location:** `get-shit-done/workflows/uat-auto.md`
+**Pattern:** Fully autonomous workflow (no user prompts). Matches audit-milestone.md style.
 
-Two presentation modes based on route:
+**Steps:**
+1. Load `uat-config.yaml` via Read tool
+2. Discover UAT tests: scan phase dirs for `*-UAT.md` files with `status: complete`, fallback to SUMMARY.md generation
+3. Browser detection: try `tabs_context_mcp`, fall back to Playwright
+4. Start app if configured and not running (check base_url accessibility)
+5. Execute tests sequentially (Chrome MCP or Playwright via Bash)
+6. Write `.planning/MILESTONE-UAT.md` with frontmatter status and gaps YAML
+7. Save screenshots to `.planning/uat-evidence/{milestone}/`
+8. Commit results
+9. Exit 0
 
-**Quick route:** Confirmation summary (goal, scope, criteria, route). AskUserQuestion: "Yes, proceed" / "No, let me clarify". If "No", re-ask the relevant question and re-present.
+**The workflow is the "brain"** -- it does the actual testing using Chrome MCP tools or Bash for Playwright. The autopilot just spawns it and reads the results artifact.
 
-**Milestone route:** 2-3 approach proposals with pros/cons, matching brainstorm Step 4. AskUserQuestion to select approach. Selected approach feeds MILESTONE-CONTEXT.md.
+### 3. `uat-config.yaml`
 
-**Why diverge by route:** Quick tasks need validation ("did I understand you?"), milestone tasks need design input ("which direction?").
-
-### 4. Pre-Execution Comment-Back (New Step 5.5 in linear.md)
-
-Posts interview summary to Linear before execution starts. Uses `mcp__plugin_linear_linear__create_comment` already in allowed-tools.
-
-**Failure handling:** Warning only, never blocks execution. Same pattern as completion comment-back.
-
-**Result:** Each ticket gets two comments total -- interview summary before work, completion summary after work.
-
-## Existing Components Modified
-
-### 1. `workflows/linear.md` Step 6 (Write linear-context.md)
-
-**Change:** Add `interview_summary` text field to YAML frontmatter. Remove `score` field.
+**Location:** `.planning/uat-config.yaml`
 
 ```yaml
----
-issue_ids: [LIN-123]
-route: quick
-interview_summary: "Goal: Fix the login redirect. Scope: auth module only. Criteria: Redirect works for all OAuth providers."
-fetched: 2026-03-22
----
+base_url: "http://localhost:3000"
+startup_command: "npm run dev"    # optional
+startup_wait_seconds: 10          # optional, default 10
+browser: "chrome-mcp"             # optional, default chrome-mcp
+fallback_browser: "playwright"    # optional, default playwright
+timeout_minutes: 10               # optional, default 10
 ```
 
-### 2. `workflows/linear.md` Step 7 (Execute route)
+**Design rationale:** YAML over JSON because it matches UAT.md frontmatter patterns and is easier for humans to edit. Located in `.planning/` because it is project config, not source code. Separate from `config.json` because it has different ownership (per-project, manually created vs auto-generated).
 
-**Quick route 5a (description synthesis):** Replace `title + description[:1500]` truncation with interview-enriched context. `$DESCRIPTION` now includes goal, scope, and success criteria from interview.
+### 4. `MILESTONE-UAT.md`
 
-**Milestone route 5a (MILESTONE-CONTEXT.md):** Add `## Selected Approach` section with the chosen approach name and description.
+**Location:** `.planning/MILESTONE-UAT.md`
+**Lifecycle:** Created by uat-auto workflow, consumed by autopilot and plan-milestone-gaps, cleaned up during milestone archival.
 
-### 3. `commands/gsd/linear.md`
-
-**Change:** Update `<objective>` text to mention interview phase. No tool changes -- AskUserQuestion is already allowed.
-
-### 4. Success criteria in `workflows/linear.md`
-
-**Remove:**
-- "Routing heuristic scores on issue count, sub-issues, description, labels, relations (WKFL-03)"
-- "Score >= 3 routes to milestone, < 3 routes to quick (WKFL-03)"
-
-**Add:**
-- "Interview asks 3-5 adaptive questions, skipping answered ones"
-- "Route determined from interview complexity signal"
-- "Quick route shows confirmation, milestone route shows approach proposals"
-- "Interview summary posted to Linear before execution"
-
-## Existing Components Reused (No Modification)
-
-| Component | What's Reused | How |
-|-----------|---------------|-----|
-| AskUserQuestion | Interview questions + confirmation/selection | Already in allowed-tools |
-| mcp create_comment | Pre-execution comment-back | Same API, second call point |
-| mcp get_issue + list_comments | Ticket data for pre-scan | Already fetched in Step 2 |
-| Quick task infrastructure | Steps 5b-5i (init, planner, executor, STATE.md) | Unchanged |
-| Milestone infrastructure | MILESTONE-CONTEXT.md, new-milestone steps 1-11 | Unchanged except content |
-| gsd-tools.cjs (init, commit, slug) | All CLI tooling | No changes |
-| Completion comment-back (Step 8) | Post-execution summary | Unchanged |
-| Cleanup (Step 9) | Delete linear-context.md | Unchanged |
-
-## Architectural Patterns
-
-### Pattern 1: Adaptive Skip (interview design)
-
-**What:** Each question checks a precondition before asking. If the answer is already known from ticket data or previous answers, skip it.
-**When to use:** When gathering information that may already be partially available from context.
-
-**Implementation approach:**
-```
-For each question:
-  1. Check if ticket data already answers this
-  2. Check if a previous answer covers this
-  3. If either YES, log "Skipping Q{N}: already answered by {source}"
-  4. If NO, ask via AskUserQuestion
-  5. After answer, update $INTERVIEW_CONTEXT
-```
-
-### Pattern 2: Dual-Mode Presentation (hybrid output)
-
-**What:** Present different UI based on the routing decision -- lightweight confirmation for simple tasks, rich proposals for complex tasks.
-**When to use:** When the same workflow serves both low-complexity and high-complexity paths with fundamentally different user needs.
-
-### Pattern 3: Pre-Execution Comment-Back (audit trail)
-
-**What:** Post understanding to the external system before starting work, not just after completion.
-**When to use:** When work takes significant time and stakeholders need visibility into what will happen.
-
-## Data Flow
-
-### Full Flow (Interview Path)
-
-```
-User: /gsd:linear LIN-123
-    |
-    v
-Step 1: Parse "LIN-123", no flags
-    |
-    v
-Step 2: MCP get_issue + list_comments -> $ISSUES
-    |
-    v
-Step 3: Pre-scan ticket data
-    |   -> Goal clear? Scope bounded? Criteria stated? Approach indicated?
-    |
-    v
-Step 3: AskUserQuestion loop (3-5 questions, skipping answered)
-    |   -> $INTERVIEW_CONTEXT accumulated
-    |
-    v
-Step 4: Route from complexity signal answer
-    |   -> $ROUTE = "quick" | "milestone"
-    |   -> $FULL_MODE = true (if "Medium")
-    |
-    +--- quick -----------------+
-    |                           |
-    v                           v
-Step 5: Confirmation        Step 5: Approach proposals (2-3)
-    |   "Does this look         |   "Which approach?"
-    |    right?" -> Yes/No      |   -> Selected approach
-    |                           |
-    v                           v
-Step 5.5: MCP create_comment (interview summary)
-    |
-    v
-Step 6: Write linear-context.md (with interview_summary)
-    |
-    v
-Step 7: Execute route
-    |   Quick: enriched $DESCRIPTION from interview
-    |   Milestone: MILESTONE-CONTEXT.md with selected approach
-    |
-    v
-Step 8: MCP create_comment (completion summary)
-    |
-    v
-Step 9: Cleanup linear-context.md
-```
-
-### Flag Override Data Flow
-
-```
-User: /gsd:linear LIN-123 --quick
-    |
-    v
-Steps 1-2: Same as above
-    |
-    v
-Step 3: Pre-scan + Questions Q1, Q2, Q3, Q5 (SKIP Q4 -- route predetermined)
-    |   -> $INTERVIEW_CONTEXT still gathered
-    |
-    v
-Step 4: $ROUTE = "quick" (flag override, no complexity question needed)
-    |
-    v
-Steps 5-9: Same as above (confirmation summary path)
-```
-
-### Key Data Structures
-
-**$INTERVIEW_CONTEXT** (string, accumulated):
-```
-Goal: Fix the login redirect loop for OAuth providers
-Scope: auth module (src/auth/) -- specifically the callback handler
-Success criteria: All three OAuth providers (Google, GitHub, GitLab) redirect correctly after login
-Complexity: Quick task (hours)
-Additional: The issue only affects the production environment, not local dev
-```
-
-**linear-context.md frontmatter** (modified):
+**Frontmatter contract (critical for autopilot parsing):**
 ```yaml
----
-issue_ids: [LIN-123]
-route: quick
-interview_summary: "Goal: Fix login redirect loop. Scope: auth module. Criteria: All OAuth providers redirect correctly."
-fetched: 2026-03-22T10:30:00Z
----
+status: passed | gaps_found    # autopilot reads this field
+milestone: v3.1
+browser: chrome-mcp | playwright
+started: 2026-03-22T10:30:00Z
+completed: 2026-03-22T10:35:00Z
+total: 12
+passed: 11
+failed: 1
 ```
 
-**MILESTONE-CONTEXT.md** (enriched for milestone route):
-```markdown
-# Milestone Context
-...existing content...
-
-## Selected Approach
-**Approach 2: Event-Driven Refactor**
-Restructure the notification pipeline to use an event bus pattern,
-decoupling producers from consumers and enabling per-channel configuration.
+**Gaps section format** -- must match what `plan-milestone-gaps` can consume:
+```yaml
+- truth: "Description of expected behavior"
+  status: failed
+  reason: "What automated UAT observed"
+  severity: major | minor
+  evidence: "uat-evidence/v3.1/04-test-2.png"
 ```
 
-## Anti-Patterns
+## Modified Components Detail
 
-### Anti-Pattern 1: Extracting Interview into a Separate Agent
+### 5. `autopilot.mjs` Main Flow -- 3 Insertion Points
 
-**What people do:** Create a `gsd-interviewer` agent spawned via Task() that handles the question-asking.
-**Why it's wrong:** AskUserQuestion cannot be called from within a Task() subagent -- it must be called from the top-level workflow. The interview is a direct user conversation, not analysis work. Spawning an agent would fail at runtime.
-**Do this instead:** Keep interview logic inline in the workflow step.
+All three sites follow the same pattern: after audit passes (exit 0), run UAT before completion.
 
-### Anti-Pattern 2: Keeping the Scoring Heuristic as Fallback
+**Insertion point 1: Lines ~1088-1100 (all phases already complete on startup)**
+```javascript
+// BEFORE:
+if (auditResult === 0) {
+  await runMilestoneCompletion();
+  process.exit(0);
+}
 
-**What people do:** Retain the $MILESTONE_SCORE calculation as a fallback when interview is inconclusive.
-**Why it's wrong:** Two routing mechanisms create ambiguity and maintenance burden. The scoring heuristic was the problem being solved.
-**Do this instead:** Remove the scoring table completely. If the interview is inconclusive, ask a follow-up question.
+// AFTER:
+if (auditResult === 0) {
+  const uatResult = await runAutomatedUAT();
+  if (uatResult === 10) {
+    await runGapClosureLoop();
+    // After gap closure, need full re-validation: re-audit + re-UAT
+    // This creates a nested loop -- extract to helper function
+  } else if (uatResult !== 0) {
+    console.error('ERROR: Automated UAT encountered an error');
+    process.exit(1);
+  }
+  await runMilestoneCompletion();
+  process.exit(0);
+}
+```
 
-### Anti-Pattern 3: Storing Interview State in a Separate File
+**Insertion point 2: Lines ~1165-1176 (phases complete during main loop)**
+Same pattern as insertion point 1.
 
-**What people do:** Write `.planning/interview-context.md` as a temporary file consumed later.
-**Why it's wrong:** The interview data is consumed immediately within the same workflow execution. Writing to disk adds file lifecycle management for data that never leaves the workflow's scope.
-**Do this instead:** Keep `$INTERVIEW_CONTEXT` as an in-memory variable. Persist only the summary into linear-context.md's frontmatter.
+**Insertion point 3: Lines ~1004-1016 (after gap closure re-audit passes)**
+After gap closure loop re-audit passes, UAT must also run before declaring closure complete. This is inside `runGapClosureLoop()`.
 
-### Anti-Pattern 4: Making All Questions Mandatory
+**Refactoring recommendation:** Extract an `auditAndUAT()` helper that runs audit, then UAT (if audit passes), and returns the combined result. This eliminates the 3x duplication:
 
-**What people do:** Always ask all 5 questions regardless of ticket clarity.
-**Why it's wrong:** Well-written tickets already contain goal, scope, and criteria. Forcing users to re-state what is written creates friction.
-**Do this instead:** Pre-scan the ticket and skip questions whose answers are already clear.
+```javascript
+async function auditAndUAT() {
+  const auditResult = await runMilestoneAudit();
+  if (auditResult !== 0) return auditResult; // gaps or error
 
-## Integration Points
+  const uatResult = await runAutomatedUAT();
+  return uatResult; // 0=pass, 10=gaps, 1=error
+}
+```
 
-### Internal Boundaries
+### 6. `plan-milestone-gaps.md` Workflow Modification
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Step 2 -> Step 3 | $ISSUES data feeds pre-scan | Pre-scan reads title, description, labels, comments from already-fetched data |
-| Step 3 -> Step 4 | $INTERVIEW_CONTEXT string | Complexity signal answer is primary routing input |
-| Step 3 -> Step 5 | $INTERVIEW_CONTEXT string | Goal, scope, criteria feed confirmation/proposals |
-| Step 5 -> Step 5.5 | Confirmed understanding or selected approach | Comment body built from confirmed interview answers |
-| Step 5 -> Step 6 | interview_summary field | Persisted to linear-context.md frontmatter |
-| Step 3 -> Step 7 (quick) | $INTERVIEW_CONTEXT enriches $DESCRIPTION | Replaces truncated ticket text with structured interview output |
-| Step 5 -> Step 7 (milestone) | Selected approach name + description | Added to MILESTONE-CONTEXT.md as new section |
+Must recognize `MILESTONE-UAT.md` as a gap source alongside `v*-MILESTONE-AUDIT.md`. The gaps YAML format is intentionally identical so the existing gap-to-phase-plan mapping works without changes.
 
-### External Boundaries
+**Change:** In the gap discovery step, scan for both files:
+- `.planning/v*-MILESTONE-AUDIT.md` (existing)
+- `.planning/MILESTONE-UAT.md` (new)
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Workflow -> User | AskUserQuestion (3-5 times in interview + 1 in hybrid output) | More user interaction than current workflow (which has 0-1 questions) |
-| Workflow -> Linear MCP | create_comment (Step 5.5, NEW) | Second comment-back call; first is pre-execution, existing is post-execution |
+Merge gaps from both sources before creating fix phases.
 
-### No Interaction Points
+## Patterns to Follow
 
-| Component | Why No Integration |
-|-----------|-------------------|
-| gsd-tools.cjs | No new CLI commands needed; interview is pure workflow logic |
-| init.cjs | No new init functions; routing infrastructure unchanged |
-| autopilot.mjs | Linear workflow is interactive (AskUserQuestion); not part of autonomous pipeline |
-| testing.cjs | No test-related changes |
-| brainstorm.md | Approach proposals pattern is replicated, not imported |
+### Pattern 1: Gate-on-Config for Optional Features
+
+**What:** Check for a config file to decide whether to run a feature. If missing, skip silently with exit 0.
+**When:** The feature is not applicable to all projects.
+**Example:** `runAutomatedUAT()` returns 0 immediately if no `uat-config.yaml` exists.
+
+### Pattern 2: Frontmatter-Based Result Communication
+
+**What:** The spawned workflow writes results to a markdown file with YAML frontmatter. The caller reads the frontmatter to determine outcome.
+**When:** Cross-process result passing (autopilot -> Claude session -> back to autopilot).
+**Why:** Exactly how `runMilestoneAudit()` works -- reads `status` from MILESTONE-AUDIT.md frontmatter via `gsd-tools frontmatter get`.
+
+### Pattern 3: Exit Code Contract (0/10/1)
+
+**What:** Functions return 0 for pass, 10 for gaps found, 1 for error.
+**When:** Any milestone-level check that might produce actionable gaps.
+**Why:** The gap closure loop checks for exit 10 specifically (line 1009).
+
+### Pattern 4: Browser Detection with Graceful Fallback
+
+**What:** Try Chrome MCP first, fall back to Playwright if unavailable.
+**When:** UAT execution needs a browser.
+**Detection:** `tabs_context_mcp` call. Success = Chrome MCP mode. Failure/timeout (5s) = Playwright mode.
+
+### Pattern 5: CJS Module for Data Operations
+
+**What:** All file I/O, YAML parsing, and state reading lives in a `.cjs` module, not in the workflow or autopilot.
+**When:** Any operation that needs to be testable or reusable.
+**Why:** Follows phase.cjs, verify.cjs, testing.cjs pattern. Enables unit testing without Claude.
+
+**Note on uat.cjs:** The design doc does not call for a `uat.cjs` module -- it has the autopilot doing config existence checks directly (simple `fs.existsSync`) and the workflow doing all test logic. A `uat.cjs` module makes sense if there is significant parsing logic that needs testing (e.g., config validation, test discovery). However, keeping it simple (no module, logic in workflow + inline in autopilot) also works and follows the brainstorm.md precedent where workflow files contain the logic directly. **Decision: start without uat.cjs, extract only if testing demands it.**
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Persistent Playwright Spec Files for UAT
+
+**What:** Generating and committing `.spec.ts` files for UAT tests.
+**Why bad:** UAT tests are ephemeral judgment calls, not regression tests. The agent writes inline scripts, runs them, discards them.
+**Instead:** MILESTONE-UAT.md results + screenshots are the permanent artifacts.
+
+### Anti-Pattern 2: Separate Agent for UAT Orchestration
+
+**What:** Creating a new agent (like gsd-playwright) to orchestrate the UAT session.
+**Why bad:** The workflow file IS the orchestrator. Adding an agent creates unnecessary indirection.
+**Instead:** Single workflow file (`uat-auto.md`) that the autopilot spawns via `claude -p`.
+
+### Anti-Pattern 3: Modifying Existing Per-Phase UAT.md Files
+
+**What:** Writing automated test results back into the per-phase `*-UAT.md` files.
+**Why bad:** Those are human-owned verify-work artifacts.
+**Instead:** Read from `*-UAT.md` (test discovery), write to `MILESTONE-UAT.md` (results).
+
+### Anti-Pattern 4: Running UAT Before Milestone Audit
+
+**What:** Placing UAT earlier in the flow.
+**Why bad:** UAT is expensive (browser sessions, screenshots). Audit catches structural issues cheaply first.
+**Instead:** Audit first (cheap), then UAT (expensive), then completion.
+
+### Anti-Pattern 5: Adding a YAML Parser to autopilot.mjs
+
+**What:** Importing js-yaml in autopilot.mjs to read uat-config.yaml directly.
+**Why bad:** autopilot.mjs uses `gsd-tools frontmatter get` for all YAML/frontmatter needs.
+**Instead:** Gate on file existence only (`fs.existsSync`). Let the workflow read and parse the full config.
+
+### Anti-Pattern 6: Complex Dev Server Process Management
+
+**What:** Using tree-kill, process groups, or PID file management for the startup_command.
+**Why bad:** Over-engineering for what is optional convenience.
+**Instead:** The workflow starts the server if needed, does its testing, and the process exits when the Claude session ends. The dev server can be left running -- the user manages it.
+
+## Integration Points Summary
+
+| Integration Point | Existing Component | New Component | Connection Type |
+|---|---|---|---|
+| Autopilot main flow (3 sites) | autopilot.mjs audit-to-completion | `runAutomatedUAT()` | Function call, exit code contract (0/10/1) |
+| Gap closure input | plan-milestone-gaps.md | MILESTONE-UAT.md | File read -- gaps YAML section |
+| Test discovery | verify-work `*-UAT.md` files | uat-auto.md workflow | File read -- test definitions |
+| Browser interaction | Chrome MCP tools (external) | uat-auto.md workflow | MCP tool calls |
+| Browser fallback | Playwright (testing.cjs detection) | uat-auto.md workflow | Bash execution |
+| Config gate | autopilot.mjs (fs.existsSync) | uat-config.yaml | File existence check |
+| Results parsing | gsd-tools frontmatter get | MILESTONE-UAT.md | CLI tool invocation |
+| Evidence storage | .planning/ directory | uat-evidence/ subdirectory | File system, git commit |
+| Milestone archival | complete-milestone.md workflow | uat-evidence/ + MILESTONE-UAT.md | Cleanup during archival |
+
+## Build Order (dependency-driven)
+
+```
+Phase 1: Foundation (no dependencies)
+  -> uat-config.yaml schema definition
+  -> MILESTONE-UAT.md format specification
+  -> Evidence directory structure (.planning/uat-evidence/)
+
+Phase 2: Workflow (depends on Phase 1 formats)
+  -> uat-auto.md workflow file
+  -> Chrome MCP execution logic (navigate, interact, screenshot, judge)
+  -> Playwright fallback logic (inline scripts via Bash)
+  -> Test discovery from *-UAT.md files
+
+Phase 3: Autopilot Integration (depends on Phase 2 producing a callable workflow)
+  -> runAutomatedUAT() function in autopilot.mjs
+  -> 3 insertion points in main flow (or auditAndUAT() helper)
+  -> Exit code routing (0/10/1)
+
+Phase 4: Gap Closure Integration (depends on Phase 3)
+  -> plan-milestone-gaps.md modification to read MILESTONE-UAT.md
+  -> Re-UAT after gap closure loop
+
+Phase 5: Evidence + Reporting + Documentation
+  -> Screenshot storage and git commit
+  -> Milestone archival cleanup for uat-evidence/
+  -> help.md, USER-GUIDE.md updates
+  -> Tests (autopilot source-text tests for new function, workflow integration)
+```
+
+**Rationale:** Each phase produces an artifact the next phase consumes. The workflow must exist before autopilot can call it. The autopilot integration must exist before gap closure can re-trigger UAT. Evidence management can be polished last since it does not block the core flow.
+
+## Scalability Considerations
+
+| Concern | At ~10 tests | At 20+ tests | At 50+ tests |
+|---------|-------------|--------------|-------------|
+| Execution time | Under 5 min | 10-15 min, may hit default timeout | Increase timeout_minutes, consider test batching |
+| Screenshot storage | <1MB per milestone | ~5MB per milestone | Consider cleanup or .gitignore for old milestones |
+| Context window | Fits easily in 200k | Still fits | May need test batching if descriptions are long |
+| Browser stability | Chrome MCP stable | Stable with single-tab design | Single-tab prevents accumulation |
 
 ## Sources
 
-- Design doc: `.planning/designs/2026-03-22-refactor-linear-ticket-flow-interview-design.md` (HIGH confidence)
-- Existing workflow: `get-shit-done/workflows/linear.md` (HIGH confidence)
-- Command spec: `commands/gsd/linear.md` (HIGH confidence)
-- PROJECT.md v3.0 requirements (HIGH confidence)
-- brainstorm.md approach proposals pattern (HIGH confidence)
-
----
-*Architecture research for: /gsd:linear interview phase integration*
-*Researched: 2026-03-22*
+- `get-shit-done/scripts/autopilot.mjs` -- milestone audit (line 862), gap closure (line 924), completion (line 1019), main loop (line 1120), 3 insertion points (lines 1088, 1165, 1004)
+- `.planning/designs/2026-03-22-automated-uat-session-design.md` -- full design specification
+- `get-shit-done/bin/lib/testing.cjs` -- Playwright detection (`detectPlaywright`), test output parsing
+- `agents/gsd-playwright.md` -- existing Playwright agent patterns
+- `get-shit-done/workflows/verify-work.md` -- UAT.md file format and ownership
+- `get-shit-done/workflows/audit-milestone.md` -- milestone audit patterns
+- `get-shit-done/workflows/plan-milestone-gaps.md` -- gap consumption patterns
+- `get-shit-done/bin/lib/config.cjs` -- CONFIG_DEFAULTS pattern
