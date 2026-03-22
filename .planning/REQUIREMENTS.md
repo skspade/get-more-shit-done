@@ -57,9 +57,9 @@ Requirements for v3.1 Automated UAT Session. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: help.md updated with `/gsd:uat-auto` command reference
-- [ ] **DOCS-02**: USER-GUIDE.md updated with automated UAT usage guide
-- [ ] **DOCS-03**: README.md command table updated with uat-auto entry
+- [x] **DOCS-01**: help.md updated with `/gsd:uat-auto` command reference *(Phase 95)*
+- [x] **DOCS-02**: USER-GUIDE.md updated with automated UAT usage guide *(Phase 95)*
+- [x] **DOCS-03**: README.md command table updated with uat-auto entry *(Phase 95)*
 
 ## v2 Requirements
 
@@ -119,9 +119,9 @@ Deferred to future release.
 | AUTO-03 | Phase 94 | Pending |
 | AUTO-04 | Phase 94 | Pending |
 | AUTO-05 | Phase 94 | Pending |
-| DOCS-01 | Phase 95 | Pending |
-| DOCS-02 | Phase 95 | Pending |
-| DOCS-03 | Phase 95 | Pending |
+| DOCS-01 | Phase 95 | Complete |
+| DOCS-02 | Phase 95 | Complete |
+| DOCS-03 | Phase 95 | Complete |
 
 **Coverage:**
 - v1 requirements: 30 total
