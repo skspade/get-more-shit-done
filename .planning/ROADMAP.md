@@ -245,7 +245,9 @@
   3. All 20 unchecked requirement checkboxes in REQUIREMENTS.md are checked (verified satisfied by audit)
   4. SUMMARY.md files for phases 91-94 include `requirements-completed` frontmatter
   5. REQUIREMENTS.md tool names updated from stale `chrome_navigate` to `mcp__claude-in-chrome__navigate` format
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 96-01-PLAN.md — Fix allowed-tools, gitignore, REQUIREMENTS.md checkboxes/tool names, SUMMARY frontmatter
 
 ### Phase 97: Test Suite Consolidation
 **Goal**: Bring test suite under budget (800) by retiring subsumed tests, pruning duplicates, and parameterizing verbose routing tests
