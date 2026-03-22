@@ -28,10 +28,10 @@ Requirements for v3.1 Automated UAT Session. Each maps to roadmap phases.
 
 ### Playwright Fallback
 
-- [ ] **PWRT-01**: When Chrome MCP is unavailable, agent falls back to Playwright with headless Chromium
-- [ ] **PWRT-02**: Agent generates ephemeral inline Playwright scripts per test (no persistent .spec.ts files)
-- [ ] **PWRT-03**: Playwright fallback checks Chromium binary availability and installs if missing (`npx playwright install chromium`)
-- [ ] **PWRT-04**: Output format (screenshots, results) identical between Chrome MCP and Playwright modes
+- [x] **PWRT-01**: When Chrome MCP is unavailable, agent falls back to Playwright with headless Chromium *(Phase 93)*
+- [x] **PWRT-02**: Agent generates ephemeral inline Playwright scripts per test (no persistent .spec.ts files) *(Phase 93)*
+- [x] **PWRT-03**: Playwright fallback checks Chromium binary availability and installs if missing (`npx playwright install chromium`) *(Phase 93)*
+- [x] **PWRT-04**: Output format (screenshots, results) identical between Chrome MCP and Playwright modes *(Phase 93)*
 
 ### Evidence & Reporting
 
@@ -102,10 +102,10 @@ Deferred to future release.
 | CMCP-03 | Phase 92 | Pending |
 | CMCP-04 | Phase 92 | Pending |
 | CMCP-05 | Phase 92 | Pending |
-| PWRT-01 | Phase 93 | Pending |
-| PWRT-02 | Phase 93 | Pending |
-| PWRT-03 | Phase 93 | Pending |
-| PWRT-04 | Phase 93 | Pending |
+| PWRT-01 | Phase 93 | Complete |
+| PWRT-02 | Phase 93 | Complete |
+| PWRT-03 | Phase 93 | Complete |
+| PWRT-04 | Phase 93 | Complete |
 | EVID-01 | Phase 94 | Pending |
 | EVID-02 | Phase 94 | Pending |
 | EVID-03 | Phase 94 | Pending |
