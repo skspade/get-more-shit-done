@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 
 // ─── Path Resolution ──────────────────────────────────────────────────────────
 
@@ -62,13 +63,6 @@ try {
   await which('claude');
 } catch {
   console.error('Error: claude CLI not found on PATH. Install Claude Code first.');
-  process.exit(1);
-}
-
-try {
-  await which('node');
-} catch {
-  console.error('Error: node not found on PATH. Node.js 18+ required.');
   process.exit(1);
 }
 
@@ -134,6 +128,7 @@ let noProgressCount = 0;
 let iterationLog = [];
 let totalIterations = 0;
 const tempFiles = [];
+let activeAbortController = null;
 
 // ─── Signal Handling ──────────────────────────────────────────────────────────
 
@@ -144,6 +139,7 @@ function cleanupTemp() {
 }
 
 process.on('SIGINT', () => {
+  activeAbortController?.abort();
   cleanupTemp();
   console.log('');
   console.log('');
@@ -156,6 +152,7 @@ process.on('SIGINT', () => {
 });
 
 process.on('SIGTERM', () => {
+  activeAbortController?.abort();
   cleanupTemp();
   console.log('');
   console.log('');
@@ -208,7 +205,137 @@ function getConfig(key, defaultVal) {
 const CIRCUIT_BREAKER_THRESHOLD = getConfig('autopilot.circuit_breaker_threshold', 3);
 const MAX_DEBUG_RETRIES = getConfig('autopilot.max_debug_retries', 3);
 
-// ─── Streaming Functions ─────────────────────────────────────────────────────
+// ─── SDK Functions ───────────────────────────────────────────────────────────
+
+function buildStepHooks() {
+  const stallTimeout = getConfig('autopilot.stall_timeout_ms', 300000);
+  let stallTimer = null;
+  let stallCount = 0;
+
+  function armStallTimer() {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(function onStall() {
+      stallCount++;
+      const mins = (stallTimeout * stallCount) / 60000;
+      process.stderr.write(`\u26a0 No tool activity for ${mins} minutes -- step may be stalled\n`);
+      logMsg(`STALL WARNING: no tool activity for ${mins} minutes`);
+      stallTimer = setTimeout(onStall, stallTimeout);
+      stallTimer.unref();
+    }, stallTimeout);
+    stallTimer.unref();
+  }
+
+  function clearStallTimer() {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = null;
+  }
+
+  const hooks = {
+    PostToolUse: [{ matcher: ".*", hooks: [async () => { armStallTimer(); return {}; }] }],
+    Stop: [{ matcher: ".*", hooks: [async () => { clearStallTimer(); return {}; }] }],
+  };
+
+  hooks._armStallTimer = armStallTimer;
+  hooks._clearStallTimer = clearStallTimer;
+
+  return hooks;
+}
+
+function handleMessage(message, { quiet, outputFile } = {}) {
+  if (outputFile) {
+    try {
+      fs.appendFileSync(outputFile, JSON.stringify(message) + '\n');
+    } catch {}
+  }
+
+  if (quiet || QUIET) return;
+
+  switch (message.type) {
+    case 'assistant': {
+      const content = message.message?.content || [];
+      for (const block of content) {
+        if (block.type === 'text') {
+          process.stdout.write(block.text);
+        } else if (block.type === 'tool_use') {
+          process.stderr.write(`  \u25c6 ${block.name}\n`);
+        }
+      }
+      break;
+    }
+    case 'system': {
+      if (message.subtype === 'init') {
+        logMsg(`SESSION: id=${message.session_id} model=${message.model}`);
+      }
+      break;
+    }
+    case 'result': {
+      if (message.subtype === 'success') {
+        logMsg(`RESULT: success cost=$${message.total_cost_usd?.toFixed(4)} turns=${message.num_turns}`);
+      } else {
+        logMsg(`RESULT: ${message.subtype} cost=$${message.total_cost_usd?.toFixed(4)}`);
+        if (message.subtype === 'error_max_turns') {
+          console.error('\u26a0 Step hit maxTurns limit');
+        } else if (message.subtype === 'error_max_budget_usd') {
+          console.error('\u26a0 Step hit budget limit');
+        } else if (message.subtype === 'error_during_execution') {
+          console.error('\u26a0 Execution error');
+        }
+      }
+      break;
+    }
+  }
+}
+
+async function runAgentStep(prompt, { outputFile, quiet, maxTurns, maxBudgetUsd, mcpServers } = {}) {
+  const controller = new AbortController();
+  activeAbortController = controller;
+  let resultMsg = null;
+  let lastAssistantText = '';
+  const hooks = buildStepHooks();
+
+  hooks._armStallTimer();
+
+  try {
+    for await (const message of query({
+      prompt,
+      options: {
+        cwd: PROJECT_DIR,
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        maxTurns: maxTurns || getConfig('autopilot.max_turns_per_step', 200),
+        maxBudgetUsd: maxBudgetUsd || undefined,
+        mcpServers: mcpServers || {},
+        disallowedTools: ["AskUserQuestion"],
+        systemPrompt: { type: "preset", preset: "claude_code" },
+        settingSources: ["project"],
+        hooks,
+        abortController: controller,
+      },
+    })) {
+      hooks._armStallTimer();
+      handleMessage(message, { quiet, outputFile });
+
+      if (message.type === 'assistant') {
+        const textBlocks = (message.message?.content || []).filter(b => b.type === 'text');
+        if (textBlocks.length > 0) {
+          lastAssistantText = textBlocks.map(b => b.text).join('');
+        }
+      }
+      if (message.type === 'result') {
+        resultMsg = message;
+      }
+    }
+  } finally {
+    hooks._clearStallTimer();
+    activeAbortController = null;
+  }
+
+  const exitCode = resultMsg?.subtype === 'success' ? 0 : 1;
+  const stdout = resultMsg?.subtype === 'success' ? (resultMsg?.result || '') : lastAssistantText;
+  return { exitCode, stdout, costUsd: resultMsg?.total_cost_usd };
+}
+
+// ─── Streaming Functions (legacy — used by debug retry, removed in Phase 99) ─
 
 function displayStreamEvent(event) {
   if (event.type === 'assistant') {
