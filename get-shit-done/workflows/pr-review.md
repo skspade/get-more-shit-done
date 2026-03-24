@@ -35,7 +35,45 @@ Store results:
 
 ---
 
-**Step 2: Capture review**
+**Step 2: Fetch and update base branch**
+
+Detect the base branch and update the local ref from origin so the review diffs against current remote state, not a stale local copy.
+
+**2a. Detect base branch:**
+
+```bash
+BASE_BRANCH=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
+```
+
+If `gh pr view` fails (no PR context, not on a PR branch, or gh not available), fall back:
+
+```bash
+BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+```
+
+If both fail, default: `BASE_BRANCH="main"`
+
+Store `$BASE_BRANCH` for use in this step.
+
+**2b. Fetch and update local ref:**
+
+```bash
+git fetch origin "$BASE_BRANCH"
+```
+
+Then update the local branch ref without checking it out:
+
+```bash
+git branch -f "$BASE_BRANCH" "origin/$BASE_BRANCH" 2>/dev/null || true
+```
+
+The `|| true` handles the case where we are currently on the base branch (git will refuse to force-update the checked-out branch, but in that case local is already up-to-date from the fetch).
+
+Display: `"Base branch: ${BASE_BRANCH} (updated from origin)"`
+
+---
+
+**Step 3: Capture review**
 
 **Fresh mode** (when `$INGEST_MODE` is false):
 
@@ -57,7 +95,7 @@ Store the user's response as `$RAW_REVIEW`.
 
 ---
 
-**Step 3: Parse findings**
+**Step 4: Parse findings**
 
 Parse `$RAW_REVIEW` into a structured findings array. Track the current severity section as you scan through the review output.
 
@@ -94,26 +132,26 @@ Exit the workflow cleanly. This is a success condition — the review ran but fo
 
 ---
 
-**Step 4: Deduplicate and group findings**
+**Step 5: Deduplicate and group findings**
 
 Group `$FINDINGS` by file proximity to reduce noise and cluster related issues.
 
-**4a. Sort findings:**
+**5a. Sort findings:**
 
 Sort `$FINDINGS` by `file` path (alphabetical), then by `line` number (ascending). Findings with null `file` or `line` go last.
 
-**4b. Group by proximity:**
+**5b. Group by proximity:**
 
 Iterate sorted findings. For each finding:
 - If it shares the same `file` as the previous finding AND the `line` difference is <= 20, add it to the current group.
 - Otherwise, start a new group.
 - Findings with null `file` or `line` each become their own single-finding group.
 
-**4c. Merge overlapping groups transitively:**
+**5c. Merge overlapping groups transitively:**
 
 After initial grouping, check if any adjacent groups share the same file and have overlapping or touching line ranges (group A's max line + 20 >= group B's min line). If so, merge them into one group. Repeat until no more merges occur.
 
-**4d. Assign group metadata:**
+**5d. Assign group metadata:**
 
 For each group, compute:
 - `id`: `"group-N"` (sequential from 1)
@@ -125,7 +163,7 @@ For each group, compute:
 
 Store result as `$GROUPS` array.
 
-**4e. Display dedup summary:**
+**5e. Display dedup summary:**
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -143,7 +181,7 @@ For single-line groups (where line_range start equals end), display as `{file}:{
 
 ---
 
-**Step 5: Write permanent review report**
+**Step 6: Write permanent review report**
 
 Create the reviews directory if it does not exist:
 
@@ -188,7 +226,7 @@ For groups with null file (general observations), use the group's description te
 
 ---
 
-**Step 6: Write temporary routing context**
+**Step 7: Write temporary routing context**
 
 Write `.planning/review-context.md`:
 
@@ -208,23 +246,23 @@ The `route` and `score` fields are empty placeholders — Phase 42 populates the
 
 ---
 
-**Step 7: Score and route**
+**Step 8: Score and route**
 
-**7a. Check flag overrides first:**
+**8a. Check flag overrides first:**
 
 **If `$FORCE_QUICK`:**
 - Set `$ROUTE = "quick"`
 - Set `$REVIEW_SCORE = "override"`
 - Display: "Route: QUICK (flag override)"
-- Skip scoring, proceed to Step 8.
+- Skip scoring, proceed to Step 9.
 
 **If `$FORCE_MILESTONE`:**
 - Set `$ROUTE = "milestone"`
 - Set `$REVIEW_SCORE = "override"`
 - Display: "Route: MILESTONE (flag override)"
-- Skip scoring, proceed to Step 8.
+- Skip scoring, proceed to Step 9.
 
-**7b. Compute score from `$GROUPS`:**
+**8b. Compute score from `$GROUPS`:**
 
 Start `$REVIEW_SCORE` at 0. Iterate all findings across all groups:
 - For each finding with severity "critical": +2
@@ -235,13 +273,13 @@ Then count distinct files across all groups (deduplicate `primary_file` values, 
 
 Minimum score is 0 (cannot go negative).
 
-**7c. Route decision:**
+**8c. Route decision:**
 - If `$REVIEW_SCORE >= 5`: set `$ROUTE = "milestone"`
 - If `$REVIEW_SCORE < 5`: set `$ROUTE = "quick"`
 
 Display: `Routing: {$ROUTE} (score: {$REVIEW_SCORE})`
 
-**7d. Update review-context.md:**
+**8d. Update review-context.md:**
 
 Read `.planning/review-context.md`. Update the YAML frontmatter:
 - Set `route:` to `$ROUTE` (replacing the empty placeholder)
@@ -251,18 +289,18 @@ Write the updated file back.
 
 ---
 
-**Step 8: Quick route**
+**Step 9: Quick route**
 
 If `$ROUTE == "quick"`:
 
-**8a. Synthesize description:**
+**9a. Synthesize description:**
 
 Build `$DESCRIPTION` from the grouped findings:
 - Title line: `"Fix PR review issues: {N} groups across {distinct_files_count} files"`
 - Body: For each file-region group, append: `"- {primary_file}:{line_range} ({max_severity}, {findings_count} findings)"`
 - Truncate total `$DESCRIPTION` to 2000 chars
 
-**8b. Initialize:**
+**9b. Initialize:**
 
 ```bash
 SLUG=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" generate-slug "$DESCRIPTION")
@@ -273,7 +311,7 @@ Parse INIT JSON for: `planner_model`, `executor_model`, `checker_model`, `verifi
 
 **If `roadmap_exists` is false:** Error — "Quick mode requires an active project with ROADMAP.md. Run `/gsd:new-project` first."
 
-**8c. Create task directory:**
+**9c. Create task directory:**
 
 ```bash
 mkdir -p "${quick_dir}"
@@ -288,7 +326,7 @@ Directory: ${QUICK_DIR}
 Source: pr-review
 ```
 
-**8d. Spawn planner (quick mode):**
+**9d. Spawn planner (quick mode):**
 
 The planner prompt includes review findings as context. Each file-region group maps to one plan task.
 
@@ -346,7 +384,7 @@ After planner returns:
 
 If plan not found, error: "Planner failed to create ${next_num}-PLAN.md"
 
-**8e. Plan-checker loop (only when `$FULL_MODE`):**
+**9e. Plan-checker loop (only when `$FULL_MODE`):**
 
 Skip if NOT `$FULL_MODE`.
 
@@ -399,10 +437,10 @@ Task(
 ```
 
 Handle checker return:
-- `## VERIFICATION PASSED`: Display confirmation, proceed to 8f.
+- `## VERIFICATION PASSED`: Display confirmation, proceed to 9f.
 - `## ISSUES FOUND`: Display issues, enter revision loop (max 2 iterations).
 
-**8f. Spawn executor:**
+**9f. Spawn executor:**
 
 ```
 Task(
@@ -437,7 +475,7 @@ After executor returns:
 
 If summary not found, error: "Executor failed to create ${next_num}-SUMMARY.md"
 
-**8g. Verification (only when `$FULL_MODE`):**
+**9g. Verification (only when `$FULL_MODE`):**
 
 Skip if NOT `$FULL_MODE`.
 
@@ -471,7 +509,7 @@ Handle verification status:
 - `human_needed`: Display items needing manual check, store `$VERIFICATION_STATUS = "Needs Review"`, continue
 - `gaps_found`: Display gap summary, offer: 1) Re-run executor, 2) Accept as-is. Store `$VERIFICATION_STATUS = "Gaps"`
 
-**8h. Update STATE.md:**
+**9h. Update STATE.md:**
 
 Read STATE.md. Check for `### Quick Tasks Completed` section.
 
@@ -496,7 +534,7 @@ Update "Last activity" line:
 Last activity: ${date} - Completed quick task ${next_num}: Fix PR review issues
 ```
 
-**8i. Final commit and completion:**
+**9i. Final commit and completion:**
 
 Build file list:
 - `${QUICK_DIR}/${next_num}-PLAN.md`
@@ -514,15 +552,15 @@ Get commit hash:
 commit_hash=$(git rev-parse --short HEAD)
 ```
 
-Store `$QUICK_DIR` and `$commit_hash` for Step 11 completion banner.
+Store `$QUICK_DIR` and `$commit_hash` for Step 12 completion banner.
 
 ---
 
-**Step 9: Milestone route**
+**Step 10: Milestone route**
 
 If `$ROUTE == "milestone"`:
 
-**9a. Build MILESTONE-CONTEXT.md:**
+**10a. Build MILESTONE-CONTEXT.md:**
 
 Write to `.planning/MILESTONE-CONTEXT.md`:
 
@@ -552,7 +590,7 @@ ${end}
 
 For groups with null `primary_file` (general observations), use header `### Fix: General observations (${max_severity})`.
 
-**9b. Initialize and delegate to new-milestone workflow:**
+**10b. Initialize and delegate to new-milestone workflow:**
 
 ```bash
 MINIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init new-milestone)
@@ -590,7 +628,7 @@ Display after delegation:
 
 ---
 
-**Step 10: Cleanup**
+**Step 11: Cleanup**
 
 This step runs after BOTH routes (shared exit path).
 
@@ -602,7 +640,7 @@ The permanent review report at `.planning/reviews/YYYY-MM-DD-pr-review.md` is ex
 
 ---
 
-**Step 11: Completion banner**
+**Step 12: Completion banner**
 
 Display unified completion banner:
 
