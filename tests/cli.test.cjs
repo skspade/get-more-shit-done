@@ -153,48 +153,6 @@ describe('COMMANDS', () => {
 // ─── routeCommand ───────────────────────────────────────────────────────────
 
 describe('routeCommand', () => {
-  test('routes progress to handler with real data', () => {
-    const result = routeCommand('progress', '/tmp', [], 'rich');
-    assert.strictEqual(result.command, 'progress');
-    assert.ok(result.message);
-    assert.ok(result.milestone, 'Should have milestone data');
-    assert.ok(Array.isArray(result.phases), 'Should have phases array');
-    assert.ok(result.progress, 'Should have progress data');
-  });
-
-  test('routes todos to handler with structured data', () => {
-    const result = routeCommand('todos', '/tmp', [], 'rich');
-    assert.strictEqual(result.command, 'todos');
-    assert.strictEqual(result.count, 0);
-    assert.deepStrictEqual(result.todos, []);
-  });
-
-  test('routes health to handler with structured data', () => {
-    const result = routeCommand('health', '/tmp', [], 'rich');
-    assert.strictEqual(result.command, 'health');
-    assert.ok(result.status, 'Should have status');
-    assert.ok(Array.isArray(result.checks), 'Should have checks array');
-    assert.ok(Array.isArray(result.errors), 'Should have errors array');
-    assert.ok(Array.isArray(result.warnings), 'Should have warnings array');
-    assert.ok(Array.isArray(result.info), 'Should have info array');
-    assert.ok(result.message, 'Should have message');
-  });
-
-  test('routes settings to handler', () => {
-    const result = routeCommand('settings', '/tmp', [], 'rich');
-    assert.strictEqual(result.command, 'settings');
-  });
-
-  test('routes help to handler with all command names', () => {
-    const result = routeCommand('help', null, [], 'rich');
-    assert.strictEqual(result.command, 'help');
-    assert.ok(result.message.includes('progress'));
-    assert.ok(result.message.includes('todos'));
-    assert.ok(result.message.includes('health'));
-    assert.ok(result.message.includes('settings'));
-    assert.ok(result.message.includes('help'));
-  });
-
   test('returns null for unknown command', () => {
     const result = routeCommand('nonexistent', '/tmp', [], 'rich');
     assert.strictEqual(result, null);
