@@ -309,7 +309,7 @@ Plans:
 **Gap Closure:** Closes unsatisfied requirement gaps from audit
 
 Plans:
-- [ ] 102-01: TBD
+- [ ] 102-01: Fix SUMMARY frontmatter and create VERIFICATION.md
 
 ### Phase 103: Test Suite Consolidation
 **Goal:** Bring test suite under 800-test budget by pruning stale tests and promoting subsumed unit tests
