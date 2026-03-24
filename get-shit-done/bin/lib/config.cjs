@@ -12,6 +12,16 @@ const CONFIG_DEFAULTS = {
   'autopilot.max_audit_fix_iterations': 3,
   'autopilot.auto_accept_tech_debt': true,
   'autopilot.stall_timeout_ms': 300000,
+  'autopilot.max_turns_per_step': 200,
+  'autopilot.max_budget_per_step_usd': null,
+  'autopilot.turns.discuss': 100,
+  'autopilot.turns.plan': 150,
+  'autopilot.turns.execute': 300,
+  'autopilot.turns.verify': 100,
+  'autopilot.turns.debug': 50,
+  'autopilot.turns.audit': 100,
+  'autopilot.turns.uat': 150,
+  'autopilot.turns.completion': 50,
 };
 
 function cmdConfigEnsureSection(cwd, raw) {

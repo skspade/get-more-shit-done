@@ -624,6 +624,22 @@ function validateSetting(key, value) {
     if (!Number.isInteger(value) || value <= 0) {
       return `'autopilot.stall_timeout_ms' must be a positive integer`;
     }
+  } else if (key === 'autopilot.max_turns_per_step') {
+    if (!Number.isInteger(value) || value <= 0) {
+      return `'autopilot.max_turns_per_step' must be a positive integer`;
+    }
+  } else if (key === 'autopilot.max_debug_retries' || key === 'autopilot.max_audit_fix_iterations') {
+    if (!Number.isInteger(value) || value <= 0) {
+      return `'${key}' must be a positive integer`;
+    }
+  } else if (key.startsWith('autopilot.turns.')) {
+    if (!Number.isInteger(value) || value <= 0) {
+      return `'${key}' must be a positive integer`;
+    }
+  } else if (key === 'autopilot.max_budget_per_step_usd') {
+    if (value !== null && (typeof value !== 'number' || value <= 0)) {
+      return `'autopilot.max_budget_per_step_usd' must be a positive number or null`;
+    }
   }
 
   return null;
@@ -660,6 +676,12 @@ const KNOWN_SETTINGS_KEYS = [
   'workflow.auto_advance', 'workflow.nyquist_validation',
   'parallelization', 'brave_search',
   'autopilot', 'autopilot.circuit_breaker_threshold', 'autopilot.stall_timeout_ms',
+  'autopilot.max_debug_retries', 'autopilot.max_audit_fix_iterations',
+  'autopilot.auto_accept_tech_debt', 'autopilot.max_turns_per_step',
+  'autopilot.max_budget_per_step_usd',
+  'autopilot.turns', 'autopilot.turns.discuss', 'autopilot.turns.plan',
+  'autopilot.turns.execute', 'autopilot.turns.verify', 'autopilot.turns.debug',
+  'autopilot.turns.audit', 'autopilot.turns.uat', 'autopilot.turns.completion',
   'mode', 'depth', 'model_overrides',
   'research', 'plan_checker', 'verifier', 'nyquist_validation',
   'test', 'test.hard_gate', 'test.acceptance_tests', 'test.budget',
