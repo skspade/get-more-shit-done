@@ -26,7 +26,7 @@ describe('module exports', () => {
 
   test('KNOWN_SETTINGS_KEYS is an array with expected length', () => {
     assert.ok(Array.isArray(KNOWN_SETTINGS_KEYS));
-    assert.strictEqual(KNOWN_SETTINGS_KEYS.length, 15);
+    assert.strictEqual(KNOWN_SETTINGS_KEYS.length, 16);
   });
 });
 

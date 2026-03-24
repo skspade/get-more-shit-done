@@ -22,6 +22,7 @@ const CONFIG_DEFAULTS = {
   'autopilot.turns.audit': 100,
   'autopilot.turns.uat': 150,
   'autopilot.turns.completion': 50,
+  'uat.chrome_mcp_enabled': true,
 };
 
 function cmdConfigEnsureSection(cwd, raw) {

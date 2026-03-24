@@ -129,6 +129,7 @@ let iterationLog = [];
 let totalIterations = 0;
 const tempFiles = [];
 let activeAbortController = null;
+let cumulativeCostUsd = 0;
 
 // ─── Signal Handling ──────────────────────────────────────────────────────────
 
@@ -214,6 +215,18 @@ function getMaxTurns(stepType) {
   return getConfig(`autopilot.turns.${stepType}`, TURNS_CONFIG[stepType] || 200);
 }
 
+const STEP_MCP_SERVERS = {
+  'automated-uat': () => {
+    if (!getConfig('uat.chrome_mcp_enabled', true)) return {};
+    return {
+      'chrome-devtools': {
+        command: 'npx',
+        args: ['@anthropic-ai/chrome-devtools-mcp@latest'],
+      },
+    };
+  },
+};
+
 // ─── SDK Functions ───────────────────────────────────────────────────────────
 
 function buildStepHooks() {
@@ -279,7 +292,8 @@ function handleMessage(message, { quiet, outputFile } = {}) {
     }
     case 'result': {
       if (message.subtype === 'success') {
-        logMsg(`RESULT: success cost=$${message.total_cost_usd?.toFixed(4)} turns=${message.num_turns}`);
+        const coldStart = (message.duration_ms || 0) - (message.duration_api_ms || 0);
+        logMsg(`RESULT: success cost=$${message.total_cost_usd?.toFixed(4)} turns=${message.num_turns} duration=${message.duration_ms}ms cold_start=${coldStart}ms`);
       } else {
         logMsg(`RESULT: ${message.subtype} cost=$${message.total_cost_usd?.toFixed(4)}`);
         if (message.subtype === 'error_max_turns') {
@@ -342,7 +356,19 @@ async function runAgentStep(prompt, { outputFile, quiet, maxTurns, maxBudgetUsd,
   const subtype = resultMsg?.subtype || 'unknown';
   const exitCode = subtype === 'success' ? 0 : 1;
   const stdout = subtype === 'success' ? (resultMsg?.result || '') : lastAssistantText;
-  return { exitCode, stdout, costUsd: resultMsg?.total_cost_usd, subtype };
+
+  if (resultMsg?.total_cost_usd) {
+    cumulativeCostUsd += resultMsg.total_cost_usd;
+  }
+
+  return {
+    exitCode,
+    stdout,
+    costUsd: resultMsg?.total_cost_usd,
+    subtype,
+    durationMs: resultMsg?.duration_ms,
+    numTurns: resultMsg?.num_turns,
+  };
 }
 
 // ─── Progress Tracking (Circuit Breaker) ──────────────────────────────────────
@@ -430,9 +456,12 @@ async function runStep(prompt, stepName, stepType) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runAgentStep(prompt, { maxTurns: getMaxTurns(stepType || stepName) });
+  const { exitCode, costUsd, numTurns, durationMs } = await runAgentStep(prompt, {
+    maxTurns: getMaxTurns(stepType || stepName),
+    mcpServers: STEP_MCP_SERVERS[stepName]?.() || {},
+  });
 
-  logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
+  logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode} cost=$${costUsd?.toFixed(4) || '0.0000'} turns=${numTurns || 0} duration=${durationMs || 0}ms`);
 
   const snapshotAfter = await takeProgressSnapshot();
   checkProgress(snapshotBefore, snapshotAfter, stepName);
@@ -618,9 +647,13 @@ async function runStepCaptured(prompt, stepName, outputFile, stepType) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const result = await runAgentStep(prompt, { outputFile, maxTurns: getMaxTurns(stepType || stepName) });
+  const result = await runAgentStep(prompt, {
+    outputFile,
+    maxTurns: getMaxTurns(stepType || stepName),
+    mcpServers: STEP_MCP_SERVERS[stepName]?.() || {},
+  });
 
-  logMsg(`STEP DONE: step=${stepName} exit_code=${result.exitCode}`);
+  logMsg(`STEP DONE: step=${stepName} exit_code=${result.exitCode} cost=$${result.costUsd?.toFixed(4) || '0.0000'} turns=${result.numTurns || 0} duration=${result.durationMs || 0}ms`);
 
   const snapshotAfter = await takeProgressSnapshot();
   checkProgress(snapshotBefore, snapshotAfter, stepName);
@@ -1199,7 +1232,7 @@ Do not wait for human input at any step.`;
 }
 
 function printFinalReport() {
-  logMsg(`COMPLETE: all phases done, total_iterations=${totalIterations}`);
+  logMsg(`COMPLETE: all phases done, total_iterations=${totalIterations} cumulative_cost=$${cumulativeCostUsd.toFixed(4)}`);
 
   console.log('');
   console.log('\u2501'.repeat(53));
@@ -1208,6 +1241,7 @@ function printFinalReport() {
   console.log('');
   console.log('All phases complete.');
   console.log(`Total iterations: ${totalIterations}`);
+  console.log(`Cumulative cost: $${cumulativeCostUsd.toFixed(4)}`);
   console.log('');
 }
 

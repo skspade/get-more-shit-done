@@ -602,7 +602,8 @@ function validateSetting(key, value) {
   const validProfiles = ['quality', 'balanced', 'budget'];
   const validStrategies = ['none', 'phase', 'milestone'];
   const booleanKeys = ['commit_docs', 'search_gitignored', 'parallelization',
-    'workflow.research', 'workflow.plan_check', 'workflow.verifier', 'workflow.auto_advance'];
+    'workflow.research', 'workflow.plan_check', 'workflow.verifier', 'workflow.auto_advance',
+    'uat.chrome_mcp_enabled'];
 
   if (key === 'model_profile') {
     if (!validProfiles.includes(value)) {
@@ -687,6 +688,7 @@ const KNOWN_SETTINGS_KEYS = [
   'test', 'test.hard_gate', 'test.acceptance_tests', 'test.budget',
   'test.budget.per_phase', 'test.budget.project', 'test.steward',
   'test.command', 'test.framework',
+  'uat', 'uat.chrome_mcp_enabled',
 ];
 
 function handleSettings(projectRoot, args) {

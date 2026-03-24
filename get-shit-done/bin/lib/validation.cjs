@@ -13,7 +13,7 @@ const { CONFIG_DEFAULTS } = require('./config.cjs');
 
 const KNOWN_SETTINGS_KEYS = ['model_profile', 'commit_docs', 'search_gitignored', 'branching_strategy',
   'workflow', 'parallelization', 'autopilot', 'mode', 'depth', 'model_overrides',
-  'research', 'plan_checker', 'verifier', 'nyquist_validation', 'test'];
+  'research', 'plan_checker', 'verifier', 'nyquist_validation', 'test', 'uat'];
 
 const VALID_PROFILES = ['quality', 'balanced', 'budget'];
 
