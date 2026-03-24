@@ -238,7 +238,7 @@
 ### v3.2 Autopilot Agent SDK Migration (In Progress)
 
 - [x] **Phase 98: Core SDK Integration** - Install SDK, implement runAgentStep/handleMessage/buildStepHooks, wire primary call sites (completed 2026-03-24)
-- [ ] **Phase 99: Safety Infrastructure and Caller Updates** - Turn limits, budget caps, debug retry migration, old code deletion
+- [x] **Phase 99: Safety Infrastructure and Caller Updates** - Turn limits, budget caps, debug retry migration, old code deletion (completed 2026-03-24)
 - [ ] **Phase 100: MCP Configuration and Observability** - Per-step MCP servers, cost/turn logging, cumulative cost reporting
 
 ## Phase Details
@@ -317,5 +317,5 @@ Phases execute in numeric order: 98 → 99 → 100
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
 | 91-97 | v3.1 | 9/9 | Complete | 2026-03-22 |
 | 98. Core SDK Integration | 2/2 | Complete    | 2026-03-24 | - |
-| 99. Safety Infrastructure and Caller Updates | v3.2 | 0/0 | Not started | - |
+| 99. Safety Infrastructure and Caller Updates | 2/2 | Complete    | 2026-03-24 | - |
 | 100. MCP Configuration and Observability | v3.2 | 0/0 | Not started | - |
