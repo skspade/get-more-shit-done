@@ -239,7 +239,7 @@
 
 - [x] **Phase 98: Core SDK Integration** - Install SDK, implement runAgentStep/handleMessage/buildStepHooks, wire primary call sites (completed 2026-03-24)
 - [x] **Phase 99: Safety Infrastructure and Caller Updates** - Turn limits, budget caps, debug retry migration, old code deletion (completed 2026-03-24)
-- [ ] **Phase 100: MCP Configuration and Observability** - Per-step MCP servers, cost/turn logging, cumulative cost reporting
+- [x] **Phase 100: MCP Configuration and Observability** - Per-step MCP servers, cost/turn logging, cumulative cost reporting (completed 2026-03-24)
 
 ## Phase Details
 
@@ -287,8 +287,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 100-01: TBD
-- [ ] 100-02: TBD
+- [x] 100-01: MCP Configuration and Config Registration
+- [x] 100-02: Observability Enhancements
 
 ## Progress
 
@@ -318,4 +318,4 @@ Phases execute in numeric order: 98 → 99 → 100
 | 91-97 | v3.1 | 9/9 | Complete | 2026-03-22 |
 | 98. Core SDK Integration | 2/2 | Complete    | 2026-03-24 | - |
 | 99. Safety Infrastructure and Caller Updates | 2/2 | Complete    | 2026-03-24 | - |
-| 100. MCP Configuration and Observability | v3.2 | 0/0 | Not started | - |
+| 100. MCP Configuration and Observability | v3.2 | 2/2 | Complete | 2026-03-24 |
