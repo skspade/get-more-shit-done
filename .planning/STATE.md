@@ -5,7 +5,7 @@ milestone_name: Autopilot Agent SDK Migration
 status: unknown
 last_updated: "2026-03-24T20:32:46.676Z"
 progress:
-  total_phases: 1
+  total_phases: 3
   completed_phases: 1
   total_plans: 2
   completed_plans: 2
