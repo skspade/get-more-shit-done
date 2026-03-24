@@ -481,7 +481,7 @@ async function runStep(prompt, stepName) {
   if (DRY_RUN) {
     logMsg(`STEP DRY-RUN: ${stepName}`);
     console.log('[DRY RUN] Would execute:');
-    console.log(`  claude -p --dangerously-skip-permissions --output-format json "${prompt}"`);
+    console.log(`  runAgentStep("${prompt.slice(0, 80)}...")`);
     console.log('');
     checkProgress(snapshotBefore, snapshotBefore, `${stepName} (dry-run)`);
     return 0;
@@ -489,7 +489,7 @@ async function runStep(prompt, stepName) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runClaudeStreaming(prompt);
+  const { exitCode } = await runAgentStep(prompt);
 
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
 
@@ -667,7 +667,7 @@ async function runStepCaptured(prompt, stepName, outputFile) {
 
   if (DRY_RUN) {
     logMsg(`STEP DRY-RUN: ${stepName}`);
-    const msg = `[DRY RUN] Would execute: claude -p --dangerously-skip-permissions --output-format json "${prompt}"`;
+    const msg = `[DRY RUN] Would execute: runAgentStep("${prompt.slice(0, 80)}...")`;
     console.log(msg);
     console.log('');
     fs.appendFileSync(outputFile, msg + '\n');
@@ -677,7 +677,7 @@ async function runStepCaptured(prompt, stepName, outputFile) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runClaudeStreaming(prompt, { outputFile });
+  const { exitCode } = await runAgentStep(prompt, { outputFile });
 
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
 
