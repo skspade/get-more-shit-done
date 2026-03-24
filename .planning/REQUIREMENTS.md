@@ -9,26 +9,26 @@ Requirements for Autopilot Agent SDK Migration. Each maps to roadmap phases.
 
 ### SDK Integration
 
-- [ ] **SDK-01**: Install `@anthropic-ai/claude-agent-sdk` and `zod` (peer dep), bump `engines.node` to `>=18.0.0`
-- [ ] **SDK-02**: Import `query` from SDK in autopilot.mjs; remove `which('node')` prerequisite check
-- [ ] **SDK-03**: Implement `runAgentStep()` wrapping SDK `query()` with `permissionMode: "bypassPermissions"`, `allowDangerouslySkipPermissions: true`, `systemPrompt` preset, `settingSources: ["project"]`, `disallowedTools: ["AskUserQuestion"]`
+- [x] **SDK-01**: Install `@anthropic-ai/claude-agent-sdk` and `zod` (peer dep), bump `engines.node` to `>=18.0.0`
+- [x] **SDK-02**: Import `query` from SDK in autopilot.mjs; remove `which('node')` prerequisite check
+- [x] **SDK-03**: Implement `runAgentStep()` wrapping SDK `query()` with `permissionMode: "bypassPermissions"`, `allowDangerouslySkipPermissions: true`, `systemPrompt` preset, `settingSources: ["project"]`, `disallowedTools: ["AskUserQuestion"]`
 
 ### Message Handling
 
-- [ ] **MSG-01**: Implement `handleMessage()` with typed switch on `message.type` (assistant, system, result) replacing `displayStreamEvent()` NDJSON parsing
-- [ ] **MSG-02**: Accumulate `lastAssistantText` from assistant messages for error context when result subtype is not `success`
+- [x] **MSG-01**: Implement `handleMessage()` with typed switch on `message.type` (assistant, system, result) replacing `displayStreamEvent()` NDJSON parsing
+- [x] **MSG-02**: Accumulate `lastAssistantText` from assistant messages for error context when result subtype is not `success`
 - [ ] **MSG-03**: Log session ID, cost (`total_cost_usd`), turns (`num_turns`), and duration (`duration_ms`) from result messages
 
 ### Safety Mechanisms
 
 - [ ] **SAFE-01**: Implement per-step-type `maxTurns` limits via `TURNS_CONFIG` (discuss:100, plan:150, execute:300, verify:100, debug:50, audit:100, uat:150, completion:50), configurable via config.json
 - [ ] **SAFE-02**: Implement optional `maxBudgetUsd` per-step cost cap via config key `autopilot.max_budget_per_step_usd`
-- [ ] **SAFE-03**: Implement `buildStepHooks()` with `PostToolUse` stall detection replacing custom `armStallTimer()`/`setTimeout` pattern, plus message-loop stall re-arm for thinking-heavy turns
-- [ ] **SAFE-04**: Update SIGINT/SIGTERM handlers to store `AbortController` reference and call `abort()` before `process.exit()` to prevent orphaned Claude processes
+- [x] **SAFE-03**: Implement `buildStepHooks()` with `PostToolUse` stall detection replacing custom `armStallTimer()`/`setTimeout` pattern, plus message-loop stall re-arm for thinking-heavy turns
+- [x] **SAFE-04**: Update SIGINT/SIGTERM handlers to store `AbortController` reference and call `abort()` before `process.exit()` to prevent orphaned Claude processes
 
 ### Caller Migration
 
-- [ ] **CALL-01**: Wire `runAgentStep()` to `runStep()` and `runStepCaptured()` (replacing `runClaudeStreaming()` at primary call sites)
+- [x] **CALL-01**: Wire `runAgentStep()` to `runStep()` and `runStepCaptured()` (replacing `runClaudeStreaming()` at primary call sites)
 - [ ] **CALL-02**: Wire `runAgentStep()` to all 3 debug retry call sites in `runStepWithRetry()` and `runVerifyWithDebugRetry()`
 - [ ] **CALL-03**: Update debug retry logic to only trigger on `error_during_execution` subtype (not `error_max_turns` or `error_max_budget_usd`)
 
@@ -74,27 +74,30 @@ Requirements for Autopilot Agent SDK Migration. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SDK-01 | Phase 98 | Pending |
-| SDK-02 | Phase 98 | Pending |
-| SDK-03 | Phase 98 | Pending |
-| MSG-01 | Phase 98 | Pending |
-| MSG-02 | Phase 98 | Pending |
-| MSG-03 | Phase 100 | Pending |
-| SAFE-01 | Phase 99 | Pending |
-| SAFE-02 | Phase 99 | Pending |
-| SAFE-03 | Phase 98 | Pending |
-| SAFE-04 | Phase 98 | Pending |
-| CALL-01 | Phase 98 | Pending |
-| CALL-02 | Phase 99 | Pending |
-| CALL-03 | Phase 99 | Pending |
-| MCP-01 | Phase 100 | Pending |
-| OBS-01 | Phase 100 | Pending |
-| OBS-02 | Phase 100 | Pending |
-| CLN-01 | Phase 99 | Pending |
-| CLN-02 | Phase 99 | Pending |
+| SDK-01 | Phase 98 | Verified |
+| SDK-02 | Phase 98 | Verified |
+| SDK-03 | Phase 98 | Verified |
+| MSG-01 | Phase 98 | Verified |
+| MSG-02 | Phase 98 | Verified |
+| MSG-03 | Phase 102 | Pending |
+| SAFE-01 | Phase 101 | Pending |
+| SAFE-02 | Phase 101 | Pending |
+| SAFE-03 | Phase 98 | Verified |
+| SAFE-04 | Phase 98 | Verified |
+| CALL-01 | Phase 98 | Verified |
+| CALL-02 | Phase 101 | Pending |
+| CALL-03 | Phase 101 | Pending |
+| MCP-01 | Phase 102 | Pending |
+| OBS-01 | Phase 102 | Pending |
+| OBS-02 | Phase 102 | Pending |
+| CLN-01 | Phase 101 | Pending |
+| CLN-02 | Phase 101 | Pending |
 
 **Coverage:**
 - v3.2 requirements: 18 total
+- Verified (Phase 98): 8
+- Pending verification (Phase 101): 6
+- Pending verification (Phase 102): 4
 - Mapped to phases: 18
 - Unmapped: 0
 
