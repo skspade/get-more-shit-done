@@ -682,24 +682,24 @@ async function runStepCaptured(prompt, stepName, outputFile, stepType) {
     console.log('');
     fs.appendFileSync(outputFile, msg + '\n');
     checkProgress(snapshotBefore, snapshotBefore, `${stepName} (dry-run)`);
-    return 0;
+    return { exitCode: 0, stdout: '', costUsd: 0, subtype: 'success' };
   }
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runAgentStep(prompt, { outputFile, maxTurns: getMaxTurns(stepType || stepName) });
+  const result = await runAgentStep(prompt, { outputFile, maxTurns: getMaxTurns(stepType || stepName) });
 
-  logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
+  logMsg(`STEP DONE: step=${stepName} exit_code=${result.exitCode}`);
 
   const snapshotAfter = await takeProgressSnapshot();
   checkProgress(snapshotBefore, snapshotAfter, stepName);
 
-  return exitCode;
+  return result;
 }
 
 // ─── Retry Loop ─────────────────────────────────────────────────────────────
 
-async function runStepWithRetry(prompt, stepName) {
+async function runStepWithRetry(prompt, stepName, stepType) {
   let retryCount = 0;
 
   while (true) {
@@ -707,11 +707,22 @@ async function runStepWithRetry(prompt, stepName) {
     fs.writeFileSync(outputFile, '');
     tempFiles.push(outputFile);
 
-    const stepExit = await runStepCaptured(prompt, stepName, outputFile);
+    const stepResult = await runStepCaptured(prompt, stepName, outputFile, stepType);
+    const stepExit = stepResult.exitCode;
+    const stepSubtype = stepResult.subtype;
 
     if (stepExit === 0) {
       await clearFailureState();
       return 0;
+    }
+
+    // Only retry on actual execution errors -- safety limits are not retryable
+    if (stepSubtype !== 'error_during_execution') {
+      logMsg(`NON-RETRYABLE: step=${stepName} subtype=${stepSubtype}`);
+      console.error(`Step '${stepName}' stopped with ${stepSubtype} (not retryable).`);
+      await writeFailureState(stepName, stepExit, 0, MAX_DEBUG_RETRIES);
+      writeFailureReport(stepName, stepExit, 0, MAX_DEBUG_RETRIES, outputFile);
+      return stepExit;
     }
 
     retryCount++;
@@ -748,7 +759,9 @@ async function runStepWithRetry(prompt, stepName) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    const { exitCode: debugExitCode } = await runClaudeStreaming(debugPrompt);
+    const { exitCode: debugExitCode } = await runAgentStep(debugPrompt, {
+      maxTurns: getMaxTurns('debug'),
+    });
     if (debugExitCode !== 0) {
       console.error('WARNING: Debugger itself returned non-zero. Continuing to next retry.');
     }
@@ -763,9 +776,20 @@ async function runVerifyWithDebugRetry(phase) {
     fs.writeFileSync(outputFile, '');
     tempFiles.push(outputFile);
 
-    const verifyExit = await runStepCaptured(`/gsd:verify-work ${phase}`, 'verify', outputFile);
+    const verifyResult = await runStepCaptured(`/gsd:verify-work ${phase}`, 'verify', outputFile, 'verify');
+    const verifyExit = verifyResult.exitCode;
 
     if (verifyExit !== 0) {
+      // Only retry on actual execution errors -- safety limits are not retryable
+      const verifySubtype = verifyResult.subtype;
+      if (verifySubtype !== 'error_during_execution') {
+        logMsg(`NON-RETRYABLE: verify subtype=${verifySubtype}`);
+        console.error(`Verify stopped with ${verifySubtype} (not retryable).`);
+        await writeFailureState('verify', verifyExit, 0, MAX_DEBUG_RETRIES);
+        writeFailureReport('verify', verifyExit, 0, MAX_DEBUG_RETRIES, outputFile);
+        return verifyExit;
+      }
+
       retryCount++;
       if (retryCount > MAX_DEBUG_RETRIES) {
         console.error('Debug retries exhausted for verify step.');
@@ -792,7 +816,9 @@ async function runVerifyWithDebugRetry(phase) {
       console.log('\u2501'.repeat(53));
       console.log('');
 
-      await runClaudeStreaming(debugPrompt);
+      await runAgentStep(debugPrompt, {
+        maxTurns: getMaxTurns('debug'),
+      });
       continue;
     }
 
@@ -830,7 +856,9 @@ async function runVerifyWithDebugRetry(phase) {
     console.log('\u2501'.repeat(53));
     console.log('');
 
-    await runClaudeStreaming(debugPrompt);
+    await runAgentStep(debugPrompt, {
+      maxTurns: getMaxTurns('debug'),
+    });
   }
 }
 
@@ -1000,7 +1028,7 @@ async function runMilestoneAudit() {
   printBanner('MILESTONE AUDIT');
   logMsg('AUDIT: starting milestone audit');
 
-  const auditExit = await runStepWithRetry('/gsd:audit-milestone', 'milestone-audit');
+  const auditExit = await runStepWithRetry('/gsd:audit-milestone', 'milestone-audit', 'audit');
   if (auditExit !== 0) {
     logMsg(`AUDIT: failed with exit=${auditExit}`);
     console.error(`ERROR: Milestone audit failed (exit ${auditExit})`);
@@ -1069,7 +1097,7 @@ async function runAutomatedUAT() {
   printBanner('AUTOMATED UAT');
   logMsg('UAT: starting automated UAT session');
 
-  const uatExit = await runStepWithRetry('/gsd:uat-auto', 'automated-uat');
+  const uatExit = await runStepWithRetry('/gsd:uat-auto', 'automated-uat', 'uat');
   if (uatExit !== 0) {
     logMsg(`UAT: workflow failed exit=${uatExit}`);
     return 1;
@@ -1126,7 +1154,7 @@ async function runGapClosureLoop() {
     noProgressCount = 0;
     iterationLog = [];
 
-    const gapPlanExit = await runStepWithRetry('/gsd:plan-milestone-gaps --auto', 'gap-planning');
+    const gapPlanExit = await runStepWithRetry('/gsd:plan-milestone-gaps --auto', 'gap-planning', 'plan');
     if (gapPlanExit !== 0) {
       console.error(`ERROR: Gap planning failed (exit ${gapPlanExit})`);
       printEscalationReport(iteration, maxIterations);
@@ -1153,7 +1181,7 @@ async function runGapClosureLoop() {
             await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan', 'plan');
             break;
           case 'execute': {
-            const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
+            const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute', 'execute');
             if (execExit !== 0) {
               printHaltReport('Fix phase execution failed after debug retries', 'execute', execExit);
               process.exit(1);
@@ -1226,7 +1254,7 @@ IMPORTANT: This is running in autopilot mode. Auto-approve ALL interactive confi
 - Any other confirmation prompts
 Do not wait for human input at any step.`;
 
-  const completionExit = await runStepWithRetry(completionPrompt, 'milestone-completion');
+  const completionExit = await runStepWithRetry(completionPrompt, 'milestone-completion', 'completion');
   if (completionExit !== 0) {
     console.error(`ERROR: Milestone completion failed (exit ${completionExit})`);
     printHaltReport('Milestone completion failed after retries', 'milestone-completion', completionExit);
@@ -1319,7 +1347,7 @@ while (true) {
       break;
 
     case 'execute': {
-      const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
+      const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute', 'execute');
       if (execExit !== 0) {
         printHaltReport('Execution failed after debug retries', 'execute', execExit);
         process.exit(1);
