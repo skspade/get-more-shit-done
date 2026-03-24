@@ -108,65 +108,6 @@ describe('autopilot.mjs --dry-run', () => {
   });
 });
 
-// ─── Static Analysis: stdin redirect regression ─────────────────────────────
-
-describe('autopilot.mjs stdin redirect (regression)', () => {
-  const source = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
-  const lines = source.split('\n');
-
-  // Shell invocation lines: contain both "$`" (zx tagged template) and "claude -p"
-  // Exclude comment lines (trimmed starts with //) and console.log lines
-  const shellInvocationLines = lines.filter((line) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('//')) return false;
-    if (trimmed.includes('console.log')) return false;
-    return line.includes('$`') && line.includes('claude -p');
-  });
-
-  test('every claude -p shell invocation includes < /dev/null', () => {
-    for (const line of shellInvocationLines) {
-      assert.ok(
-        line.includes('< /dev/null'),
-        `Missing < /dev/null in shell invocation: ${line.trim()}`
-      );
-    }
-  });
-
-  test('there are exactly 2 claude -p shell invocations', () => {
-    assert.strictEqual(
-      shellInvocationLines.length,
-      2,
-      `Expected 2 claude -p shell invocations, found ${shellInvocationLines.length}:\n` +
-        shellInvocationLines.map((l, i) => `  ${i + 1}: ${l.trim()}`).join('\n')
-    );
-  });
-
-  test('count of < /dev/null matches count of claude -p invocations', () => {
-    const devNullCount = shellInvocationLines.filter((l) => l.includes('< /dev/null')).length;
-    assert.strictEqual(
-      devNullCount,
-      shellInvocationLines.length,
-      `< /dev/null count (${devNullCount}) does not match invocation count (${shellInvocationLines.length})`
-    );
-  });
-
-  test('comment and console.log lines with claude -p are not flagged', () => {
-    const nonInvocationLines = lines.filter((line) => {
-      const trimmed = line.trim();
-      if (!line.includes('claude -p')) return false;
-      return trimmed.startsWith('//') || trimmed.includes('console.log');
-    });
-    // These lines should exist but should NOT be in our invocation set
-    assert.ok(nonInvocationLines.length > 0, 'Expected at least one comment/log line with claude -p');
-    for (const line of nonInvocationLines) {
-      assert.ok(
-        !shellInvocationLines.includes(line),
-        `Non-invocation line incorrectly included: ${line.trim()}`
-      );
-    }
-  });
-});
-
 // ─── Argument Validation ────────────────────────────────────────────────────
 
 describe('autopilot.mjs argument validation', () => {
@@ -203,24 +144,10 @@ describe('autopilot.mjs argument validation', () => {
   });
 });
 
-// ─── Static Analysis: streaming functions (Phase 54) ─────────────────────────
+// ─── Static Analysis: SDK functions (Phase 54→98) ────────────────────────────
 
-describe('autopilot.mjs streaming functions (static analysis)', () => {
+describe('autopilot.mjs SDK functions (static analysis)', () => {
   const source = fs.readFileSync(AUTOPILOT_PATH, 'utf-8');
-
-  test('runClaudeStreaming function exists', () => {
-    assert.ok(
-      source.includes('function runClaudeStreaming'),
-      'autopilot.mjs should contain runClaudeStreaming function'
-    );
-  });
-
-  test('displayStreamEvent function exists', () => {
-    assert.ok(
-      source.includes('function displayStreamEvent'),
-      'autopilot.mjs should contain displayStreamEvent function'
-    );
-  });
 
   test('--quiet flag is in knownFlags', () => {
     const knownFlagsLine = source.split('\n').find(l => l.includes('knownFlags') && l.includes('new Set'));
@@ -245,27 +172,6 @@ describe('autopilot.mjs streaming functions (static analysis)', () => {
     );
   });
 
-  test('streaming path uses --output-format stream-json', () => {
-    assert.ok(
-      source.includes('stream-json'),
-      'autopilot.mjs should use --output-format stream-json'
-    );
-  });
-
-  test('displayStreamEvent handles assistant events', () => {
-    assert.ok(
-      source.includes("event.type === 'assistant'") || source.includes('event.type === "assistant"'),
-      'displayStreamEvent should handle assistant event type'
-    );
-  });
-
-  test('displayStreamEvent handles tool_use events', () => {
-    assert.ok(
-      source.includes("event.type === 'tool_use'") || source.includes('event.type === "tool_use"'),
-      'displayStreamEvent should handle tool_use event type'
-    );
-  });
-
   test('stall timer uses unref to prevent blocking exit', () => {
     assert.ok(
       source.includes('.unref()'),
@@ -273,11 +179,11 @@ describe('autopilot.mjs streaming functions (static analysis)', () => {
     );
   });
 
-  test('runClaudeStreaming returns exitCode and stdout', () => {
+  test('runAgentStep returns exitCode and stdout', () => {
     const returnPattern = /return\s*\{\s*exitCode.*stdout|return\s*\{\s*stdout.*exitCode/;
     assert.ok(
       returnPattern.test(source),
-      'runClaudeStreaming should return { exitCode, stdout }'
+      'runAgentStep should return { exitCode, stdout }'
     );
   });
 });
