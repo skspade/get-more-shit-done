@@ -205,6 +205,15 @@ function getConfig(key, defaultVal) {
 const CIRCUIT_BREAKER_THRESHOLD = getConfig('autopilot.circuit_breaker_threshold', 3);
 const MAX_DEBUG_RETRIES = getConfig('autopilot.max_debug_retries', 3);
 
+const TURNS_CONFIG = {
+  discuss: 100, plan: 150, execute: 300, verify: 100,
+  debug: 50, audit: 100, uat: 150, completion: 50,
+};
+
+function getMaxTurns(stepType) {
+  return getConfig(`autopilot.turns.${stepType}`, TURNS_CONFIG[stepType] || 200);
+}
+
 // ─── SDK Functions ───────────────────────────────────────────────────────────
 
 function buildStepHooks() {
@@ -303,7 +312,7 @@ async function runAgentStep(prompt, { outputFile, quiet, maxTurns, maxBudgetUsd,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         maxTurns: maxTurns || getConfig('autopilot.max_turns_per_step', 200),
-        maxBudgetUsd: maxBudgetUsd || undefined,
+        maxBudgetUsd: maxBudgetUsd || getConfig('autopilot.max_budget_per_step_usd', undefined) || undefined,
         mcpServers: mcpServers || {},
         disallowedTools: ["AskUserQuestion"],
         systemPrompt: { type: "preset", preset: "claude_code" },
@@ -330,9 +339,10 @@ async function runAgentStep(prompt, { outputFile, quiet, maxTurns, maxBudgetUsd,
     activeAbortController = null;
   }
 
-  const exitCode = resultMsg?.subtype === 'success' ? 0 : 1;
-  const stdout = resultMsg?.subtype === 'success' ? (resultMsg?.result || '') : lastAssistantText;
-  return { exitCode, stdout, costUsd: resultMsg?.total_cost_usd };
+  const subtype = resultMsg?.subtype || 'unknown';
+  const exitCode = subtype === 'success' ? 0 : 1;
+  const stdout = subtype === 'success' ? (resultMsg?.result || '') : lastAssistantText;
+  return { exitCode, stdout, costUsd: resultMsg?.total_cost_usd, subtype };
 }
 
 // ─── Streaming Functions (legacy — used by debug retry, removed in Phase 99) ─
@@ -473,7 +483,7 @@ function printHaltReport(reason, step, exitCode) {
 
 // ─── Step Execution ───────────────────────────────────────────────────────────
 
-async function runStep(prompt, stepName) {
+async function runStep(prompt, stepName, stepType) {
   printBanner(`Phase ${CURRENT_PHASE} > ${stepName}`);
 
   const snapshotBefore = await takeProgressSnapshot();
@@ -489,7 +499,7 @@ async function runStep(prompt, stepName) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runAgentStep(prompt);
+  const { exitCode } = await runAgentStep(prompt, { maxTurns: getMaxTurns(stepType || stepName) });
 
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
 
@@ -660,7 +670,7 @@ gsd-autopilot --from-phase ${CURRENT_PHASE} --project-dir ${PROJECT_DIR}
 
 // ─── Output-Capturing Step Execution ───────────────────────────────────────
 
-async function runStepCaptured(prompt, stepName, outputFile) {
+async function runStepCaptured(prompt, stepName, outputFile, stepType) {
   printBanner(`Phase ${CURRENT_PHASE} > ${stepName}`);
 
   const snapshotBefore = await takeProgressSnapshot();
@@ -677,7 +687,7 @@ async function runStepCaptured(prompt, stepName, outputFile) {
 
   logMsg(`STEP START: phase=${CURRENT_PHASE} step=${stepName}`);
 
-  const { exitCode } = await runAgentStep(prompt, { outputFile });
+  const { exitCode } = await runAgentStep(prompt, { outputFile, maxTurns: getMaxTurns(stepType || stepName) });
 
   logMsg(`STEP DONE: step=${stepName} exit_code=${exitCode}`);
 
@@ -907,9 +917,9 @@ async function runFixCycle(phase) {
 
   noProgressCount = 0;
 
-  await runStep(`/gsd:plan-phase ${phase} --gaps -- Human fix request: ${fixDesc}`, 'fix-plan');
-  await runStep(`/gsd:execute-phase ${phase} --gaps-only -- Human fix request: ${fixDesc}`, 'fix-execute');
-  await runStep(`/gsd:verify-work ${phase}`, 'fix-verify');
+  await runStep(`/gsd:plan-phase ${phase} --gaps -- Human fix request: ${fixDesc}`, 'fix-plan', 'plan');
+  await runStep(`/gsd:execute-phase ${phase} --gaps-only -- Human fix request: ${fixDesc}`, 'fix-execute', 'execute');
+  await runStep(`/gsd:verify-work ${phase}`, 'fix-verify', 'verify');
 
   noProgressCount = 0;
 }
@@ -1137,10 +1147,10 @@ async function runGapClosureLoop() {
 
         switch (step) {
           case 'discuss':
-            await runStep(`/gsd:discuss-phase ${CURRENT_PHASE} --auto`, 'discuss');
+            await runStep(`/gsd:discuss-phase ${CURRENT_PHASE} --auto`, 'discuss', 'discuss');
             break;
           case 'plan':
-            await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan');
+            await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan', 'plan');
             break;
           case 'execute': {
             const execExit = await runStepWithRetry(`/gsd:execute-phase ${CURRENT_PHASE}`, 'execute');
@@ -1301,11 +1311,11 @@ while (true) {
 
   switch (currentStep) {
     case 'discuss':
-      await runStep(`/gsd:discuss-phase ${CURRENT_PHASE} --auto`, 'discuss');
+      await runStep(`/gsd:discuss-phase ${CURRENT_PHASE} --auto`, 'discuss', 'discuss');
       break;
 
     case 'plan':
-      await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan');
+      await runStep(`/gsd:plan-phase ${CURRENT_PHASE} --auto`, 'plan', 'plan');
       break;
 
     case 'execute': {
