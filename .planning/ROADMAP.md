@@ -235,7 +235,65 @@
 
 </details>
 
+### v3.2 Autopilot Agent SDK Migration (In Progress)
+
+- [ ] **Phase 98: Core SDK Integration** - Install SDK, implement runAgentStep/handleMessage/buildStepHooks, wire primary call sites
+- [ ] **Phase 99: Safety Infrastructure and Caller Updates** - Turn limits, budget caps, debug retry migration, old code deletion
+- [ ] **Phase 100: MCP Configuration and Observability** - Per-step MCP servers, cost/turn logging, cumulative cost reporting
+
+## Phase Details
+
+### Phase 98: Core SDK Integration
+**Goal**: Autopilot can invoke Claude through the Agent SDK instead of CLI subprocesses, with correct permissions, message handling, stall detection, and signal cleanup
+**Depends on**: Phase 97 (v3.1 complete)
+**Requirements**: SDK-01, SDK-02, SDK-03, MSG-01, MSG-02, SAFE-03, SAFE-04, CALL-01
+**Success Criteria** (what must be TRUE):
+  1. Running autopilot with a discuss or plan step completes successfully using the SDK `query()` call instead of spawning `claude -p` as a subprocess
+  2. Assistant text appears on stdout and tool call names appear on stderr during execution, matching the output parity of the old streaming approach
+  3. When a step fails (non-success result subtype), the error context includes the last assistant text, not an empty string
+  4. Pressing Ctrl-C during a running step terminates both the parent process and the SDK subprocess cleanly without orphaned processes
+  5. Stall detection fires a warning when no tool use occurs within the configured timeout, replacing the old NDJSON-line-based timer
+**Plans**: TBD
+
+Plans:
+- [ ] 98-01: TBD
+- [ ] 98-02: TBD
+
+### Phase 99: Safety Infrastructure and Caller Updates
+**Goal**: All 5 call sites use the SDK with per-step turn limits and optional budget caps, debug retry only fires on actual execution errors, and old CLI subprocess code is deleted
+**Depends on**: Phase 98
+**Requirements**: SAFE-01, SAFE-02, CALL-02, CALL-03, CLN-01, CLN-02
+**Success Criteria** (what must be TRUE):
+  1. Each step type (discuss, plan, execute, verify, debug, audit, uat, completion) enforces its own maxTurns limit, and exceeding it produces an `error_max_turns` result instead of running forever
+  2. Setting `autopilot.max_budget_per_step_usd` in config.json causes steps to stop when the cost cap is reached, producing an `error_max_budget_usd` result
+  3. Debug retry only triggers when a step fails with `error_during_execution` subtype -- hitting turn limits or budget caps does not trigger debug retry
+  4. `runClaudeStreaming()` and `displayStreamEvent()` no longer exist in the codebase -- all Claude invocations go through `runAgentStep()`
+  5. All new config keys (`autopilot.turns.*`, `autopilot.max_budget_per_step_usd`) are registered in config.cjs and visible via `gsd settings`
+**Plans**: TBD
+
+Plans:
+- [ ] 99-01: TBD
+- [ ] 99-02: TBD
+
+### Phase 100: MCP Configuration and Observability
+**Goal**: UAT steps get Chrome DevTools MCP attached automatically, every step logs cost/turns/duration, and the final report shows cumulative cost
+**Depends on**: Phase 99
+**Requirements**: MCP-01, MSG-03, OBS-01, OBS-02
+**Success Criteria** (what must be TRUE):
+  1. When autopilot runs a UAT step, Chrome DevTools MCP is attached to that step's SDK query; non-UAT steps have no MCP servers attached
+  2. Each step's completion log line includes cost (USD), turn count, duration, and cold start overhead (duration minus API duration)
+  3. The final report printed at milestone completion includes a cumulative cost total across all steps
+  4. Session ID from the SDK is logged per step for post-mortem correlation
+**Plans**: TBD
+
+Plans:
+- [ ] 100-01: TBD
+- [ ] 100-02: TBD
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 98 → 99 → 100
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -258,3 +316,6 @@
 | 78-83 | v2.9 | 7/7 | Complete | 2026-03-21 |
 | 84-90 | v3.0 | 10/10 | Complete | 2026-03-22 |
 | 91-97 | v3.1 | 9/9 | Complete | 2026-03-22 |
+| 98. Core SDK Integration | v3.2 | 0/0 | Not started | - |
+| 99. Safety Infrastructure and Caller Updates | v3.2 | 0/0 | Not started | - |
+| 100. MCP Configuration and Observability | v3.2 | 0/0 | Not started | - |

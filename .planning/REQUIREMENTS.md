@@ -74,30 +74,30 @@ Requirements for Autopilot Agent SDK Migration. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SDK-01 | Phase 1 | Pending |
-| SDK-02 | Phase 1 | Pending |
-| SDK-03 | Phase 1 | Pending |
-| MSG-01 | Phase 1 | Pending |
-| MSG-02 | Phase 1 | Pending |
-| MSG-03 | Phase 3 | Pending |
-| SAFE-01 | Phase 2 | Pending |
-| SAFE-02 | Phase 2 | Pending |
-| SAFE-03 | Phase 1 | Pending |
-| SAFE-04 | Phase 1 | Pending |
-| CALL-01 | Phase 1 | Pending |
-| CALL-02 | Phase 2 | Pending |
-| CALL-03 | Phase 2 | Pending |
-| MCP-01 | Phase 3 | Pending |
-| OBS-01 | Phase 3 | Pending |
-| OBS-02 | Phase 3 | Pending |
-| CLN-01 | Phase 2 | Pending |
-| CLN-02 | Phase 2 | Pending |
+| SDK-01 | Phase 98 | Pending |
+| SDK-02 | Phase 98 | Pending |
+| SDK-03 | Phase 98 | Pending |
+| MSG-01 | Phase 98 | Pending |
+| MSG-02 | Phase 98 | Pending |
+| MSG-03 | Phase 100 | Pending |
+| SAFE-01 | Phase 99 | Pending |
+| SAFE-02 | Phase 99 | Pending |
+| SAFE-03 | Phase 98 | Pending |
+| SAFE-04 | Phase 98 | Pending |
+| CALL-01 | Phase 98 | Pending |
+| CALL-02 | Phase 99 | Pending |
+| CALL-03 | Phase 99 | Pending |
+| MCP-01 | Phase 100 | Pending |
+| OBS-01 | Phase 100 | Pending |
+| OBS-02 | Phase 100 | Pending |
+| CLN-01 | Phase 99 | Pending |
+| CLN-02 | Phase 99 | Pending |
 
 **Coverage:**
 - v3.2 requirements: 18 total
 - Mapped to phases: 18
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after initial definition*
+*Last updated: 2026-03-24 after roadmap creation*
