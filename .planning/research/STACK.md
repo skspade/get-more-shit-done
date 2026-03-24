@@ -1,136 +1,197 @@
-# Technology Stack
+# Stack Research
 
-**Project:** GSD Automated UAT Session (v3.1)
-**Researched:** 2026-03-22
+**Domain:** Claude Agent SDK migration for autonomous autopilot orchestrator
+**Researched:** 2026-03-24
+**Confidence:** HIGH
 
 ## Scope
 
-This research covers ONLY what is new for v3.1: YAML config parsing for `uat-config.yaml`, app startup/shutdown management, screenshot file handling, Chrome MCP browser automation (primary), Playwright fallback execution, and autopilot integration. The existing validated stack (Node.js CJS, zx/ESM, Claude Code CLI, markdown-based state, Playwright detection/scaffolding in testing.cjs, Chrome MCP tools, Linear MCP) is NOT re-evaluated.
+This research covers ONLY what is new for v3.2: the `@anthropic-ai/claude-agent-sdk` npm package, its peer dependency (`zod`), TypeScript type availability for JavaScript consumers, ESM/zx compatibility, Node.js version requirements, and integration points with the existing autopilot.mjs. The existing validated stack (Node.js CJS, zx/ESM, js-yaml, Claude Code CLI, markdown-based state, Chrome MCP, Playwright) is NOT re-evaluated.
 
 ## Recommended Stack
 
-### New Dependency: js-yaml
+### New Dependency: @anthropic-ai/claude-agent-sdk
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| js-yaml | ^4.1.1 | Parse `uat-config.yaml` | See rationale below |
+| @anthropic-ai/claude-agent-sdk | ^0.2.81 | Replace `runClaudeStreaming()` CLI subprocess spawning with SDK `query()` calls | The SDK provides typed message streaming, built-in `maxTurns`/`maxBudgetUsd` safety limits, hook-based lifecycle events, and per-step MCP server configuration -- all features the design requires. It spawns Claude Code as a subprocess internally (same auth model), so this is a drop-in replacement for the `claude -p` invocations, not an API change. |
 
-**Why js-yaml over alternatives:**
+**Key facts verified from npm registry and official docs:**
 
-1. **Over hand-rolled parser:** The existing `extractFrontmatter()` in `frontmatter.cjs` is a hand-rolled YAML-subset parser. It handles flat key-value pairs, inline arrays, and simple nesting. It does NOT reliably parse all YAML features -- the known tech debt already notes it "does not parse nested YAML array-of-objects." The `uat-config.yaml` file is simple today (5 flat keys), but using a real parser avoids fragile custom code and handles edge cases (quoted strings with colons, booleans, numeric types).
+1. **Version:** 0.2.81 (published 2026-03-20, actively maintained with 66 releases)
+2. **Module format:** ESM-only (`"type": "module"`, entry point `sdk.mjs`). This is a direct match for autopilot.mjs which is already ESM.
+3. **Node.js requirement:** `>=18.0.0`. Current project `engines` field says `>=16.7.0` -- this MUST be bumped to `>=18.0.0`. The actual runtime is v22.20.0 so no practical impact, but the package.json needs updating for correctness.
+4. **Authentication:** Uses the same Claude Code CLI under the hood. The SDK spawns `claude` as a subprocess -- no ANTHROPIC_API_KEY change needed. The existing `which('claude')` prerequisite check remains valid.
+5. **No direct dependencies:** The SDK has zero npm dependencies (empty `dependencies` object).
+6. **TypeScript types included:** Ships `sdk.d.ts` alongside `sdk.mjs`. JavaScript consumers get full IntelliSense/type checking via JSDoc `@type` imports without installing TypeScript.
+7. **Renamed from `@anthropic-ai/claude-code`:** The package was renamed in v0.1.0. The new name is `@anthropic-ai/claude-agent-sdk`. Do not use the old package name.
 
-2. **Over `yaml` package (eemeli/yaml):** `yaml` (v2.8.3) is more feature-rich (custom types, schema validation, streaming API) but heavier. `js-yaml` is lighter, faster, has 24k+ dependents, and is the standard choice for "just parse YAML." The `uat-config.yaml` is a simple flat config -- no custom types or streaming needed.
+**Breaking changes from v0.1.0 (already accounted for in design):**
+- System prompt no longer defaults to Claude Code's prompt. Must explicitly pass `systemPrompt: { type: "preset", preset: "claude_code" }`.
+- Settings sources no longer loaded by default. Must pass `settingSources: ["project"]` to load CLAUDE.md files.
+- Both of these are already specified in the design document's `runAgentStep()` function.
 
-3. **Over no dependency (using extractFrontmatter):** While technically possible since the config is flat key-value, this couples UAT config parsing to the frontmatter module's quirks. A real YAML parser costs 61KB and removes ambiguity about type coercion (e.g., `startup_wait_seconds: 10` as number, not string "10").
+### New Peer Dependency: zod
 
-**Confidence:** HIGH -- js-yaml 4.1.1 is stable, widely used, zero dependencies itself.
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| zod | ^4.0.0 | Required peer dependency of claude-agent-sdk | The SDK declares `zod: "^4.0.0"` as a peer dependency. It is NOT marked optional. npm 7+ will auto-install it, but it should be explicitly listed. |
 
-### No New Dependency: App Startup Management
+**Why zod is needed but not directly used:**
 
-| Approach | Why |
-|----------|-----|
-| `zx` `$` shell command + fetch retry loop | zx is already a dependency and provides `$` for spawning `npm run dev`. A simple retry loop (`fetch(base_url)` with backoff, max `startup_wait_seconds`) is sufficient -- no need for `wait-on` package. |
+The SDK uses zod internally for the `tool()` function's schema validation (custom MCP tool definitions). Our project does NOT use `tool()` -- we only use `query()`. However, because zod is a required (not optional) peer dependency, npm will warn or error if it is absent. Installing it explicitly avoids install-time warnings and ensures deterministic dependency resolution.
 
-**Why NOT `wait-on`:** Adding a dependency for a 10-line fetch retry loop is unnecessary. The startup check is: spawn process, poll `base_url` with fetch every 1 second for N seconds, fail if timeout. Node.js built-in `fetch` (available since Node 18, project requires >=16.7 but runs on v20.16) handles this directly.
+**Why zod 4, not zod 3:** The SDK's npm registry entry shows `"zod": "^4.0.0"` as the peer dependency (updated from `^3.24.1` in earlier versions). Zod 4 is a major version bump with breaking changes from zod 3, but since we do not use zod directly in our code, the version is irrelevant to us -- it only needs to satisfy the SDK's peer requirement.
 
-**Implementation note:** The startup command runs as a background child process. Use `zx`'s `$` with `.nothrow()` for the health check. Store the child process reference for cleanup (kill on UAT completion or error). Standard `process.kill(pid)` with SIGTERM is sufficient -- no `tree-kill` needed since `npm run dev` typically spawns a single process.
+**Confidence:** HIGH -- verified directly from `npm view @anthropic-ai/claude-agent-sdk peerDependencies`.
 
-### No New Dependency: Screenshot File Handling
+### Package.json Engine Bump
 
-| Approach | Why |
-|----------|-----|
-| Node.js built-in `fs` + `Buffer` | Chrome MCP's `chrome_screenshot` returns base64 PNG data. Decode with `Buffer.from(data, 'base64')` and write with `fs.writeFileSync()`. Zero dependencies needed. |
+| Change | From | To | Why |
+|--------|------|----|-----|
+| `engines.node` | `>=16.7.0` | `>=18.0.0` | The SDK requires Node.js 18+. The project already runs on v22.20.0, but the package.json `engines` field must reflect the new minimum. |
 
-### No New Dependency: Chrome MCP Browser Automation
+This is a necessary change, not optional. The SDK's entry point is an ES module (`sdk.mjs`) that uses Node.js 18+ APIs.
 
-| Tool | Purpose | Already Available |
-|------|---------|-------------------|
-| `tabs_context_mcp` | Session detection + availability check | Yes -- Chrome MCP tool |
-| `tabs_create_mcp` | Create new browser tab | Yes -- Chrome MCP tool |
-| `chrome_navigate` | Navigate to URL | Yes -- Chrome MCP tool |
-| `chrome_click_element` | Click UI elements | Yes -- Chrome MCP tool |
-| `chrome_fill_or_select` | Fill form fields | Yes -- Chrome MCP tool |
-| `chrome_keyboard` | Keyboard input | Yes -- Chrome MCP tool |
-| `chrome_screenshot` | Capture screenshot evidence | Yes -- Chrome MCP tool |
-| `chrome_get_web_content` | Extract DOM content for assertion | Yes -- Chrome MCP tool |
+## ESM/zx Compatibility
 
-These are MCP tools available to Claude subagents -- no npm packages involved. The UAT workflow file instructs the subagent to use them. Detection of availability is via attempting `tabs_context_mcp` and checking for error/timeout.
+**Fully compatible.** The SDK exports ESM (`sdk.mjs`), and autopilot.mjs is already ESM (zx shebang `#!/usr/bin/env zx`). The import is:
 
-### No New Dependency: Playwright Fallback
+```javascript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+```
 
-| Technology | Version | Purpose | Already Available |
-|------------|---------|---------|-------------------|
-| @playwright/test | ^1.50.0 (installed: 1.58.2 available) | Fallback browser automation | Yes -- already in devDependencies |
+This works directly alongside the existing zx imports and `createRequire` CJS bridge. No interop shims needed.
 
-The Playwright fallback uses the existing `@playwright/test` dependency. The design specifies ephemeral inline scripts (not persistent `.spec.ts` files) -- the subagent generates a script, runs it with `node`, captures results. The existing `detectPlaywright()` in `testing.cjs` handles detection.
+**zx remains necessary.** The SDK replaces only the Claude invocation layer (`runClaudeStreaming()`). The following zx features are still used and cannot be replaced by the SDK:
+- `$` template literals for `gsdTools()` shell commands (gsd-tools.cjs dispatch)
+- `$` for `takeProgressSnapshot()` (git diff calls)
+- `argv` for CLI argument parsing (`--from-phase`, `--project-dir`, `--dry-run`, `--quiet`, `--legacy`)
+- `which()` for prerequisite checks (`claude`, `node`)
 
-**Note:** The current `@playwright/test` pin is `^1.50.0` but latest is 1.58.2. No need to bump for this milestone -- the ephemeral script approach works with any recent version. Bumping is optional maintenance.
+## TypeScript Types for JavaScript Consumers
 
-## What NOT to Add
+The SDK ships TypeScript declarations (`sdk.d.ts`) alongside the JavaScript entry point. JavaScript consumers can leverage these types via JSDoc annotations without adding TypeScript as a dependency:
 
-| Rejected | Why |
-|----------|-----|
-| `wait-on` | 10-line fetch retry loop is simpler than adding a dependency |
-| `tree-kill` | `process.kill(pid, 'SIGTERM')` handles dev server cleanup; tree-kill adds complexity for no gain |
-| `yaml` (eemeli/yaml) | Overkill for flat config file; js-yaml is lighter |
-| `puppeteer` | Chrome MCP and Playwright already cover browser automation; puppeteer would be redundant |
-| `sharp` / image processing | Screenshots are evidence files, not processed images; raw PNG from Chrome MCP is sufficient |
-| `glob` / `fast-glob` | UAT.md discovery uses `fs.readdirSync` + filter on phase directories (already the pattern in phase.cjs) |
-| Any test assertion library | Claude is the "assertion engine" -- it compares screenshots and DOM content against natural language expectations |
+```javascript
+/** @typedef {import("@anthropic-ai/claude-agent-sdk").SDKMessage} SDKMessage */
+/** @typedef {import("@anthropic-ai/claude-agent-sdk").SDKResultMessage} SDKResultMessage */
+/** @typedef {import("@anthropic-ai/claude-agent-sdk").HookCallback} HookCallback */
+```
+
+Key types available for the migration:
+
+| Type | Purpose | Used In |
+|------|---------|---------|
+| `SDKMessage` | Union of all message types from `query()` | `handleMessage()` |
+| `SDKAssistantMessage` | Assistant response with content blocks | `handleMessage()` text/tool display |
+| `SDKResultMessage` | Final result with cost, turns, exit status | `runAgentStep()` return value |
+| `SDKSystemMessage` | Init message with session_id, model | `handleMessage()` session logging |
+| `HookCallback` | Hook function signature | `buildStepHooks()` stall detection |
+| `HookCallbackMatcher` | Hook config with matcher regex | `buildStepHooks()` return type |
+| `Options` | Full options object for `query()` | `runAgentStep()` |
+| `McpStdioServerConfig` | MCP server config for stdio transport | UAT Chrome MCP config |
+
+No TypeScript compiler or build step is needed. The `.d.ts` files provide editor support and type checking via `// @ts-check` if desired.
 
 ## Installation
 
 ```bash
-# Single new dependency
-npm install js-yaml
+# New dependencies (one SDK + one peer dependency)
+npm install @anthropic-ai/claude-agent-sdk zod
 ```
 
-No devDependency additions needed. Playwright is already installed.
+That is the complete install command. Two packages added to `dependencies` in package.json.
 
-## Integration Points
+## What NOT to Add
 
-### New CJS Module: `uat.cjs`
+| Rejected | Why | Use Instead |
+|----------|-----|-------------|
+| `@anthropic-ai/claude-code` | Old package name, renamed to `claude-agent-sdk` in v0.1.0 | `@anthropic-ai/claude-agent-sdk` |
+| `@anthropic-ai/sdk` (Client SDK) | Direct API SDK -- requires implementing your own tool loop. The Agent SDK handles tool execution autonomously. | `@anthropic-ai/claude-agent-sdk` |
+| TypeScript compiler (`typescript`) | SDK ships pre-built `.mjs` + `.d.ts`. No compilation needed for JS consumers. | JSDoc type imports for editor support |
+| `@modelcontextprotocol/sdk` | Only needed if using `tool()` or `createSdkMcpServer()` for custom MCP tools. We use stdio MCP configs (Chrome MCP), not SDK-embedded servers. | `mcpServers` option with `McpStdioServerConfig` objects |
+| `dotenv` | The SDK reads `ANTHROPIC_API_KEY` from the environment. The project already has Claude Code CLI auth configured. No `.env` file handling needed. | Existing CLI authentication |
+| Any logging library | The design uses `process.stdout.write` / `process.stderr.write` / existing `logMsg()`. The SDK's typed messages replace NDJSON parsing -- no log parsing library needed. | Existing `logMsg()` and `handleMessage()` |
 
-A new module at `get-shit-done/bin/lib/uat.cjs` providing:
+## Key SDK API Surface (Verified)
 
-| Function | Purpose | Uses |
-|----------|---------|------|
-| `loadUatConfig(projectDir)` | Parse `.planning/uat-config.yaml` | js-yaml |
-| `discoverUatTests(projectDir)` | Find `*-UAT.md` files across phase dirs | fs, path, existing phase.cjs patterns |
-| `writeUatResults(projectDir, results)` | Write MILESTONE-UAT.md with frontmatter | extractFrontmatter/reconstructFrontmatter from frontmatter.cjs |
-| `saveScreenshot(evidenceDir, name, base64Data)` | Decode and save PNG evidence | fs, Buffer |
+### `query()` function
 
-### Autopilot Integration: `runAutomatedUAT()`
+```javascript
+import { query } from "@anthropic-ai/claude-agent-sdk";
 
-New async function in `autopilot.mjs` inserted between audit pass and `runMilestoneCompletion()`. Three insertion points exist (lines 1089, 1094, 1167-1172). The function:
+// Returns AsyncGenerator<SDKMessage, void>
+for await (const message of query({
+  prompt: "string",
+  options: {
+    cwd: "/path/to/project",
+    permissionMode: "bypassPermissions",           // or "acceptEdits", "default", "dontAsk", "plan"
+    allowDangerouslySkipPermissions: true,          // required with bypassPermissions
+    maxTurns: 200,                                  // max agentic turns (tool-use round trips)
+    maxBudgetUsd: 5.00,                             // optional cost cap per query
+    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "WebSearch", "WebFetch"],
+    systemPrompt: { type: "preset", preset: "claude_code" },  // use Claude Code system prompt
+    settingSources: ["project"],                    // load CLAUDE.md files
+    mcpServers: {                                   // per-query MCP server configs
+      "chrome-devtools": {
+        command: "npx",
+        args: ["@anthropic-ai/chrome-devtools-mcp@latest"]
+      }
+    },
+    hooks: {
+      PostToolUse: [{ matcher: ".*", hooks: [myHook] }],
+      Stop: [{ matcher: ".*", hooks: [cleanupHook] }]
+    }
+  }
+})) {
+  // message is SDKMessage union type
+}
+```
 
-1. Calls `loadUatConfig()` -- if no config, skip UAT (not all projects have web UIs)
-2. Optionally starts the app via `$\`${config.startup_command}\`` (zx background process)
-3. Calls `runClaudeStreaming('/gsd:uat-auto')` (existing pattern)
-4. Parses exit code: 0 + pass = complete, 0 + gaps = gap closure loop, non-zero = debug retry
+### Message types returned
 
-### New Workflow: `workflows/uat-auto.md`
+| Type | `message.type` | Key Fields | When |
+|------|----------------|------------|------|
+| System init | `"system"` | `session_id`, `model`, `tools`, `mcp_servers` | First message |
+| Assistant | `"assistant"` | `message.content[]` (text blocks + tool_use blocks) | Each assistant turn |
+| Result (success) | `"result"` | `subtype: "success"`, `result`, `total_cost_usd`, `num_turns` | Query complete |
+| Result (max turns) | `"result"` | `subtype: "error_max_turns"`, `errors[]` | Hit maxTurns limit |
+| Result (budget) | `"result"` | `subtype: "error_max_budget_usd"`, `errors[]` | Hit cost cap |
+| Result (error) | `"result"` | `subtype: "error_during_execution"`, `errors[]` | Execution error |
 
-Defines the `/gsd:uat-auto` slash command consumed by autopilot. This is a markdown prompt file (standard GSD pattern), not code. The workflow instructs the Claude subagent on the 8-step UAT execution process.
+### Hook signature
 
-### New Command: `commands/uat-auto.md`
+```javascript
+/** @type {import("@anthropic-ai/claude-agent-sdk").HookCallback} */
+const myHook = async (input, toolUseID, { signal }) => {
+  // input has session_id, cwd, hook_event_name
+  // For PostToolUse: also has tool_name, tool_input, tool_result
+  return {};  // empty object = no-op (allow, don't modify)
+};
+```
 
-Command spec for `/gsd:uat-auto` (standard GSD pattern, like existing `linear.md`, `brainstorm.md`).
+## Version Compatibility
 
-## Existing Stack (Unchanged)
-
-| Technology | Version | Role | Notes |
-|------------|---------|------|-------|
-| Node.js | v20.16.0 | Runtime | CJS modules + ESM autopilot |
-| zx | ^8.0.0 (8.8.5 installed) | Autopilot shell commands | `$` for app startup, process management |
-| @playwright/test | ^1.50.0 | Fallback browser driver | Already in devDependencies |
-| Claude Code CLI | Latest | Subagent invocation | `runClaudeStreaming()` pattern |
-| Chrome MCP | N/A (tool-level) | Primary browser automation | Available via MCP tool calls |
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `@anthropic-ai/claude-agent-sdk@^0.2.81` | Node.js >=18.0.0 | ESM only, ships `.mjs` entry |
+| `@anthropic-ai/claude-agent-sdk@^0.2.81` | `zx@^8.0.0` | Both ESM, no conflicts |
+| `@anthropic-ai/claude-agent-sdk@^0.2.81` | `zod@^4.0.0` | Required peer dependency |
+| `zod@^4.0.0` | Node.js >=18.0.0 | Standard library, widely compatible |
+| `zod@^4.0.0` | `js-yaml@^4.1.1` | No interaction (independent packages) |
 
 ## Sources
 
-- [js-yaml on npm](https://www.npmjs.com/package/js-yaml) -- v4.1.1, 24k+ dependents
-- [yaml on npm](https://www.npmjs.com/package/yaml) -- v2.8.3, considered but rejected as overkill
-- [js-yaml GitHub](https://github.com/nodeca/js-yaml) -- MIT license, zero dependencies
-- [wait-on on npm](https://www.npmjs.com/package/wait-on) -- considered but rejected in favor of fetch retry
-- Existing codebase: `frontmatter.cjs` (hand-rolled YAML parser limitations), `testing.cjs` (Playwright detection), `autopilot.mjs` (integration pattern)
+- [npm registry: @anthropic-ai/claude-agent-sdk](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) -- v0.2.81, verified version/engines/peerDeps via `npm view` (HIGH confidence)
+- [Agent SDK Overview](https://platform.claude.com/docs/en/agent-sdk/overview) -- architecture, capabilities, authentication model (HIGH confidence)
+- [Agent SDK Quickstart](https://platform.claude.com/docs/en/agent-sdk/quickstart) -- Node.js 18+ prerequisite, installation, query() usage (HIGH confidence)
+- [TypeScript SDK Reference](https://platform.claude.com/docs/en/agent-sdk/typescript) -- full Options type, message types, hook types (HIGH confidence)
+- [Migration Guide](https://platform.claude.com/docs/en/agent-sdk/migration-guide) -- breaking changes in v0.1.0 rename, systemPrompt/settingSources defaults (HIGH confidence)
+- [Hooks Guide](https://platform.claude.com/docs/en/agent-sdk/hooks) -- PostToolUse/Stop hook patterns, matcher syntax (HIGH confidence)
+- [GitHub: claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript) -- v0.2.81, 66 releases, Node.js 18+ badge (HIGH confidence)
+- [GitHub Issue #38: zod v3 to v4 upgrade](https://github.com/anthropics/claude-agent-sdk-typescript/issues/38) -- zod peer dependency context (MEDIUM confidence)
+
+---
+*Stack research for: Autopilot Agent SDK Migration (v3.2)*
+*Researched: 2026-03-24*

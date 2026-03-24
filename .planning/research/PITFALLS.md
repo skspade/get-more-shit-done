@@ -1,279 +1,439 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** Automated UAT browser testing in autonomous pipeline (Chrome MCP + Playwright dual-engine)
-**Researched:** 2026-03-22
-**Confidence:** HIGH (design doc analysis, codebase pattern review, web-verified Chrome MCP behavior, Playwright best practices)
+**Domain:** CLI subprocess spawning to Claude Agent SDK migration (autopilot.mjs)
+**Researched:** 2026-03-24
+**Confidence:** HIGH (verified against official SDK docs, GitHub issues, TypeScript SDK reference)
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites or major issues.
+### Pitfall 1: Missing `allowDangerouslySkipPermissions` Flag
+
+**What goes wrong:**
+Setting `permissionMode: "bypassPermissions"` without also setting `allowDangerouslySkipPermissions: true` causes every tool call to require approval. The agent hangs waiting for permission input that never comes in headless/autonomous mode. This is the single most reported issue in the SDK's GitHub tracker (issue #14279).
+
+**Why it happens:**
+The CLI uses a single flag (`--dangerously-skip-permissions`), but the SDK requires TWO separate settings. The naming is deliberately cumbersome as a safety guard. Developers assume `permissionMode: "bypassPermissions"` is sufficient because the CLI only needed one flag.
+
+**How to avoid:**
+Always pair the two settings together:
+```javascript
+{
+  permissionMode: "bypassPermissions",
+  allowDangerouslySkipPermissions: true,
+}
+```
+Add a unit test that verifies the options object passed to `query()` always includes both when bypass mode is intended. The design document already shows this correctly -- the risk is during implementation if someone copies partial config.
+
+**Warning signs:**
+- Tool calls return `"This command requires approval"` errors
+- Agent completes with 0 turns but non-zero cost (init cost without any work)
+- `permission_denials` array on `ResultMessage` is non-empty
+
+**Phase to address:**
+Phase 1 (core `runAgentStep()` implementation). Must be correct from the first working call.
+
+---
+
+### Pitfall 2: System Prompt and Settings Sources Not Loaded by Default
+
+**What goes wrong:**
+The agent runs but ignores CLAUDE.md instructions, custom slash commands, project settings.json rules, and .claude/settings.json allow rules. GSD workflows depend heavily on CLAUDE.md for project conventions and slash commands for phase operations. Without these, the agent produces correct output structurally but violates project conventions.
+
+**Why it happens:**
+Breaking change in Agent SDK v0.1.0: the SDK no longer loads filesystem settings by default and no longer uses Claude Code's system prompt by default. This was an intentional isolation decision for SDK applications. Developers migrating from CLI assume the same environment applies.
+
+**How to avoid:**
+Always include both settings:
+```javascript
+{
+  systemPrompt: { type: "preset", preset: "claude_code" },
+  settingSources: ["project"],
+}
+```
+The design document correctly specifies `settingSources: ["project"]` and the system prompt preset. The risk is:
+1. Using `settingSources: ["user", "project", "local"]` when you only want project settings (user settings may contain unexpected allow/deny rules on the developer's machine).
+2. Omitting `settingSources` entirely if a developer refactors the options object and drops it.
+3. Passing a custom string as `systemPrompt` instead of the preset, losing Claude Code's built-in tool-use instructions and behaviors.
+
+**Warning signs:**
+- Agent does not recognize GSD slash commands
+- Agent ignores conventions from CLAUDE.md (commit message style, file patterns)
+- Agent asks clarifying questions instead of following project instructions
+- `slash_commands` array in `SystemMessage` init is empty
+
+**Phase to address:**
+Phase 1. Configuration structure must be correct at the options-building layer.
+
+---
+
+### Pitfall 3: Exit Code vs Result Subtype Semantic Mismatch
+
+**What goes wrong:**
+The current autopilot treats exit codes as the primary success/failure signal: `exitCode === 0` means success, non-zero means failure, `130` means SIGINT. The SDK does not return exit codes. It returns `ResultMessage` with a `subtype` field. Naively mapping `subtype !== "success"` to `exitCode = 1` loses critical information about WHY the step failed and whether it is recoverable.
+
+**Why it happens:**
+The current `runClaudeStreaming()` returns `{ exitCode, stdout }`. The design's `runAgentStep()` synthesizes an exit code from the result subtype. But different subtypes demand different handling:
+- `error_max_turns`: The agent did useful work but ran out of turns. Progress was made. The circuit breaker should NOT count this as zero-progress.
+- `error_max_budget_usd`: Cost cap hit. Different from a crash.
+- `error_during_execution`: An API failure or process crash. This IS analogous to a non-zero exit.
+- `success`: Direct analog to exit code 0.
+- `error_max_structured_output_retries`: Not relevant here (no structured output used).
+
+Treating all non-success subtypes identically causes:
+1. Debug retry loops wasting retries on budget/turn limits (not fixable by debugging)
+2. Circuit breaker false positives (maxTurns hit after productive work counts as "no progress")
+3. Loss of cost-cap enforcement intent (budget exceeded should escalate, not debug-retry)
+
+**How to avoid:**
+Replace the synthesized `exitCode` return with the actual subtype:
+```javascript
+return {
+  subtype: resultMsg?.subtype || "error_during_execution",
+  resultText,
+  costUsd: resultMsg?.total_cost_usd,
+  numTurns: resultMsg?.num_turns,
+};
+```
+Then update callers to switch on subtype:
+- `success` -> continue normally
+- `error_max_turns` -> log warning, may still have made progress, do NOT debug-retry
+- `error_max_budget_usd` -> escalate to human, do NOT debug-retry
+- `error_during_execution` -> debug-retry (this is the actual error case)
+
+**Warning signs:**
+- Debug retries triggered immediately after an agent that did extensive work
+- "Budget limit hit" appearing in error context passed to the debugger
+- Autopilot running debug retries 3 times then halting on what was actually a successful-but-capped run
+
+**Phase to address:**
+Phase 1 (return type design) and Phase 2 (caller updates). The return type must be designed correctly BEFORE updating callers.
+
+---
+
+### Pitfall 4: Orphaned Claude Processes on SIGINT/SIGTERM
+
+**What goes wrong:**
+When the autopilot receives SIGINT (Ctrl-C) or SIGTERM, the current code cleans up temp files and prints a resume message. But the SDK spawns a Claude Code subprocess internally. If the parent process exits without explicitly aborting the SDK query, the Claude subprocess becomes orphaned and continues running, consuming 50-100MB RAM each. Over time with repeated Ctrl-C interruptions, dozens of orphans accumulate (issue #142, still open as of Jan 2026).
+
+**Why it happens:**
+The current autopilot's `$` template literal (zx) creates a child process that is killed when the parent exits because zx handles this. The SDK manages its own subprocess but has no built-in parent-death cleanup. The `AbortController` only works if the parent process is alive to call `abort()`. On SIGKILL or hard crashes, there is no cleanup at all.
+
+**How to avoid:**
+1. Store a reference to the `AbortController` used by each `query()` call in module-level state.
+2. In SIGINT/SIGTERM handlers, call `controller.abort()` before `process.exit()`.
+3. Use the `Query.close()` method if available (it forcefully ends the query and cleans up resources).
+4. Consider a periodic cleanup sweep as a defensive measure.
+
+```javascript
+let activeAbortController = null;
+
+process.on('SIGINT', () => {
+  if (activeAbortController) {
+    activeAbortController.abort();
+  }
+  cleanupTemp();
+  // ... existing resume message ...
+  process.exit(130);
+});
+```
+
+**Warning signs:**
+- `ps aux | grep claude` shows multiple claude processes after Ctrl-C
+- Memory usage grows over repeated autopilot runs
+- Port conflicts or file lock issues from zombie claude processes
+
+**Phase to address:**
+Phase 1. Signal handler updates must happen in the same phase as the `runAgentStep()` implementation. Cannot be deferred.
+
+---
+
+### Pitfall 5: `allowedTools` Does NOT Restrict Tools in `bypassPermissions` Mode
+
+**What goes wrong:**
+The design document specifies:
+```javascript
+allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "WebSearch", "WebFetch"],
+```
+Developers assume this RESTRICTS the agent to only these tools. In `bypassPermissions` mode, `allowedTools` is purely additive -- it only pre-approves listed tools. Unlisted tools are NOT blocked; they fall through to the permission mode, where `bypassPermissions` approves everything. The agent can use ANY tool including `TodoWrite`, `Skill`, `AskUserQuestion`, and MCP tools.
+
+**Why it happens:**
+The mental model from other APIs (OpenAI function calling, etc.) is that a tools list restricts what's available. The SDK docs explicitly warn: "`allowed_tools` does not constrain `bypassPermissions`. Every tool is approved, not just the ones you listed."
+
+**How to avoid:**
+If you want to restrict tools in bypass mode, use `disallowedTools` to explicitly block what you do NOT want:
+```javascript
+{
+  permissionMode: "bypassPermissions",
+  allowDangerouslySkipPermissions: true,
+  disallowedTools: ["AskUserQuestion"], // Block interactive prompts in autonomous mode
+}
+```
+For the autopilot, `AskUserQuestion` is particularly dangerous: if the agent tries to ask a question, it will hang waiting for input that never comes (no TTY, stdin was /dev/null). Block it explicitly with `disallowedTools`.
+
+Alternatively, use `permissionMode: "dontAsk"` with `allowedTools` for a strict whitelist. `dontAsk` denies anything not in the allowed list. But this requires testing that all GSD workflows function correctly without tools that might be implicitly needed.
+
+**Warning signs:**
+- Agent spawns `AskUserQuestion` during autonomous execution and hangs
+- Agent uses `TodoWrite` or `Skill` tools unexpectedly
+- Agent calls MCP tools you didn't configure (from settings.json if loaded)
 
-### Pitfall 1: Chrome MCP Availability Detection Gives False Positives
+**Phase to address:**
+Phase 1. Must decide the permission strategy (bypass + disallowedTools vs. dontAsk + allowedTools) before implementing `runAgentStep()`.
 
-**What goes wrong:** The design calls for `tabs_context_mcp` as the availability probe. Chrome MCP can appear "available" (the tool resolves) but the browser session is stale, on the wrong machine, or the extension has lost connection. The agent proceeds with Chrome MCP mode, then every subsequent `chrome_navigate` or `chrome_click_element` call silently fails or times out, wasting the entire test session before falling back.
+---
 
-**Why it happens:** Chrome MCP availability is not binary. The MCP bridge can be connected but the Chrome tab closed, Chrome can be running headless without the extension, or (per real-world reports) the extension can route to a different machine's Chrome instance when multiple machines have it installed. A single `tabs_context_mcp` probe does not exercise the full tool chain. GitHub issue #27492 documents the MCP client failing to establish connections to bridge-type MCP servers even when Chrome is running.
+### Pitfall 6: `result` Field Only Exists on Success Subtype
 
-**Consequences:** Entire UAT session burns 10+ minutes of context window on Chrome MCP calls that silently fail. The fallback to Playwright never triggers because the initial probe passed. The autopilot stall detector may eventually catch this, but by then the context window is wasted.
+**What goes wrong:**
+The `SDKResultMessage` is a discriminated union. The `result` (final text output) field only exists on the `success` variant. On error variants (`error_max_turns`, `error_during_execution`, etc.), accessing `resultMsg.result` returns `undefined`. If the code does `resultText = resultMsg?.result || ""`, it silently works but the debug retry system receives empty error context because the agent's last output is not captured.
 
-**Prevention:**
-1. Probe must be a full round-trip: call `tabs_context_mcp`, then `tabs_create_mcp` to open a new tab, then `chrome_navigate` to the actual `base_url`, and verify a non-error response. Only then confirm Chrome MCP is working.
-2. Implement per-test engine fallback, not just per-session. If any Chrome MCP call returns an error or times out mid-session, switch to Playwright for remaining tests rather than failing the whole session.
-3. Set a hard timeout (5 seconds as designed) but on the full probe sequence, not just `tabs_context_mcp`.
+**Why it happens:**
+The current code captures stdout from the CLI process, which always has output regardless of exit code. The SDK separates "result text" (only on success) from the message stream (always available). The actual output text is in the `AssistantMessage` objects yielded during iteration, not in the `ResultMessage`.
+
+**How to avoid:**
+Capture the last assistant text from the message stream, not from the result:
+```javascript
+let lastAssistantText = "";
+for await (const message of query({...})) {
+  if (message.type === "assistant") {
+    const textBlocks = (message.message?.content || [])
+      .filter(b => b.type === "text")
+      .map(b => b.text);
+    if (textBlocks.length > 0) {
+      lastAssistantText = textBlocks.join("");
+    }
+  }
+  if (message.type === "result") {
+    resultText = message.subtype === "success" ? message.result : lastAssistantText;
+  }
+}
+```
+
+**Warning signs:**
+- Debug retry prompts have empty `<errors>` section
+- `constructDebugPrompt()` receives "No output captured" when the agent actually produced output
+- Output file for debug context is empty despite the agent having run for many turns
 
-**Detection:** First sign is Chrome MCP tests all failing with timeout or connection errors while the probe reported success.
-
-**Phase:** Must be addressed in the Chrome MCP engine implementation phase. The probe logic is the first thing to get right.
-
-**Confidence:** HIGH -- multiple sources confirm Chrome MCP connection instability ([GitHub issue #27492](https://github.com/anthropics/claude-code/issues/27492), [wrong-machine routing report](https://mikestephenson.me/2026/03/13/claude-cowork-browser-automation-wrong-machine/)).
-
-### Pitfall 2: AI-Driven Pass/Fail Judgment is Non-Deterministic
-
-**What goes wrong:** The design has Claude judge pass/fail by comparing screenshots + DOM content against natural language expected behavior descriptions. This judgment is inherently non-deterministic -- the same screenshot and expected text can produce different pass/fail verdicts across runs, across context windows, or based on surrounding context in the conversation. A test that "passes" on Tuesday "fails" on Wednesday with identical application state.
-
-**Why it happens:** LLM inference is stochastic. The expected behavior descriptions in UAT.md are natural language ("Comment appears immediately after submission") which have ambiguous thresholds. "Immediately" could mean visible in the screenshot or present in the DOM. A loading spinner might be interpreted as "not yet appeared" or "in progress, will appear." The model's confidence varies with context length and prior conversation content.
-
-**Consequences:** UAT results are not reproducible. Failed tests trigger gap closure phases that "fix" things that are not broken. Passed tests miss regressions that a stricter check would catch. The autopilot enters fix-reaudit-re-UAT loops chasing phantom failures, burning context windows and potentially making unnecessary code changes.
-
-**Prevention:**
-1. Require the agent to output a structured confidence score (1-5) alongside each pass/fail verdict. Only count tests with confidence < 3 as "needs human review" rather than hard failures.
-2. Implement a confirmation re-test for failures: if a test fails, re-run it once before recording the failure. Two consecutive failures = confirmed failure. Single failure = flaky, log but do not create gaps.
-3. Use DOM content assertions (text presence, element existence) as the primary signal, with screenshot judgment as supplementary evidence. DOM checks are deterministic; screenshots are not.
-4. Write expected behaviors in UAT.md with concrete observable criteria ("page contains text 'Comment posted successfully'") not vague descriptions ("comment appears").
-5. Include explicit failure criteria in the workflow prompt: "A test fails if: the expected element is not visible, an error message appears, the page shows a loading spinner after the wait period, or the observed behavior contradicts the expected behavior description. When in doubt, fail the test."
-
-**Detection:** UAT results flip between runs with no code changes. Gap closure phases produce "fixes" that do not change application behavior.
-
-**Phase:** Must be addressed in the UAT-Auto workflow design phase. The judgment protocol is the core of the testing logic.
-
-**Confidence:** HIGH -- this is an inherent property of LLM-based judgment, well-documented in AI testing literature.
-
-### Pitfall 3: App Startup Race Condition
-
-**What goes wrong:** The design runs `startup_command` (e.g., `npm run dev`) and waits `startup_wait_seconds` (default 10) before testing. But dev servers have wildly variable startup times depending on cold cache, dependency installation, compilation, and port availability. The wait is either too short (app not ready, all tests fail with connection refused) or too long (wasting 30+ seconds every run).
-
-**Why it happens:** Fixed wait times are a known anti-pattern in browser testing. Playwright's own docs state: "Never wait for timeout in production. Tests that wait for time are inherently flaky." Dev servers (Next.js, Vite, webpack-dev-server) have non-linear startup: fast on warm cache, slow on cold start. Port conflicts can cause the startup command to fail silently (exits with error but the agent already moved on). The agent cannot distinguish "server starting" from "server failed to start."
-
-**Consequences:** If too short: every test fails with connection refused, creating false gap closure cycles. The failure categorization (app-level vs test-level from v2.7) should catch this, but only if the error messages are recognized. If too long: wasted time in every UAT session, compounding across milestones.
-
-**Prevention:**
-1. Replace fixed wait with HTTP polling: after starting the dev server, poll `base_url` every 2 seconds with a hard timeout of 60 seconds. Only proceed when HTTP 200 (or any non-error response) is received.
-2. Capture the startup command's stderr/stdout. If it exits before the wait completes, check the exit code. Non-zero = startup failed, skip UAT with a clear error.
-3. Check if `base_url` is already responding BEFORE starting the startup command. If it is, skip startup entirely (user may have the app running).
-4. If using Playwright, leverage its built-in `webServer` config block which handles startup, port detection, and readiness checking natively. (Note: scaffolding templates currently omit `webServer` block -- known v2.7 tech debt.)
-5. Register a `process.on('exit')` handler in autopilot.mjs that kills the dev server PID. Also register `SIGINT` and `SIGTERM` handlers to prevent orphan processes.
-
-**Detection:** All tests fail with "connection refused" or "navigation timeout." Startup command in process but server not yet listening.
-
-**Phase:** Must be addressed in the autopilot integration phase (where `runAutomatedUAT()` is implemented). The startup management is autopilot's responsibility, not the workflow's.
-
-**Confidence:** HIGH -- universally known issue in browser testing. [Playwright docs](https://betterstack.com/community/guides/testing/avoid-flaky-playwright-tests/) and [BrowserStack](https://www.browserstack.com/guide/playwright-flaky-tests) explicitly warn against fixed waits.
-
-### Pitfall 4: Gap Format Incompatibility Breaks Closure Loop
-
-**What goes wrong:** The design introduces `MILESTONE-UAT.md` with a YAML gap format that must be consumed by `plan-milestone-gaps`. If the gap format from UAT differs even slightly from what the gap planner expects (different field names, different severity values, missing required fields), the gap closure loop silently produces empty or malformed fix phases.
-
-**Why it happens:** The existing gap format is defined by `MILESTONE-AUDIT.md` and the audit workflow. The UAT gap format in the design uses fields like `truth`, `evidence`, `observed` that may not exist in the audit gap schema. The gap planner may not know how to parse UAT-specific fields. YAML parsing in the codebase already has a known tech debt issue (`extractFrontmatter` does not parse nested YAML array-of-objects).
-
-**Consequences:** UAT failures are detected but never fixed. The gap closure loop creates phases but the plans are empty or nonsensical because the planner could not parse the gap descriptions. The autopilot loops through audit-UAT-gap closure without making progress, eventually hitting the circuit breaker.
-
-**Prevention:**
-1. Use the exact same gap schema as `MILESTONE-AUDIT.md`. Map UAT failures to the existing schema rather than inventing a new one. The `truth`/`status`/`reason`/`severity` fields should match what `plan-milestone-gaps` already parses.
-2. Write an integration test that feeds a sample `MILESTONE-UAT.md` through the gap planning workflow and verifies it produces valid fix phases.
-3. Keep the gap format as simple YAML that `extractFrontmatter` can actually parse -- avoid nested array-of-objects given the known parsing limitation.
-4. The `evidence` and `observed` fields are additive metadata; they should not be required fields for gap planning.
-
-**Detection:** Gap closure phases have empty or generic plans. The planner's output does not reference specific UAT test failures.
-
-**Phase:** Must be addressed in the evidence and reporting phase. Gap format must be validated against existing consumers before implementation.
-
-**Confidence:** HIGH -- the `extractFrontmatter` limitation is documented tech debt, and the gap format is the integration contract between UAT and the existing closure loop.
-
-### Pitfall 5: Subagent Cannot Spawn Subagent
-
-**What goes wrong:** The workflow tries to spawn a nested subagent (e.g., a Playwright-specific agent from within the UAT agent).
-
-**Why it happens:** GSD has a hard constraint documented in PROJECT.md: "Subagents cannot spawn subagents -- the orchestrator must be the top-level spawner." The `/gsd:uat-auto` workflow is spawned by autopilot as a subagent. Any `Task()` calls inside it would create subagent-spawning-subagent, which silently fails.
-
-**Consequences:** Task() calls silently fail or error out, breaking the entire UAT session.
-
-**Prevention:** The `/gsd:uat-auto` workflow must handle BOTH Chrome MCP and Playwright paths in a single agent session. Do not try to spawn separate agents for each browser mode. The workflow detects the browser mode and branches internally. All browser interaction happens through tool calls (Chrome MCP tools or Bash for Playwright scripts), not through additional agent spawning.
-
-**Detection:** Agent errors about Task() or subagent spawning.
-
-**Phase:** Must be addressed in the UAT-Auto workflow architecture phase. This is a fundamental constraint that shapes the entire implementation.
-
-**Confidence:** HIGH -- documented codebase constraint, well-established pattern.
-
-## Moderate Pitfalls
-
-### Pitfall 6: Screenshot Evidence Bloats Git Repository
-
-**What goes wrong:** The design commits PNG screenshots to git for every UAT test, every milestone. Over 10 milestones with 12 tests each, that is 120+ PNGs accumulating in git history. PNGs are binary; git stores them as full copies on every change. Repository clone time and size grow linearly. Per industry reports, thirty screenshots updated weekly can result in 156MB of history per year.
-
-**Why it happens:** The design explicitly states "Evidence PNGs are committed to git" and "Old evidence is cleaned up during milestone archival." But git history is permanent -- archival removes files from the working tree but not from pack files.
-
-**Prevention:**
-1. Add `.planning/uat-evidence/` to `.gitignore` and store evidence as ephemeral artifacts. Only commit the `MILESTONE-UAT.md` results file, not the screenshots. If evidence is needed for debugging, it is available in the local filesystem until archival.
-2. If screenshots must be committed, enforce max dimensions (1280x720), use JPEG at 80% quality instead of PNG (evidence, not pixel-perfect baselines), and consider git LFS.
-3. At minimum, clean up evidence PNGs from git history (not just working tree) during milestone archival.
-
-**Phase:** Should be addressed in the evidence and reporting phase.
-
-**Confidence:** MEDIUM -- the design handles archival cleanup, but [git history bloat](https://dev.to/omachala/your-screenshot-automation-is-bloating-your-git-repo-3lgc) is a known long-term issue with binary files.
-
-### Pitfall 7: Playwright Fallback Produces Different Results Than Chrome MCP
-
-**What goes wrong:** The dual-engine approach means the same test suite can produce different results depending on which engine runs. Chrome MCP uses a real headed Chrome with extensions and user-agent; Playwright uses headless Chromium with a different user-agent and no extensions. Applications that detect headless mode, bot user-agents, or depend on Chrome extensions will behave differently.
-
-**Why it happens:** Chrome MCP operates on the user's actual Chrome browser with full state (cookies, extensions, logged-in sessions). Playwright creates an isolated browser context with no state. The design says "Output format: Identical to Chrome MCP mode" but the browser behavior is not identical.
-
-**Prevention:**
-1. Document that UAT tests must not depend on pre-existing browser state (cookies, login sessions). If authentication is required, the UAT test must include login steps.
-2. Set Playwright's user-agent to match Chrome's to avoid bot detection differences.
-3. Record which engine was used in `MILESTONE-UAT.md` (the design already does this) and do not compare results across engines. A test that passes in Chrome MCP and fails in Playwright is an engine difference, not a regression.
-
-**Phase:** Should be addressed in both engine implementation phases with a shared test contract.
-
-**Confidence:** MEDIUM -- known issue in dual-browser testing strategies.
-
-### Pitfall 8: Timeout Management Across Nested Loops
-
-**What goes wrong:** The design adds a new step (`runAutomatedUAT()`) between audit and completion in a pipeline that already has nested timeout management: stall detection in `runClaudeStreaming()` (5 min default), debug retry limits, gap closure iteration limits (configurable max), and the progress circuit breaker. The UAT session has its own 10-minute timeout. If UAT triggers gap closure, which triggers re-audit, which triggers re-UAT, the total wall-clock time can exceed any reasonable expectation.
-
-**Why it happens:** Each layer manages its own timeout independently. There is no top-level wall-clock budget for the entire audit-UAT-gap-reaudit cycle.
-
-**Prevention:**
-1. Add a top-level wall-clock timeout for the post-audit phase (audit + UAT + gap closure combined). Default 30 minutes. If exceeded, halt and escalate.
-2. Limit UAT-triggered gap closure to 1 iteration. If UAT fails after gap closure, escalate to human rather than looping again. Reasoning: if the first fix did not resolve the UAT failure, subsequent automated attempts are unlikely to succeed.
-3. Make the UAT timeout configurable in `uat-config.yaml` and scale it by test count (10 minutes for 5 tests is fine; 10 minutes for 30 tests is not).
-
-**Phase:** Should be addressed in the autopilot integration phase where `runAutomatedUAT()` is wired into the main flow.
-
-**Confidence:** HIGH -- the existing pipeline already has multiple timeout layers; adding another without coordination is a known integration risk.
-
-### Pitfall 9: UAT Test Discovery Produces Zero Tests or Fabricated Tests
-
-**What goes wrong:** If no phases in the current milestone produced UAT.md files (infrastructure-only milestone), the fallback is to "generate test scenarios from SUMMARY.md files." This fallback produces AI-generated tests that may have no relationship to actual user-facing behavior.
-
-**Why it happens:** Not every milestone has web UI changes. The UAT.md files are produced by `verify-work` which only runs when there is something to verify manually.
-
-**Prevention:**
-1. When zero UAT.md files are found AND no SUMMARY.md files describe UI changes, skip UAT entirely with a clear "No UAT-testable changes in this milestone" message. Do not fabricate tests.
-2. The `uat-config.yaml` presence is already the opt-in gate. Reinforce: no config = no UAT, no exceptions.
-3. Follow the precedent from v2.7 where the `gsd-playwright` agent returns BLOCKED status when acceptance tests are missing. Same pattern: no testable content = BLOCKED, not "generate something."
-
-**Phase:** Should be addressed in the test discovery phase.
-
-**Confidence:** HIGH -- the BLOCKED pattern from v2.7 is an established codebase precedent.
-
-### Pitfall 10: Context Window Exhaustion During Multi-Test Sessions
-
-**What goes wrong:** The Chrome MCP agent processes all UAT tests sequentially in a single Claude session. Each test involves navigation, interaction, screenshot capture (which consumes tokens as image data), DOM content extraction, and judgment. With 12+ tests, the context window fills. Claude's Chrome documentation itself warns about increased context consumption with browser tools enabled.
-
-**Why it happens:** Screenshots are multimodal input that consume significant tokens. DOM content can be large (especially for SPAs). The design runs all tests in one session with no batching.
-
-**Prevention:**
-1. Batch tests: run no more than 5 tests per Claude session. Between batches, spawn a new session with results-so-far and remaining tests.
-2. Minimize DOM capture: extract only relevant DOM elements rather than full `chrome_get_web_content`.
-3. Do not accumulate screenshots in conversation history -- take the screenshot, judge it, record the result, move on. Evidence is saved to disk; it does not need to persist in context.
-4. Set a test count limit in `uat-config.yaml` (default: 20 tests max per session).
-
-**Phase:** Should be addressed in the UAT-Auto workflow implementation phase.
-
-**Confidence:** MEDIUM -- depends on actual token consumption per test, which varies by application complexity. [Claude Chrome docs](https://code.claude.com/docs/en/chrome) confirm increased context usage.
-
-### Pitfall 11: Playwright Fallback Chromium Not Installed
-
-**What goes wrong:** Playwright is in devDependencies (`@playwright/test` installed) but Chromium browser binary is not downloaded (`npx playwright install chromium` never ran). The existing `detectPlaywright()` returns `installed` if the package exists, but that does not guarantee the binary.
-
-**Prevention:** The Playwright fallback path must check for the browser binary, not just the npm package. Add `npx playwright install chromium` as part of the fallback initialization path. This is an existing gap in the three-tier detection from v2.7.
-
-**Detection:** Playwright scripts fail with "browser not found" errors.
-
-**Phase:** Playwright fallback engine phase.
-
-**Confidence:** HIGH -- known limitation of `detectPlaywright()`.
-
-## Minor Pitfalls
-
-### Pitfall 12: Port Conflicts When Starting Dev Server
-
-**What goes wrong:** The startup command binds to a port already in use (from a previous failed UAT run or another dev server). The startup command fails or binds to an alternate port, but UAT tests navigate to the original `base_url` port.
-
-**Prevention:** Before running the startup command, check if `base_url` port is already responding. If so, either use the existing server or warn. After startup, verify the server is on the expected port by hitting `base_url` directly.
-
-**Phase:** Autopilot integration phase.
-
-### Pitfall 13: Chrome MCP ~5s Per Call Latency Compounds
-
-**What goes wrong:** Each Chrome MCP tool call has approximately 5 seconds of MCP protocol overhead. A single test with 5 tool calls = 25 seconds. Twelve tests = 5 minutes just in MCP overhead, before any actual page load or interaction time.
-
-**Prevention:** Factor MCP latency into timeout calculations. A 10-minute UAT timeout with 12 tests allows only ~50 seconds of actual testing per test after MCP overhead. Increase default timeout or reduce test count expectations. Playwright fallback does not have this overhead and is significantly faster.
-
-**Phase:** Chrome MCP engine implementation phase.
-
-**Confidence:** MEDIUM -- [5s per call is reported](https://www.hanifcarroll.com/blog/browser-automation-tools-comparison-2026/) but may vary by setup.
-
-### Pitfall 14: YAML Config Type Coercion
-
-**What goes wrong:** `startup_wait_seconds: 10` parsed as string "10" instead of number 10 by hand-rolled parser.
-
-**Prevention:** Use js-yaml for parsing (handles types correctly). If using `extractFrontmatter`, must explicitly parseInt/parseFloat.
-
-**Phase:** Config parsing phase.
-
-### Pitfall 15: Base URL Trailing Slash Inconsistency
-
-**What goes wrong:** Config has `base_url: "http://localhost:3000"` but test descriptions reference "/dashboard". URL concatenation produces double slashes or missing slashes.
-
-**Prevention:** Normalize base_url by stripping trailing slash in the config loader. Use `new URL(path, base)` for path resolution.
-
-**Phase:** Config parsing phase.
-
-### Pitfall 16: Evidence Path Convention Mismatch
-
-**What goes wrong:** The design specifies `{phase}-test-{N}.png` naming but phase identifiers in the codebase use mixed conventions (e.g., `04-comments` vs `04` vs `phase-04`). Known v2.7 tech debt: path convention mismatch.
-
-**Prevention:** Use a consistent, simple naming scheme: `test-{sequential-number}.png`. Do not encode phase information in the filename -- that is already captured in the results table. After writing evidence, verify the file exists at the recorded path.
-
-**Phase:** Evidence and reporting phase.
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Chrome MCP engine | Detection false positive (#1), 5s/call latency (#13) | Full round-trip probe, latency-aware timeouts |
-| Playwright fallback engine | Result divergence (#7), Chromium not installed (#11), missing `webServer` block (v2.7 debt) | Shared test contract, binary check, Playwright native startup |
-| UAT-Auto workflow | Non-deterministic judgment (#2), context exhaustion (#10), zero-test discovery (#9), subagent constraint (#5) | Confidence scoring, test batching, BLOCKED status, single-agent design |
-| Autopilot integration | App startup race (#3), timeout cascade (#8), port conflicts (#12), orphan processes | HTTP polling, top-level timeout budget, port check, exit handlers |
-| Evidence and reporting | Gap format incompatibility (#4), git bloat (#6), path mismatches (#16) | Reuse audit gap schema, gitignore evidence, simple naming |
-| Config parsing | Type coercion (#14), URL normalization (#15) | Use js-yaml, use URL constructor |
-| Test phase (unit/integration) | Testing non-deterministic AI output | Test the protocol (structured output, retry logic), not the judgment content |
-
-## Existing Tech Debt Interactions
-
-These known tech debt items from the codebase directly interact with UAT implementation:
-
-| Tech Debt Item | UAT Interaction | Risk |
-|----------------|-----------------|------|
-| `extractFrontmatter` cannot parse nested YAML array-of-objects | MILESTONE-UAT.md gaps section uses YAML arrays | Gap parsing may fail silently |
-| `playwright-detect --raw` returns string not JSON | Fallback detection logic may mis-parse result | False negative on Playwright availability |
-| Scaffolding templates omit `webServer` block | Playwright fallback needs startup management | Must implement startup separately or fix scaffolding |
-| Test budget at 103.25% (826/800) | New UAT infrastructure tests add to count if not excluded | Must add exclusion pattern like existing e2e/ exclusion |
-| v2.7 path convention mismatch | Evidence file paths must be consistent | Use simple sequential naming |
+**Phase to address:**
+Phase 1 (`handleMessage` implementation). The message capture logic must accumulate assistant text throughout the session.
+
+---
+
+### Pitfall 7: ~12s Cold Start Overhead Per `query()` Call
+
+**What goes wrong:**
+Every `query()` call spawns a fresh Claude Code subprocess. This has a consistent ~12 second startup overhead (issue #34). The autopilot makes 4+ `query()` calls per phase (discuss, plan, execute, verify), with up to 10+ phases per milestone. That is 40-120+ calls, adding 8-24 MINUTES of pure startup overhead per milestone run.
+
+**Why it happens:**
+The SDK spawns a new process for every `query()` call (unlike the CLI which also spawns a new process per invocation). This is architecturally intentional for isolation, but the overhead is significant for sequential workflows.
+
+**How to avoid:**
+This is a known limitation that was partially addressed by streaming input mode (sessions). However, the autopilot design intentionally uses separate `query()` calls per step to get fresh context windows -- this is a FEATURE, not a bug. Each GSD phase needs a clean context to prevent context rot across phases.
+
+Mitigation strategies:
+1. Accept the overhead. 12s per call across 50 calls = 10 minutes of overhead. The alternative (context rot) is worse.
+2. Do NOT try to use sessions to reuse processes across phases -- the fresh context is critical.
+3. Consider batching where possible: if discuss + plan can be a single prompt, that saves one cold start. But this violates the current architecture's isolation guarantees.
+4. Log the overhead so it is visible in timing reports. Users should know "12s of that 5-minute phase was startup."
+
+**Warning signs:**
+- Autopilot wall-clock time significantly exceeds expected API time
+- `duration_ms` vs `duration_api_ms` in ResultMessage shows large gaps
+- Users complain about autopilot being "slow" even on simple milestones
+
+**Phase to address:**
+Phase 1 (acknowledge and document). Not a bug to fix but a tradeoff to accept and communicate. Add startup overhead to timing logs.
+
+---
+
+### Pitfall 8: Hook `continue: false` Silently Ignored
+
+**What goes wrong:**
+The design document uses `PostToolUse` hooks for stall detection. If a hook returns `{ continue: false }` to stop the agent, the CLI subprocess may silently ignore this signal (issue #29991, open). The agent continues running despite the hook's instruction to stop.
+
+**Why it happens:**
+The SDK communicates hook results to the CLI subprocess via a JSON control protocol. The `continue: false` field in `PostToolUse` responses is documented to stop execution, but the CLI may not honor it in all code paths. This is a known bug.
+
+**How to avoid:**
+Do NOT rely on `continue: false` for critical safety stops. The stall detection design in the migration doc uses hooks for WARNINGS only (logging, stderr output) -- this is correct and safe. If you need to actually STOP a stalled agent:
+1. Use `maxTurns` as the hard stop (always honored).
+2. Use `maxBudgetUsd` as a cost-based hard stop (always honored).
+3. For emergency kills, use the `AbortController` from outside the hook.
+4. The stall timer pattern (setTimeout with warnings) is fine because it only emits warnings; the actual kill comes from maxTurns or budget limits.
+
+**Warning signs:**
+- Stall detection warnings appear but agent continues running indefinitely
+- Hook fires correctly (verified via logging) but agent doesn't stop
+- Agent exceeds expected turn count despite hooks returning `continue: false`
+
+**Phase to address:**
+Phase 2 (hook implementation). Design hooks for observability (logging, warnings), not for control flow. Use maxTurns/maxBudgetUsd for hard limits.
+
+---
+
+### Pitfall 9: Stall Timer Lifecycle Mismatch
+
+**What goes wrong:**
+The current stall detection uses `armStallTimer()` called on each NDJSON line received from the streaming CLI. The migration design replaces this with a `PostToolUse` hook. But tool-use hooks only fire AFTER a tool completes. If the agent is "thinking" (generating a long text response with no tool calls), no `PostToolUse` hooks fire and the stall timer from the initial `armStallTimer()` call eventually triggers a false stall warning.
+
+The current NDJSON streaming fires on EVERY output line including assistant text tokens, so stalls are only detected when there is truly no output at all. The SDK hooks are coarser-grained -- they fire per tool completion, not per token.
+
+**Why it happens:**
+Granularity difference: NDJSON lines arrive every few hundred milliseconds during active generation. PostToolUse hooks fire only when a tool round-trip completes (could be minutes apart during long Bash commands or file reads). The stall detection interval (5 minutes default) may be fine for the hook granularity, but edge cases exist:
+- A very long `npm install` that takes 6 minutes with no tool completion would trigger a false stall warning.
+- A thinking-heavy response with no tool calls would never re-arm the timer.
+
+**How to avoid:**
+Two approaches:
+1. Keep the 5-minute default but make it generous enough to cover slow tool calls. 5 minutes is already generous; increase to 10 minutes if needed.
+2. Add an `AssistantMessage` check in the message iteration loop (not just hooks) to re-arm the timer when any message is received:
+```javascript
+for await (const message of query({...})) {
+  armStallTimer(); // Re-arm on ANY message, not just PostToolUse
+  handleMessage(message, { quiet, outputFile });
+}
+```
+This restores the current behavior's granularity while keeping hooks for additional observability.
+
+**Warning signs:**
+- False stall warnings during legitimate long-running operations
+- Stall warning followed immediately by tool completion
+- No stall warnings ever (timer not being armed correctly)
+
+**Phase to address:**
+Phase 2 (stall detection migration). The message-loop-based re-arm is simpler and more correct than hook-only stall detection.
+
+---
+
+### Pitfall 10: `message.message.content` vs `message.content` Confusion
+
+**What goes wrong:**
+In the TypeScript SDK, `AssistantMessage` and `UserMessage` wrap the raw API message in a `.message` field. Content blocks are at `message.message.content`, NOT `message.content`. Writing `message.content` compiles without error (TypeScript structural typing may allow it or it returns undefined), producing silent data loss where assistant text is never displayed.
+
+**Why it happens:**
+The CLI streaming mode returns flat NDJSON events where `event.message.content` is the content array. The SDK wraps this in another layer. The current `displayStreamEvent()` uses `event.message?.content` which happens to be the correct path for both CLI events and SDK messages -- but this is coincidental. If the migration changes the variable name or destructures differently, the path can break.
+
+**How to avoid:**
+The design document's `handleMessage()` already uses the correct path:
+```javascript
+const content = message.message?.content || [];
+```
+This is correct. The risk is during refactoring. Add a type assertion or runtime check:
+```javascript
+if (message.type === "assistant" && !message.message?.content) {
+  console.error("WARNING: AssistantMessage has no content -- possible SDK version mismatch");
+}
+```
+
+**Warning signs:**
+- Agent runs but produces no visible output
+- Output file is empty despite agent completing successfully
+- `handleMessage` processes messages but nothing appears on stdout
+
+**Phase to address:**
+Phase 1 (`handleMessage` implementation). Test with actual SDK output early.
+
+---
+
+## Technical Debt Patterns
+
+Shortcuts that seem reasonable but create long-term problems.
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Synthesizing exit codes from result subtypes | Minimal caller changes | Loses subtype information, wrong debug-retry behavior | Never -- use subtypes directly |
+| Skipping `disallowedTools` configuration | Faster initial implementation | `AskUserQuestion` can hang autonomous agent | Never -- block interactive tools from day 1 |
+| Using `settingSources: ["user", "project", "local"]` | "Gets everything" | User-level settings vary across machines, non-reproducible behavior | Only if cross-machine consistency not needed |
+| Not storing AbortController reference | Simpler code | Orphaned processes on SIGINT | Never -- always store and abort on signal |
+| Keeping stall detection only in hooks | Cleaner separation of concerns | False stall warnings during thinking-heavy turns | Only if stall timeout is very generous (15+ min) |
+
+## Integration Gotchas
+
+Common mistakes when connecting the Agent SDK to the existing autopilot infrastructure.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Circuit breaker | Treating `error_max_turns` as zero-progress | Check if turns > 0 and artifacts changed before counting as no-progress |
+| Debug retry | Retrying on `error_max_budget_usd` | Budget exceeded is an escalation, not a retryable error |
+| Output capture | Reading `result` field on error subtypes | Accumulate `AssistantMessage` text during iteration for error context |
+| Temp file logging | Using `fs.appendFileSync(outputFile, line)` with SDK messages | Use `JSON.stringify(message)` since SDK messages are objects, not strings |
+| Quiet mode | Suppressing all messages including result | Always process `ResultMessage` even in quiet mode to capture exit status |
+| MCP servers | Passing MCP config for all steps | Only pass Chrome MCP for UAT steps; other steps pay context-window cost for unused tool schemas |
+| Verification gate | Expecting exit code 10 for gaps_found | SDK has no concept of exit code 10; check verification status via `getVerificationStatus()` after step completes (current behavior, unchanged) |
+
+## Performance Traps
+
+Patterns that work at small scale but fail as usage grows.
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Cold start per query() | ~12s overhead x N steps = minutes of idle time | Accept and document; fresh context is worth the cost | Always present, ~10 min overhead per milestone |
+| MCP server startup per step | Each step with MCP servers pays server init cost | Only attach MCP servers to steps that need them | Noticeable when UAT steps are frequent |
+| Message accumulation in memory | Storing all messages for output capture | Only keep last N messages or stream to file | Steps with 200+ turns and large tool outputs |
+| Hook timeout defaults | 60s default timeout may be too short for complex hook logic | Keep hooks fast; use async mode for side-effects | Hooks doing HTTP requests or file I/O |
+
+## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Permission mode:** `bypassPermissions` set -- verify `allowDangerouslySkipPermissions: true` is ALSO set
+- [ ] **System prompt:** Custom or empty -- verify `systemPrompt: { type: "preset", preset: "claude_code" }` is set for full Claude Code behavior
+- [ ] **Settings sources:** Working locally -- verify `settingSources: ["project"]` is set so CLAUDE.md loads
+- [ ] **Signal handling:** SIGINT handler exists -- verify it calls `abort()` on active AbortController, not just cleanup
+- [ ] **Result handling:** Success path works -- verify error subtypes return useful error context (not empty string)
+- [ ] **Stall detection:** Timer arms on query start -- verify it re-arms on message receipt, not only on PostToolUse hooks
+- [ ] **Output file:** Messages written to file -- verify `JSON.stringify(message)` is used (objects not strings)
+- [ ] **Tool restriction:** `allowedTools` configured -- verify `AskUserQuestion` is in `disallowedTools` for autonomous mode
+- [ ] **Quiet mode:** Output suppressed -- verify `ResultMessage` is still processed for exit status and cost tracking
+- [ ] **Cost tracking:** `total_cost_usd` logged -- verify it is accessed from `ResultMessage` (always present) not from `AssistantMessage`
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Missing allowDangerouslySkipPermissions | LOW | Add the flag; no state corruption, just wasted time |
+| Missing settingSources | LOW | Add the option; re-run affected steps |
+| Exit code mapping wrong | MEDIUM | Refactor return type and all callers; may need to re-test retry logic |
+| Orphaned processes | LOW | `pkill -f "claude.*stream-json"`; add AbortController cleanup |
+| allowedTools not restricting | LOW | Add disallowedTools; no harm done if agent didn't use unwanted tools |
+| result field undefined | MEDIUM | Add message accumulation in handleMessage; re-test debug retry flow |
+| Cold start overhead | NONE | Not recoverable; architectural. Accept and document |
+| Hook continue:false ignored | LOW | Switch to maxTurns-based hard stops; hooks remain for observability |
+| Stall timer false positives | LOW | Move timer re-arm to message loop; adjust timeout if needed |
+| message.message.content confusion | LOW | Fix the property path; add runtime assertion |
+
+## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls.
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Missing allowDangerouslySkipPermissions | Phase 1 (core SDK integration) | Test: query() completes with tool calls; no permission_denials |
+| Missing settingSources/systemPrompt | Phase 1 (options configuration) | Test: SystemMessage init shows slash_commands and tools |
+| Exit code vs subtype mismatch | Phase 1 (return type) + Phase 2 (callers) | Test: error_max_turns does not trigger debug retry |
+| Orphaned processes on SIGINT | Phase 1 (signal handler update) | Manual test: Ctrl-C during active query, verify no orphan via `ps` |
+| allowedTools not restricting | Phase 1 (permission strategy) | Test: disallowedTools includes AskUserQuestion |
+| result field undefined on error | Phase 1 (message accumulation) | Test: debug retry receives non-empty error context on failure |
+| Cold start overhead | Phase 1 (documentation) | Log: timing shows startup vs API time breakdown |
+| Hook continue:false ignored | Phase 2 (hook design) | Design review: hooks only emit warnings, maxTurns is hard stop |
+| Stall timer lifecycle | Phase 2 (stall detection) | Test: no false stall warning during 3-minute Bash command |
+| message.message.content | Phase 1 (handleMessage) | Test: assistant text appears on stdout during streaming |
 
 ## Sources
 
-- [Chrome MCP bug: cowork MCP connection issues](https://github.com/anthropics/claude-code/issues/27492) -- Chrome MCP connection instability
-- [Browser automation tool comparison](https://www.hanifcarroll.com/blog/browser-automation-tools-comparison-2026/) -- ~5s per call MCP overhead, form interaction reliability
-- [Wrong-machine browser automation](https://mikestephenson.me/2026/03/13/claude-cowork-browser-automation-wrong-machine/) -- Chrome extension routing to wrong machine
-- [Claude Chrome docs](https://code.claude.com/docs/en/chrome) -- increased context consumption with browser tools
-- [Avoiding flaky Playwright tests](https://betterstack.com/community/guides/testing/avoid-flaky-playwright-tests/) -- timing, selectors, hard waits
-- [Playwright flaky tests guide](https://www.browserstack.com/guide/playwright-flaky-tests) -- race conditions, timeout configuration
-- [17 Playwright testing mistakes](https://elaichenkov.github.io/posts/17-playwright-testing-mistakes-you-should-avoid/) -- common Playwright anti-patterns
-- [Screenshot git repo bloat](https://dev.to/omachala/your-screenshot-automation-is-bloating-your-git-repo-3lgc) -- binary file accumulation in git history
-- [Git LFS for screenshots](https://www.techedubyte.com/stop-git-repo-bloat-automate-screenshots-git-lfs/) -- LFS solution for screenshot management
-- GSD codebase: `.planning/RETROSPECTIVE.md` v2.7 section -- known Playwright tech debt, failure categorization pattern
-- GSD codebase: `.planning/PROJECT.md` -- known tech debt (extractFrontmatter, playwright-detect, scaffolding webServer)
-- GSD codebase: `autopilot.mjs` -- existing timeout layers (stall detection, debug retry, gap closure iterations)
+- [Claude Agent SDK TypeScript reference](https://platform.claude.com/docs/en/agent-sdk/typescript) -- Options type, SDKResultMessage union, Query object
+- [Agent SDK migration guide](https://platform.claude.com/docs/en/agent-sdk/migration-guide) -- Breaking changes: systemPrompt default, settingSources default
+- [Agent SDK permissions](https://platform.claude.com/docs/en/agent-sdk/permissions) -- Permission evaluation order, bypassPermissions behavior, allowedTools warning
+- [Agent SDK hooks](https://platform.claude.com/docs/en/agent-sdk/hooks) -- PostToolUse hooks, hook timing, continue:false behavior, common issues
+- [Agent SDK agent loop](https://platform.claude.com/docs/en/agent-sdk/agent-loop) -- Message types, result subtypes, turns and budget, context window
+- [Issue #14279: Tool execution requires approval despite bypassPermissions](https://github.com/anthropics/claude-code/issues/14279) -- Permission flag gotcha
+- [Issue #142: Auto-terminate spawned processes (orphan prevention)](https://github.com/anthropics/claude-agent-sdk-typescript/issues/142) -- No built-in cleanup, orphan accumulation
+- [Issue #34: ~12s overhead per query() call](https://github.com/anthropics/claude-agent-sdk-typescript/issues/34) -- Cold start architectural limitation
+- [Issue #29991: PostToolUse hook continue:false silently ignored](https://github.com/anthropics/claude-code/issues/29991) -- Hook control flow bug
+- [Agent SDK quickstart](https://platform.claude.com/docs/en/agent-sdk/quickstart) -- Basic usage patterns, message handling
+
+---
+*Pitfalls research for: autopilot.mjs Agent SDK migration*
+*Researched: 2026-03-24*

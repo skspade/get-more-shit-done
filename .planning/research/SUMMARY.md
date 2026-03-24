@@ -1,188 +1,203 @@
 # Project Research Summary
 
-**Project:** GSD Automated UAT Session (v3.1)
-**Domain:** Automated browser-based acceptance testing integrated into autonomous development pipeline
-**Researched:** 2026-03-22
+**Project:** Autopilot Agent SDK Migration (v3.2)
+**Domain:** Claude Agent SDK migration — replacing CLI subprocess spawning with SDK `query()` calls in autopilot.mjs
+**Researched:** 2026-03-24
 **Confidence:** HIGH
 
 ## Executive Summary
 
-GSD v3.1 adds a new automated UAT capability to the existing autopilot pipeline. The core innovation is using Claude as the "assertion engine" — a subagent that navigates a live web application using Chrome MCP (primary) or Playwright (fallback), interprets natural language expected behaviors from existing UAT.md files, and produces structured pass/fail results with screenshot evidence. This approach eliminates the need for a test DSL, CSS selectors, or spec file maintenance. The design is an additive integration on well-established GSD patterns (frontmatter-based result communication, gap closure loop, `runClaudeStreaming`) with only one new npm dependency (`js-yaml`).
+This is a targeted dependency migration of `autopilot.mjs`: replacing `runClaudeStreaming()` (which spawns `claude -p` via zx `$`) with `runAgentStep()` (which calls `query()` from `@anthropic-ai/claude-agent-sdk`). The SDK is ESM-only, ships with full TypeScript types, has zero npm dependencies of its own (zod is a required peer), and works under the same Claude Code CLI authentication model. The migration scope is intentionally narrow — only the Claude invocation layer changes. The phase loop, circuit breaker, CJS module bridge, gsd-tools shell layer, and all state management are untouched.
 
-The recommended implementation sequencing follows dependency order: define artifact schemas first (uat-config.yaml, MILESTONE-UAT.md format), build the UAT workflow second (the "brain" that executes tests), then wire it into autopilot third, and add gap closure integration last. The most critical architectural constraint is that the `/gsd:uat-auto` workflow must handle both Chrome MCP and Playwright execution paths internally — it cannot spawn subagents. The result communication contract (YAML frontmatter status: passed/gaps_found) must match the existing audit pattern exactly.
+The recommended approach is a 3-phase sequential build corresponding to the 7-step build order documented in ARCHITECTURE.md: first implement the core invocation layer and all critical safety configuration, then update all caller sites and add turn/budget safety controls, then layer on per-step MCP configuration and observability. This order ensures each phase is independently verifiable before the next and avoids the largest risk: a partially migrated state where both old and new code paths are live simultaneously.
 
-The two risks that most threaten the implementation are: (1) Chrome MCP connection instability causing false positives in availability detection — mitigated by requiring a full round-trip probe (not just `tabs_context_mcp`), and (2) AI-driven pass/fail judgment being non-deterministic — mitigated by requiring DOM-first assertions, a structured confidence score per verdict, and single-retry before recording failure. App startup race conditions (fixed wait vs HTTP polling) and YAML gap format incompatibility with the existing closure loop are the next-highest risks.
+The critical risks are concentrated entirely in Phase 1 and are all well-documented in official SDK sources. The most dangerous is the two-part permission configuration — both `permissionMode: "bypassPermissions"` AND `allowDangerouslySkipPermissions: true` are required, unlike the single `--dangerously-skip-permissions` CLI flag. The second is the SDK's breaking default (since v0.1.0) of NOT loading `settingSources` or the Claude Code system prompt — both must be explicitly set or the agent will ignore all CLAUDE.md instructions. The third is treating result subtypes as a binary exit code, which causes the debug retry loop to fire on budget-exceeded and turn-limit outcomes that are not retryable execution errors. All three are already correctly specified in the design document; the risk is implementation drift.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The only new npm dependency is `js-yaml ^4.1.1`, added to parse `uat-config.yaml`. Everything else reuses the existing stack: `zx` for background process management (dev server startup), Node.js built-in `fetch` for readiness polling, `Buffer`/`fs` for screenshot decoding, Chrome MCP tools (already available via MCP), and `@playwright/test` (already in devDependencies). The hand-rolled `extractFrontmatter` parser cannot reliably handle YAML type coercion or nested structures, making a real parser necessary even for a simple config file.
+The only new dependencies are `@anthropic-ai/claude-agent-sdk@^0.2.81` and `zod@^4.0.0` (required peer). The SDK is actively maintained (66 releases, latest published 2026-03-20), ESM-only (`sdk.mjs`), and requires Node.js >=18.0.0. The project's `package.json` `engines` field must be bumped from `>=16.7.0` to `>=18.0.0` — the actual runtime is v22.20.0 so there is no practical impact, only a correctness fix. The SDK spawns Claude Code as a subprocess internally, so no authentication changes are needed. The existing `which('claude')` prerequisite check remains valid; `which('node')` can be removed since the SDK manages its own Node.js requirement.
 
 **Core technologies:**
-- `js-yaml ^4.1.1`: YAML config parsing — lighter and simpler than `yaml` (eemeli), zero dependencies, type-safe coercion for numeric fields
-- Chrome MCP tools: primary browser engine — `chrome_navigate`, `chrome_click_element`, `chrome_fill_or_select`, `chrome_screenshot`, `chrome_get_web_content` — no npm package, available via MCP tool calls
-- `@playwright/test ^1.50.0` (already installed): fallback browser engine — ephemeral inline scripts executed via Bash, no persistent spec files
-- `zx` (already installed): background dev server spawn and health-check polling
-- Node.js built-in `fetch` + `Buffer`/`fs`: HTTP polling for readiness, PNG screenshot decoding
-
-**Not adding:** `wait-on`, `tree-kill`, `yaml` (eemeli), `puppeteer`, `sharp`, `fast-glob`, or any test assertion library. Each is explicitly rejected as over-engineering for this scope.
+- `@anthropic-ai/claude-agent-sdk@^0.2.81`: replaces CLI subprocess spawning — ESM, ships `.mjs` + `.d.ts`, zero npm deps, same CLI auth model
+- `zod@^4.0.0`: required peer dependency of the SDK — not used directly in project code
+- `engines.node` bump to `>=18.0.0`: correctness fix only, runtime already at v22.20.0
+- All existing stack (zx, js-yaml, CJS bridge, gsd-tools, Chrome MCP): fully unchanged
 
 ### Expected Features
 
-The feature set is clearly scoped by the approved design document. All features are well-defined with concrete dependencies.
+The migration preserves all existing autopilot functionality while adding observability and safety capabilities that were impossible with CLI subprocess spawning. Every feature maps directly to a verified SDK API.
 
-**Must have (table stakes):**
-- `uat-config.yaml` schema and validation — gates whether UAT runs at all; missing = skip silently
-- UAT test discovery from existing `*-UAT.md` files — reuses verify-work artifacts, no test redefinition
-- Browser engine auto-detection (Chrome MCP probe then Playwright fallback) — fully autonomous, no user intervention
-- Chrome MCP execution engine — navigate, interact, screenshot, judge pass/fail in natural language
-- Playwright fallback engine — headless Chromium via ephemeral inline scripts for CI/SSH environments
-- Screenshot evidence per test — stored in `.planning/uat-evidence/{milestone}/`, proves what agent observed
-- `MILESTONE-UAT.md` results report — YAML frontmatter (`status`, counts, browser, timestamps) + results table + gaps section
-- Gap format compatible with `plan-milestone-gaps` — identical schema to `MILESTONE-AUDIT.md` gaps
-- `runAutomatedUAT()` in autopilot.mjs — wired after audit pass, before milestone completion, returns 0/10/1
-- UAT skip when no `uat-config.yaml` — non-web projects proceed directly to completion
+**Must have (table stakes — v3.2):**
+- `runAgentStep()` wrapping `query()` — core replacement covering all 5 `runClaudeStreaming()` call sites
+- `handleMessage()` typed dispatch — replaces `displayStreamEvent()` NDJSON parsing with SDK type discrimination
+- `permissionMode: "bypassPermissions"` + `allowDangerouslySkipPermissions: true` — replaces single CLI flag; both fields required
+- `systemPrompt: { type: "preset", preset: "claude_code" }` + `settingSources: ["project"]` — explicit requirements due to SDK v0.1.0 breaking change
+- Per-step `maxTurns` via `TURNS_CONFIG` — configurable per step type (discuss:100, plan:150, execute:300, verify:100, debug:50, audit:100, uat:150, completion:50)
+- `buildStepHooks()` with `PostToolUse` stall detection — replaces custom NDJSON-line-based stall timer; stall timer also re-armed in the message loop to handle thinking-heavy turns
+- Optional `maxBudgetUsd` per-step cost cap — new capability impossible with CLI subprocess approach
+- Per-step MCP server configuration — Chrome DevTools MCP only attached to UAT steps
+- Cost and turn tracking from `SDKResultMessage` — `total_cost_usd`, `num_turns`, `duration_ms` now always available
+- `disallowedTools: ["AskUserQuestion"]` — blocks autonomous agent from hanging on interactive prompts
+- Config key registration for all new settings in `config.cjs`
+- Delete `runClaudeStreaming()`, `displayStreamEvent()`, and `which('node')` check
 
-**Should have (differentiators):**
-- Natural language test interpretation — no assertion DSL, selectors, or codegen; Claude reads UAT.md descriptions directly
-- Multimodal pass/fail judgment — both screenshot (visual) and DOM content (structural) as evidence
-- Test scenario generation from SUMMARY.md — fallback when no UAT.md files exist for a milestone
-- Gap closure loop integration — failed tests automatically feed into fix phases, re-audit, re-test cycle
-- App startup management — starts dev server if not running, skips if already up
+**Should have (v3.2 if time permits):**
+- `AbortController` integration with SIGINT/SIGTERM handlers — cleaner cancellation, prevents orphaned Claude subprocesses
+- Session ID logging in step banners — improves post-mortem debugging
 
-**Defer (post-v3.1):**
-- Phase-level automated UAT (replacing human verify-work at individual phases)
-- Custom Chrome MCP tool allowlists
-- UAT result trending across milestones
-- Configurable severity thresholds for gap creation
+**Defer (v3.2.x and beyond):**
+- `gsd debug-session <id>` command leveraging `listSessions()` / `getSessionMessages()`
+- V2 SDK interface evaluation (`createSession` / `send` / `stream`) — explicitly marked preview/unstable, do not use until stable
+- Programmatic agent definitions via SDK `agents` option
+- Per-step `effort` tuning (`'low' | 'medium' | 'high' | 'max'`)
+
+**Anti-features confirmed — do NOT build:**
+- Session resume across steps (defeats fresh context window design; each query must start fresh)
+- `includePartialMessages: true` streaming (token-level events create massive message volume with no benefit)
+- In-process MCP servers via `createSdkMcpServer()` (adds Zod schema complexity; stdio MCP works fine)
+- File checkpointing via `enableFileCheckpointing` (conflicts with git-based circuit breaker)
 
 ### Architecture Approach
 
-The automated UAT session inserts as a single new step (`runAutomatedUAT()`) in the autopilot milestone-completion flow, between `runMilestoneAudit()` returning 0 and `runMilestoneCompletion()`. It introduces 4 new components (the function, the workflow file, the config file, and the results artifact) and modifies 2 existing ones (autopilot.mjs at 3 insertion points, plan-milestone-gaps.md to recognize MILESTONE-UAT.md as a gap source). All result communication follows the established frontmatter-based pattern: the workflow writes YAML frontmatter with `status: passed|gaps_found`, and autopilot reads it via `gsd-tools frontmatter get`. The exit code contract (0=pass, 10=gaps, 1=error) matches `runMilestoneAudit()` exactly, making the gap closure loop reuse trivial.
+The architecture change is surgical: `runAgentStep()` is a drop-in replacement for `runClaudeStreaming()` at all 5 call sites, all of which converge to one function. The module layer boundary is fully preserved — autopilot.mjs (ESM) calls the SDK (ESM), and the existing `createRequire()` bridge for CJS modules is unaffected. The data flow changes from NDJSON-over-readline to typed `AsyncGenerator<SDKMessage>` iteration, eliminating all JSON.parse try/catch. Output parity is maintained: assistant text to stdout, tool names to stderr. New capability: `SDKResultMessage` provides `total_cost_usd`, `num_turns`, `duration_ms`, and per-model token usage.
 
 **Major components:**
-1. `runAutomatedUAT()` in autopilot.mjs — gates on config existence, spawns workflow, parses results, routes to completion or gap closure
-2. `uat-auto.md` workflow — the single subagent that handles discover/detect/execute/report; must contain BOTH Chrome MCP and Playwright paths internally (no subagent spawning allowed)
-3. `uat-config.yaml` (per-project) — declares `base_url`, `startup_command`, `startup_wait_seconds`, `browser`, `fallback_browser`, `timeout_minutes`
-4. `MILESTONE-UAT.md` — results artifact with frontmatter status, counts, and gaps YAML compatible with plan-milestone-gaps
-
-**Key refactoring opportunity:** Extract `auditAndUAT()` helper to eliminate the 3-site duplication in autopilot.mjs where audit-pass leads to UAT before completion.
+1. `runAgentStep()` — NEW: wraps `query()` with all project-specific options (cwd, permissions, hooks, maxTurns, MCP); returns `{ exitCode, stdout, costUsd }`
+2. `handleMessage()` — NEW: typed switch on `message.type` replaces NDJSON line parsing; accumulates `lastAssistantText` for error-subtype output capture; writes messages to outputFile as `JSON.stringify(message)`
+3. `buildStepHooks()` — NEW: PostToolUse stall timer + Stop cleanup; stall re-arming also occurs in the main message loop to handle thinking-heavy turns without false stall warnings
+4. `runStep()` / `runStepCaptured()` / `runStepWithRetry()` / `runVerifyWithDebugRetry()` — MODIFIED: internal calls change from `runClaudeStreaming()` to `runAgentStep()`; all 5 call sites mapped by line number
+5. CJS module layer, gsd-tools shell layer, main phase loop, circuit breaker, signal handlers — UNCHANGED in structure; signal handlers get AbortController addition
 
 ### Critical Pitfalls
 
-1. **Chrome MCP false-positive availability detection** — probe with full round-trip (`tabs_context_mcp` + `tabs_create_mcp` + `chrome_navigate` + response check), not just `tabs_context_mcp` alone. Implement per-test fallback to Playwright if mid-session Chrome MCP calls fail. Confirmed by GitHub issue #27492 and wrong-machine routing reports.
+1. **Missing `allowDangerouslySkipPermissions: true`** — The SDK requires BOTH `permissionMode: "bypassPermissions"` AND this flag; setting only one causes every tool call to hang waiting for permission. Most-reported SDK GitHub issue (#14279). Both flags must be set together in Phase 1.
 
-2. **Non-deterministic AI pass/fail judgment** — use DOM content assertions as primary signal (deterministic), screenshots as supplementary. Require structured confidence score (1-5) per verdict. Re-run any failed test once before recording failure; two consecutive failures = confirmed gap.
+2. **`settingSources` and `systemPrompt` not loaded by default** — SDK v0.1.0 breaking change: CLAUDE.md files and the Claude Code system prompt do not load unless explicitly configured. Agent runs but ignores all GSD project conventions and slash commands. Always include `systemPrompt: { type: "preset", preset: "claude_code" }` and `settingSources: ["project"]`.
 
-3. **App startup race condition** — replace fixed `startup_wait_seconds` with HTTP polling (`fetch(base_url)` every 2 seconds, 60-second hard cap). Check if app is already running before starting it. Capture startup command stderr/stdout and fail explicitly if it exits with non-zero before readiness.
+3. **Exit code vs result subtype semantic mismatch** — `SDKResultMessage.subtype` is a discriminated union, not a binary exit code. `error_max_turns` means productive work happened; `error_max_budget_usd` means cost cap exceeded; only `error_during_execution` is analogous to a process crash. Mapping all non-success subtypes to exit code 1 causes the debug retry loop to fire on non-retryable failures. Return `subtype` directly and switch on it in callers.
 
-4. **Gap format incompatibility** — use the exact same `truth`/`status`/`reason`/`severity` schema as `MILESTONE-AUDIT.md`. The `evidence` and `observed` fields are additive metadata, not required for gap planning. Avoid nested YAML array-of-objects given known `extractFrontmatter` limitation.
+4. **Orphaned Claude processes on SIGINT** — The SDK's internal subprocess does not automatically terminate in all cases when the parent exits. Must store `AbortController` at module scope and call `abort()` before `process.exit()` in signal handlers. Known open issue (#142).
 
-5. **Subagent cannot spawn subagent** — `uat-auto.md` workflow must handle Chrome MCP and Playwright paths in one agent session. All browser interaction happens via tool calls (Chrome MCP tools or Bash for Playwright scripts), never via `Task()`.
+5. **`result` field only exists on success subtype** — `SDKResultMessage.result` is `undefined` on all error subtypes. Must accumulate `lastAssistantText` from `AssistantMessage` objects during iteration and use that for error context when `subtype !== "success"`. Without this, debug retry receives empty error context.
+
+6. **`allowedTools` does NOT restrict in `bypassPermissions` mode** — `allowedTools` is additive/documentary in bypass mode; all tools are approved regardless. Must use `disallowedTools: ["AskUserQuestion"]` to block interactive prompts that would hang the autonomous loop.
+
+7. **~12s cold start per `query()` call** — Architectural limitation, not fixable. With 50+ calls per milestone this adds ~10 minutes of overhead. Accept, log the gap between `duration_ms` and `duration_api_ms`, and communicate to users.
 
 ## Implications for Roadmap
 
-Based on the dependency-driven build order identified in ARCHITECTURE.md, a 5-phase structure is recommended:
+Based on the dependency structure in research, a 3-phase build is recommended. All Phase 1 work must be complete and verified before Phase 2 begins, because Phase 2 modifies callers that depend on Phase 1's return type contract.
 
-### Phase 1: Foundation — Artifact Schemas and Config
+### Phase 1: Core SDK Integration
 
-**Rationale:** Every subsequent component depends on having defined formats for inputs and outputs. Schema definition has no dependencies and unblocks parallel work on the workflow and autopilot function.
-**Delivers:** `uat-config.yaml` schema with validation, `MILESTONE-UAT.md` format specification, `uat-evidence/` directory structure, `uat-auto` command spec
-**Addresses:** Table stakes items: config schema (gate for UAT), MILESTONE-UAT.md format (result contract)
-**Avoids:** Pitfall 4 (gap format incompatibility) — define gap schema as identical to audit schema from the start; Pitfall 14/15 (YAML type coercion, URL normalization) — specify js-yaml and URL constructor as required tools
+**Rationale:** All critical pitfalls are Phase 1 issues. The options configuration, permission strategy, message handling, return type design, signal handler updates, and output capture logic must all be correct from the first working call. This phase establishes the contract that all callers depend on.
 
-### Phase 2: UAT Workflow — Chrome MCP Engine and Test Discovery
+**Delivers:** A working `runAgentStep()` that replaces `runClaudeStreaming()` at the simplest call sites (`runStep()` and `runStepCaptured()`), verified end-to-end with an actual discuss or plan step.
 
-**Rationale:** The `uat-auto.md` workflow is the "brain" of the feature. It must exist and be callable before autopilot integration can proceed. Chrome MCP is the primary engine so it should be implemented before the fallback.
-**Delivers:** `uat-auto.md` workflow with Chrome MCP execution (navigate, interact, screenshot, judge), UAT test discovery from `*-UAT.md` files, screenshot saving to evidence directory, MILESTONE-UAT.md production
-**Uses:** Chrome MCP tools, `js-yaml` (config parsing in workflow), `frontmatter.cjs` (MILESTONE-UAT.md write)
-**Implements:** Components 2 and 4 (workflow and results artifact)
-**Avoids:** Pitfall 1 (Chrome MCP false positive) — full round-trip probe; Pitfall 2 (non-deterministic judgment) — DOM-first assertions, confidence scoring, single retry; Pitfall 5 (subagent constraint) — single-agent design; Pitfall 9 (zero tests) — BLOCKED status when no testable content; Pitfall 10 (context exhaustion) — minimize DOM capture, do not accumulate screenshots in context
+**Addresses:**
+- Install `@anthropic-ai/claude-agent-sdk` and `zod`, bump engines field to `>=18.0.0`
+- Remove `which('node')` prerequisite check
+- Add `import { query } from "@anthropic-ai/claude-agent-sdk"` to autopilot.mjs
+- Implement `handleMessage()` with typed switch including `lastAssistantText` accumulation
+- Implement `buildStepHooks()` with PostToolUse stall timer AND message-loop stall re-arm
+- Implement `runAgentStep()` with all required options (both permission flags, systemPrompt preset, settingSources, disallowedTools)
+- Update SIGINT/SIGTERM handlers to store `AbortController` reference and call `abort()` before exit
+- Wire `runAgentStep()` to `runStep()` (line 365) and `runStepCaptured()` (line 553)
+- Return type must expose `subtype` discriminated union, NOT a synthesized exit code
 
-### Phase 3: Playwright Fallback Engine
+**Avoids:** Pitfalls 1, 2, 4, 5, 6, 7, 10 — all are Phase 1 per pitfall-to-phase mapping in PITFALLS.md
 
-**Rationale:** The fallback is a distinct engine with its own reliability concerns. Building it separately from the Chrome MCP engine keeps each implementation focused and allows each path to be tested independently.
-**Delivers:** Playwright fallback path in uat-auto.md workflow, Chromium binary availability check (not just package detection), ephemeral inline script generation and execution via Bash
-**Uses:** `@playwright/test` (existing), Playwright headless Chromium
-**Avoids:** Pitfall 7 (result divergence) — document that tests must not depend on browser state; Pitfall 11 (Chromium not installed) — add `npx playwright install chromium` to fallback initialization
+### Phase 2: Safety Infrastructure and Caller Updates
 
-### Phase 4: Autopilot Integration and Gap Closure Wiring
+**Rationale:** Once the core function and its return type are verified, update the remaining 3 call sites (debug retry paths) and implement the turn-limit and budget controls. These callers need the Phase 1 return type contract to be stable before they are modified.
 
-**Rationale:** Can only proceed once the workflow exists (Phase 2). This is the wiring that makes UAT part of the autonomous pipeline.
-**Delivers:** `runAutomatedUAT()` function in autopilot.mjs, 3 insertion points (or `auditAndUAT()` helper refactor), `runGapClosureLoop()` wired to handle UAT exit code 10, `plan-milestone-gaps.md` modified to scan MILESTONE-UAT.md as gap source, `js-yaml` npm dependency installed
-**Uses:** `gsd-tools frontmatter get` (existing pattern), `runStepWithRetry` (existing pattern), `fs.existsSync` for config gate
-**Avoids:** Pitfall 3 (startup race) — HTTP polling not fixed wait, pre-check if already running, exit handlers for orphan processes; Pitfall 8 (timeout cascade) — limit UAT-triggered gap closure to 1 iteration, add top-level wall-clock budget; Pitfall 12 (port conflicts) — pre-check base_url before starting server
+**Delivers:** Complete migration of all 5 `runClaudeStreaming()` call sites; `maxTurns` enforcement per step type; `maxBudgetUsd` optional cap; correct debug retry behavior (only on `error_during_execution`); deletion of all old code.
 
-### Phase 5: Evidence, Reporting, and Documentation
+**Addresses:**
+- Replace `runClaudeStreaming(debugPrompt)` at lines 614, 658, 696 with `runAgentStep(debugPrompt, { maxTurns: TURNS_CONFIG.debug })`
+- Add `TURNS_CONFIG` with per-step-type defaults
+- Wire `maxBudgetUsd` from `getConfig('autopilot.max_budget_per_step_usd', undefined)`
+- Update circuit breaker: do not count `error_max_turns` as zero-progress when turns > 0
+- Update debug retry: only trigger on `error_during_execution` subtype
+- Register all new config keys in `config.cjs` (`autopilot.turns.*`, `autopilot.max_budget_per_step_usd`, `autopilot.max_turns_per_step`)
+- Delete `runClaudeStreaming()` and `displayStreamEvent()` entirely
 
-**Rationale:** Screenshot storage conventions, git hygiene, and documentation are finishers that do not block the core flow but are necessary for production quality.
-**Delivers:** Screenshot git strategy (`.gitignore` for uat-evidence/ or git LFS decision), milestone archival cleanup for uat-evidence/, help.md and USER-GUIDE.md updates, unit/integration tests for autopilot function, `uat-config.yaml` template for new projects
-**Avoids:** Pitfall 6 (git bloat) — add `.planning/uat-evidence/` to `.gitignore`, commit only MILESTONE-UAT.md results; Pitfall 16 (path convention mismatch) — use sequential `test-{N}.png` naming, not phase-encoded names
+**Avoids:** Pitfall 3 (exit code/subtype mismatch in callers), Pitfall 8 (do not use hook `continue: false` for control flow — maxTurns is the hard stop)
+
+### Phase 3: MCP Configuration and Observability
+
+**Rationale:** Per-step MCP server configuration and cost/turn logging are independent of the core migration and can be added once the invocation path is stable. Chrome DevTools MCP for UAT is the only non-trivial wiring.
+
+**Delivers:** UAT steps get Chrome DevTools MCP; all other steps have no MCP schema overhead; per-step cost, turns, and timing logged to session log and final report; cold start overhead visible in timing logs.
+
+**Addresses:**
+- Add `STEP_MCP_SERVERS` mapping with Chrome DevTools config for `automated-uat` steps
+- Wire `mcpServers: STEP_MCP_SERVERS[stepType]?.()` into `runAgentStep()` options
+- Log `total_cost_usd`, `num_turns`, `duration_ms`, `duration_api_ms` from `SDKResultMessage` per step
+- Log the gap between `duration_ms` and `duration_api_ms` to surface cold start overhead (Pitfall 7 mitigation)
+- Add cumulative cost summary to `printFinalReport()`
+- Session ID logging from `SDKSystemMessage` init event
+
+**Avoids:** Pitfall 9 (stall timer lifecycle — message-loop re-arm already implemented in Phase 1 handles this)
 
 ### Phase Ordering Rationale
 
-- Schema definition before implementation prevents the gap format incompatibility pitfall from requiring a rewrite once the closure loop is wired
-- Chrome MCP before Playwright because Chrome MCP is the primary engine; the fallback should share the same test contract established in Phase 2
-- Workflow before autopilot integration because autopilot calls the workflow — you cannot wire a caller before the callee exists
-- Gap closure integration in Phase 4 (same as autopilot) because it is tightly coupled to how autopilot routes UAT exit code 10
-- Evidence/documentation last because it does not block any core functionality
+- Phase 1 before Phase 2: The return type contract (`subtype` discriminated union) must be finalized before updating callers. Updating callers against a wrong return type creates two bugs instead of one and is harder to diagnose.
+- Phase 1 before Phase 3: MCP server config is passed inside `runAgentStep()` — the function must exist and be stable before adding MCP wiring.
+- Phase 2 before Phase 3: Debug retry callers must use the correct return type before layering on observability, to avoid logging stale data from old code paths.
+- Phase 3 is the only phase that could theoretically be split: cost logging and MCP config are independent. However, they share the same `runAgentStep()` options object and are both low-effort, so combining them is efficient.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 2 (Chrome MCP engine):** Chrome MCP connection instability is confirmed but the exact probe sequence that reliably distinguishes "available" from "falsely available" may need experimentation. The 5s/call latency assumption should be validated against actual project Chrome MCP performance before finalizing timeout values.
-- **Phase 3 (Playwright fallback):** The Playwright `webServer` config block is documented as a solution for startup management but the existing GSD scaffolding templates omit it (known v2.7 tech debt). Determine whether to fix scaffolding templates as part of this phase or implement startup separately.
+Phases with standard patterns (skip additional research — implementation can proceed directly):
+- **Phase 1:** All SDK APIs verified from official docs with HIGH confidence. The exact implementation is specified in ARCHITECTURE.md down to function signatures and line numbers. No additional research needed.
+- **Phase 2:** All config key patterns follow existing `config.cjs` conventions. Debug retry and circuit breaker logic changes are mechanical. No research needed.
+- **Phase 3:** `McpStdioServerConfig` type verified from SDK reference. Chrome MCP command pattern (`npx @anthropic-ai/chrome-devtools-mcp@latest`) is already in production use. No research needed.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Foundation):** Schema definition follows existing MILESTONE-AUDIT.md and VERIFICATION.md patterns exactly. No research needed.
-- **Phase 4 (Autopilot integration):** The `runMilestoneAudit()` function at line 862 of autopilot.mjs is a direct model. Insertion points are identified by line number. No research needed.
-- **Phase 5 (Evidence/documentation):** Standard git hygiene and documentation work. Well-understood patterns.
+No phase requires a `/gsd:research-phase` call. All implementation decisions are resolved by this research.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Single new dependency (js-yaml) is well-established with zero dependencies itself. All other stack components are already in use and verified. Rejections are well-reasoned with explicit alternatives considered. |
-| Features | HIGH | Primary source is the approved design document. Feature list is concrete, scoped, and dependency-mapped. Anti-features are explicit with rationale. |
-| Architecture | HIGH | Codebase was analyzed directly with insertion points identified by line number. Existing patterns (runMilestoneAudit, frontmatter communication, exit code contract) are confirmed to exist. |
-| Pitfalls | HIGH | All 5 critical pitfalls are documented from verified sources (GitHub issues, official docs, codebase tech debt tracking). Chrome MCP instability is confirmed by multiple independent sources. |
+| Stack | HIGH | All facts verified via `npm view` and official Anthropic docs. Version, engines, ESM format, peer deps, and module structure all confirmed directly from npm registry. |
+| Features | HIGH | All features verified against the TypeScript SDK reference, hooks guide, permissions guide, and sessions guide. SDK behavior edge cases confirmed from docs and GitHub issues with issue numbers. |
+| Architecture | HIGH | Data flow, message types, hook signatures, and call site line numbers all verified from the TypeScript reference and agent loop docs. `handleMessage()` and `buildStepHooks()` implementations are design-ready. |
+| Pitfalls | HIGH | All 10 pitfalls sourced from official docs plus confirmed GitHub issues. Recovery strategies and phase assignments provided for each. Critical pitfalls have warning signs and verification criteria. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Chrome MCP probe reliability:** The exact probe sequence that avoids false positives needs empirical validation during Phase 2 implementation. Start with the full round-trip (tabs_context_mcp + tabs_create_mcp + chrome_navigate to base_url) and adjust based on observed behavior.
-- **Test batching threshold:** Context window exhaustion (Pitfall 10) is a MEDIUM confidence risk — actual token consumption per test is application-dependent. Start with 20-test limit in config and monitor.
-- **Gap format consumer compatibility:** Validate during Phase 4 that MILESTONE-UAT.md gap YAML is parseable by plan-milestone-gaps before finalizing the schema. The `extractFrontmatter` nested array limitation may require storing gaps in the markdown body rather than YAML frontmatter.
-- **Dev server lifecycle UX:** The design notes the dev server "can be left running" when the Claude session ends. Clarify whether this is intentional or should be cleaned up, and document the expected behavior for users.
+- **SIGINT propagation through SDK subprocess (MEDIUM confidence):** The exact behavior of SIGINT through the SDK's internal subprocess is not explicitly documented. The `AbortController` + `process.exit(130)` pattern is logically correct and should be manually verified with a Ctrl-C test during a live query in Phase 1 before considering this closed.
+- **`error_max_turns` circuit breaker behavior:** The recommendation to not count `error_max_turns` as zero-progress when turns > 0 is logically correct but untested against the actual circuit breaker implementation. Needs a deliberate maxTurns-hit test scenario in Phase 2.
+- **Cold start timing:** The ~12s figure comes from GitHub issue #34. Actual timing may vary. Phase 3 logging will surface the real number; the 7-step build order footnote in ARCHITECTURE.md should be updated with observed values.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `.planning/designs/2026-03-22-automated-uat-session-design.md` — approved design specification (primary source for all research)
-- `get-shit-done/scripts/autopilot.mjs` — integration points, existing patterns, line-level analysis
-- `get-shit-done/bin/lib/testing.cjs` — Playwright detection three-tier status, known limitations
-- `get-shit-done/workflows/verify-work.md` — UAT.md file format and ownership model
-- `get-shit-done/workflows/audit-milestone.md` — milestone audit patterns replicated for UAT
-- `get-shit-done/workflows/plan-milestone-gaps.md` — gap consumption schema (must be matched)
-- [Chrome DevTools MCP official docs](https://developer.chrome.com/blog/chrome-devtools-mcp) — Chrome MCP tool capabilities
-- [Claude Chrome docs](https://code.claude.com/docs/en/chrome) — context consumption with browser tools
-- [js-yaml npm](https://www.npmjs.com/package/js-yaml) — v4.1.1, 24k+ dependents, zero dependencies
+- [npm: @anthropic-ai/claude-agent-sdk](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) — version, engines, peer deps, module format verified via `npm view`
+- [Agent SDK overview](https://platform.claude.com/docs/en/agent-sdk/overview) — architecture, subprocess spawning model, authentication
+- [Agent SDK quickstart](https://platform.claude.com/docs/en/agent-sdk/quickstart) — Node.js 18+ requirement, installation, basic `query()` usage
+- [Agent SDK TypeScript reference](https://platform.claude.com/docs/en/agent-sdk/typescript) — complete `Options` type, all message types, hook types, `McpStdioServerConfig`
+- [Agent SDK migration guide](https://platform.claude.com/docs/en/agent-sdk/migration-guide) — v0.1.0 breaking changes: systemPrompt default, settingSources default, package rename
+- [Agent SDK hooks guide](https://platform.claude.com/docs/en/agent-sdk/hooks) — PostToolUse/Stop lifecycle, matcher syntax, callback signature, `continue: false` behavior
+- [Agent SDK permissions guide](https://platform.claude.com/docs/en/agent-sdk/permissions) — `bypassPermissions` evaluation, `allowedTools` vs `disallowedTools` semantics
+- [Agent SDK sessions guide](https://platform.claude.com/docs/en/agent-sdk/sessions) — session persistence, `listSessions()`, `getSessionMessages()`
+- [Agent SDK agent loop](https://platform.claude.com/docs/en/agent-sdk/agent-loop) — result subtypes, turn counting, budget enforcement, context window behavior
 
 ### Secondary (MEDIUM confidence)
-- [Browser automation tool comparison 2026](https://www.hanifcarroll.com/blog/browser-automation-tools-comparison-2026/) — ~5s/call Chrome MCP latency overhead
-- [Browser automation for Claude Code comparison](https://dev.to/minatoplanb/i-tested-every-browser-automation-tool-for-claude-code-heres-my-final-verdict-3hb7) — real-world Chrome MCP vs Playwright assessment
-- [Avoiding flaky Playwright tests](https://betterstack.com/community/guides/testing/avoid-flaky-playwright-tests/) — fixed wait anti-pattern, polling alternatives
-- [Screenshot git repo bloat](https://dev.to/omachala/your-screenshot-automation-is-bloating-your-git-repo-3lgc) — binary accumulation in git history
-- [Agentic Browser Landscape 2026](https://www.nohackspod.com/blog/agentic-browser-landscape-2026) — ecosystem overview
+- [GitHub issue #14279: Tool execution requires approval despite bypassPermissions](https://github.com/anthropics/claude-code/issues/14279) — confirms both permission flags required together
+- [GitHub issue #142: Auto-terminate spawned processes](https://github.com/anthropics/claude-agent-sdk-typescript/issues/142) — orphaned process issue, no built-in cleanup
+- [GitHub issue #34: ~12s overhead per query() call](https://github.com/anthropics/claude-agent-sdk-typescript/issues/34) — cold start timing benchmark
+- [GitHub issue #29991: PostToolUse hook continue:false silently ignored](https://github.com/anthropics/claude-code/issues/29991) — hook control flow bug; design around with maxTurns hard stops
+- [GitHub issue #38: zod v3 to v4 peer dependency upgrade](https://github.com/anthropics/claude-agent-sdk-typescript/issues/38) — confirms zod@^4.0.0 requirement context
 
-### Confirmed Issues (codebase and external)
-- [GitHub issue #27492](https://github.com/anthropics/claude-code/issues/27492) — Chrome MCP connection instability confirmed
-- [Wrong-machine routing report](https://mikestephenson.me/2026/03/13/claude-cowork-browser-automation-wrong-machine/) — Chrome extension routing to different machine
-- `.planning/RETROSPECTIVE.md` v2.7 section — Playwright tech debt items (playwright-detect, scaffolding webServer, path conventions)
-- `.planning/PROJECT.md` — known tech debt: extractFrontmatter nested YAML limitation, test budget at 103.25%
+### Tertiary (informational only)
+- [TypeScript V2 preview](https://platform.claude.com/docs/en/agent-sdk/typescript-v2-preview) — confirms V2 is unstable/preview; do not use
 
 ---
-*Research completed: 2026-03-22*
+*Research completed: 2026-03-24*
 *Ready for roadmap: yes*
