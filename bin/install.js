@@ -1060,6 +1060,22 @@ function copyCommandsAsCodexSkills(srcDir, skillsDir, prefix, pathPrefix, runtim
 }
 
 /**
+ * Recursively copy a directory without any transformations.
+ */
+function copyDirRecursive(srcDir, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+/**
  * Recursively copy directory, replacing paths in .md files
  * Deletes existing destDir first to remove orphaned files from previous versions
  * @param {string} srcDir - Source directory
@@ -1980,6 +1996,19 @@ function install(isGlobal, runtime = 'claude') {
     const pkgJsonDest = path.join(targetDir, 'package.json');
     fs.writeFileSync(pkgJsonDest, '{"type":"commonjs"}\n');
     console.log(`  ${green}✓${reset} Wrote package.json (CommonJS mode)`);
+
+    // Copy @anthropic-ai/claude-agent-sdk into node_modules so autopilot.mjs can import it
+    const sdkSrc = path.join(src, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+    if (fs.existsSync(sdkSrc)) {
+      const sdkDest = path.join(targetDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+      fs.mkdirSync(sdkDest, { recursive: true });
+      copyDirRecursive(sdkSrc, sdkDest);
+      if (verifyInstalled(sdkDest, 'agent-sdk')) {
+        console.log(`  ${green}✓${reset} Installed @anthropic-ai/claude-agent-sdk`);
+      } else {
+        failures.push('agent-sdk');
+      }
+    }
 
     // Copy hooks from dist/ (bundled with dependencies)
     // Template paths for the target runtime (replaces '.claude' with correct config dir)
