@@ -802,6 +802,49 @@
 
 ---
 
+## Milestone: v3.2 — Autopilot Agent SDK Migration
+
+**Shipped:** 2026-03-24
+**Phases:** 6 | **Plans:** 9 | **Commits:** 53
+
+### What Was Built
+- `runAgentStep()` wrapping Claude Agent SDK `query()` — replaced CLI subprocess (`claude -p`) for all Claude invocations
+- `handleMessage()` typed switch on SDK message types (assistant/system/result) — replaced NDJSON parsing
+- `buildStepHooks()` with `PostToolUse` stall detection — replaced custom setTimeout/readline pattern
+- Per-step `TURNS_CONFIG` with configurable maxTurns limits and optional `maxBudgetUsd` cost caps
+- `STEP_MCP_SERVERS` mapping for per-step MCP injection (Chrome DevTools for UAT)
+- Per-step cost/turns/duration observability with cumulative cost in `printFinalReport()`
+- Deleted `runClaudeStreaming()`, `displayStreamEvent()`, `which('node')` — clean break from CLI subprocess
+
+### What Worked
+- Agent SDK `query()` API is clean — a single function call replaces 200+ lines of NDJSON stream parsing and process management
+- Per-step-type turn limits prevent runaway steps while allowing generous limits for execute (300) vs tight limits for debug (50)
+- Three gap closure phases (101-103) were all small, well-scoped verification/cleanup tasks
+- Audit found only tech_debt (no critical gaps) — all 18 requirements satisfied on first full audit
+- Test consolidation brought budget from over (817) to under (781) with 19 tests headroom
+
+### What Was Inefficient
+- 98-01-SUMMARY.md missing `requirements-completed` frontmatter — same recurring gap as previous milestones
+- REQUIREMENTS.md checkboxes still not updated during phase execution (4 unchecked at audit time)
+- `maxBudgetUsd` parameter accepted by `runAgentStep` but never passed by callers — dead parameter at caller level
+
+### Patterns Established
+- SDK migration pattern: implement core function first, wire primary call sites, wire secondary call sites, delete legacy code
+- Factory function pattern for per-step MCP servers: keyed on stepName, lazy evaluation at call time
+- Subtype-gated retry: only `error_during_execution` triggers debug retry; turn/budget limits are intentional stops
+
+### Key Lessons
+1. REQUIREMENTS.md checkbox and SUMMARY frontmatter updates remain the #1 recurring gap — 20 of 20 milestones now
+2. SDK `query()` API dramatically simplifies Claude invocations — typed messages, built-in limits, hooks API
+3. Clean breaks (deleting legacy code) are better than fallback patterns — no `--legacy` flag reduces maintenance
+4. Per-step-type configuration is more useful than global settings — different step types have genuinely different needs
+
+### Cost Observations
+- Sessions: 1 (autopilot run)
+- Notable: Entire milestone completed in single session (~2.5 hours for 6 phases, 9 plans)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -827,12 +870,13 @@
 | v2.9 | 28 | 6 | Test review command — direct agent spawn pattern, user-choice routing, dual-signal test mapping |
 | v3.0 | 43 | 7 | Linear interview refactor — interview-first routing, hybrid output, comment-back, enriched context |
 | v3.1 | 37 | 7 | Automated UAT — dual-engine browser testing (Chrome MCP + Playwright), autopilot integration, gap-compatible schema |
+| v3.2 | 53 | 6 | Agent SDK migration — replaced CLI subprocess with SDK query(), per-step safety/MCP/observability, legacy deletion |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Gap closure phases are consistently valuable — found real issues in 16 of 19 milestones (v2.1, v2.7, v2.8 are clean passes)
-2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 15 of 19 milestones; v2.1, v2.7, v2.8 avoided it
-3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 15 of 19 milestones)
+1. Gap closure phases are consistently valuable — found real issues in 17 of 20 milestones (v2.1, v2.7, v2.8 are clean passes)
+2. SUMMARY/VERIFICATION.md completeness was the #1 recurring audit gap — hit in 16 of 20 milestones; v2.1, v2.7, v2.8 avoided it
+3. Always create VERIFICATION.md during phase execution — retrofitting costs an extra gap closure phase (confirmed in 16 of 20 milestones)
 4. Consistent handler patterns (gatherXData/handleX) make adding new features mechanical and fast
 5. Portable paths (`@~/.claude/...`) should be the default — absolute paths are a recurring defect (v1.4)
 6. In-place workflow extension (adding steps to existing file) keeps single source of truth — proven in v1.5, v1.6, v2.2
@@ -851,3 +895,4 @@
 19. Verify file changes by reading the file after edit — v3.0 Phase 88 claimed a fix but the edit didn't persist, requiring Phase 89 to actually apply it
 20. REQUIREMENTS.md checkboxes must be updated as each phase completes, not batched — recurring issue in v2.9, v3.0, and v3.1
 21. Design new verification artifacts to reuse existing gap schemas — MILESTONE-UAT.md reuses MILESTONE-AUDIT.md format, enabling zero-change pipeline integration (v3.1)
+22. Clean breaks from legacy code are better than dual-engine patterns — SDK migration (v3.2) deleted all CLI subprocess code rather than maintaining a fallback, reducing maintenance surface

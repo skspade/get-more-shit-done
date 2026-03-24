@@ -1,5 +1,28 @@
 # Milestones
 
+## v3.2 Autopilot Agent SDK Migration (Shipped: 2026-03-24)
+
+**Phases completed:** 6 phases, 9 plans
+**Timeline:** 1 day (2026-03-24)
+**Git range:** feat(98-01) → docs(v3.2) (53 commits)
+**Files changed:** 9 (594 insertions, 225 deletions)
+
+**Key accomplishments:**
+- Replaced CLI subprocess (`claude -p`) with Agent SDK — `runAgentStep()` wraps SDK `query()` with `bypassPermissions`, typed `handleMessage()` switch on message types, and `AbortController` signal cleanup for clean SIGINT/SIGTERM
+- Added per-step safety infrastructure — `TURNS_CONFIG` with per-step-type `maxTurns` limits (discuss:100, plan:150, execute:300, etc.), optional `maxBudgetUsd` cost caps, and subtype-gated debug retry (only `error_during_execution` triggers retry)
+- Implemented per-step MCP server injection — `STEP_MCP_SERVERS` mapping attaches Chrome DevTools MCP to UAT steps automatically, factory function pattern for lazy config evaluation
+- Added cost and observability tracking — per-step cost/turns/duration/cold-start logging via SDK result messages, cumulative cost summary in `printFinalReport()`, session ID correlation per step
+- Deleted legacy code — removed `runClaudeStreaming()`, `displayStreamEvent()`, `which('node')` check; all Claude invocations route through SDK `query()`
+- Consolidated test suite — pruned stale streaming and stdin redirect tests, removed subsumed routeCommand unit tests, budget at 781/800 (97.6%)
+
+**Known Tech Debt:**
+- 98-01-SUMMARY.md missing `requirements-completed` frontmatter (7 requirements)
+- SAFE-02 `maxBudgetUsd` parameter dead at caller level (config path functional)
+- No test coverage for TURNS_CONFIG, getMaxTurns, STEP_MCP_SERVERS, cumulativeCostUsd
+- 1 stale test in roadmap.test.cjs (pre-existing, unrelated to v3.2)
+
+---
+
 ## v3.1 Automated UAT Session (Shipped: 2026-03-22)
 
 **Phases completed:** 7 phases, 9 plans
