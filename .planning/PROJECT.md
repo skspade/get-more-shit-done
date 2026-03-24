@@ -137,13 +137,21 @@ A single command that takes a milestone from zero to done autonomously, reading 
 
 ### Active
 
-(No active requirements — planning next milestone)
+- [ ] Install @anthropic-ai/claude-agent-sdk as npm dependency — v3.2
+- [ ] Replace `runClaudeStreaming()` with `runAgentStep()` wrapping SDK `query()` calls — v3.2
+- [ ] Replace `displayStreamEvent()` NDJSON parsing with typed SDK message handling — v3.2
+- [ ] Add per-step-type `maxTurns` limits configurable via config.json — v3.2
+- [ ] Add optional `maxBudgetUsd` per-step cost cap — v3.2
+- [ ] Replace custom stall detection timer with SDK `PostToolUse` hooks — v3.2
+- [ ] Add per-step MCP server configuration (Chrome DevTools for UAT steps) — v3.2
+- [ ] Remove `runClaudeStreaming()`, `displayStreamEvent()`, and `which('node')` check — v3.2
+- [ ] Cost and turn tracking logged per step via SDK result messages — v3.2
 
 ### Out of Scope
 
-- Claude Agent SDK harness — native-first approach, SDK is a future option
+- Claude Agent SDK harness — ~~native-first approach, SDK is a future option~~ MOVED TO ACTIVE (v3.2)
 - Agent Teams integration — phases are sequential, peer-to-peer coordination unnecessary
-- Budget/cost caps — progress circuit breaker handles runaway, no token budget enforcement
+- Budget/cost caps — ~~progress circuit breaker handles runaway, no token budget enforcement~~ MOVED TO ACTIVE (v3.2, maxBudgetUsd per step)
 - Interactive discuss mode — always auto-decide, never prompt during autonomous execution
 - Upstream contribution — this is a fork, not a PR to gsd-build/get-shit-done
 - CHANGELOG link updates — historical links to upstream tags, leave as-is
@@ -272,4 +280,4 @@ Shipped v3.1 with automated UAT session. 19 milestones shipped (v1.0-v3.1) acros
 **Known tech debt:** Test budget at 102.1% (817/800); `extractFrontmatter` does not parse nested YAML array-of-objects (gaps.test_consolidation entries parsed as strings, not objects — LLM path unaffected); `playwright-detect --raw` documented as JSON in 3 consumers but returns plain string; SUMMARY frontmatter references non-existent `parsePlaywrightOutput()` (actual: `parseTestOutput` with 'playwright' arg); scaffolding templates omit `webServer` block; KNOWN_SETTINGS_KEYS duplicated between validation.cjs (15 keys) and cli.cjs (33 keys); Phase 82 missing VERIFICATION.md and SUMMARY.md (documentation gap, functionally complete); v3.0 SUMMARY frontmatter gaps (phases 87, 89 missing `requirements-completed`); 1 dispatcher routing smoke test subsumed by roadmap.test.cjs
 
 ---
-*Last updated: 2026-03-22 after v3.1 milestone*
+*Last updated: 2026-03-24 after v3.2 milestone start*

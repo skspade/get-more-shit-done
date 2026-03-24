@@ -1,32 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: Automated UAT Session
-status: unknown
-last_updated: "2026-03-22T19:00:19.770Z"
+milestone: v3.2
+milestone_name: Autopilot Agent SDK Migration
+status: active
+last_updated: "2026-03-24T00:00:00.000Z"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-22)
+See: .planning/PROJECT.md (updated 2026-03-24)
 
 **Core value:** A single command that takes a milestone from zero to done autonomously, reading project state to know where it is and driving forward through every GSD phase without human bottlenecks.
-**Current focus:** Planning next milestone
+**Current focus:** Migrating autopilot from CLI subprocesses to Agent SDK
 
 ## Current Position
 
-Milestone: v3.1 Automated UAT Session — SHIPPED
-Phase: All 7 phases complete (91-97)
-Plans: 9/9 complete
-Status: Milestone shipped
-Last activity: 2026-03-24 - Completed quick task 11: Add git fetch and base branch update before PR review
+Milestone: v3.2 Autopilot Agent SDK Migration
+Phase: Not started (defining requirements)
+Plans: —
+Status: Defining requirements
+Last activity: 2026-03-24 — Milestone v3.2 started
 
 Progress: [██████████] 100%
 
