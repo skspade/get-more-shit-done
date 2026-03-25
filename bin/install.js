@@ -1416,12 +1416,29 @@ function uninstall(isGlobal, runtime = 'claude') {
     }
   }
 
-  // 2. Remove get-shit-done directory
+  // 2. Remove get-shit-done directory (includes node_modules/@anthropic-ai/claude-agent-sdk)
   const gsdDir = path.join(targetDir, 'get-shit-done');
   if (fs.existsSync(gsdDir)) {
     fs.rmSync(gsdDir, { recursive: true });
     removedCount++;
     console.log(`  ${green}✓${reset} Removed get-shit-done/`);
+  }
+
+  // 2b. Clean up legacy SDK location (older installs put it at targetDir/node_modules/)
+  const legacySdkDir = path.join(targetDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+  if (fs.existsSync(legacySdkDir)) {
+    fs.rmSync(legacySdkDir, { recursive: true });
+    // Also clean up empty parent directories
+    const anthropicDir = path.join(targetDir, 'node_modules', '@anthropic-ai');
+    if (fs.existsSync(anthropicDir) && fs.readdirSync(anthropicDir).length === 0) {
+      fs.rmSync(anthropicDir, { recursive: true });
+    }
+    const nodeModulesDir = path.join(targetDir, 'node_modules');
+    if (fs.existsSync(nodeModulesDir) && fs.readdirSync(nodeModulesDir).length === 0) {
+      fs.rmSync(nodeModulesDir, { recursive: true });
+    }
+    removedCount++;
+    console.log(`  ${green}✓${reset} Removed legacy SDK from node_modules/`);
   }
 
   // 3. Remove GSD agents (gsd-*.md files only)
@@ -2098,9 +2115,10 @@ function install(isGlobal, runtime = 'claude') {
     console.log(`  ${green}✓${reset} Wrote package.json (CommonJS mode)`);
 
     // Copy @anthropic-ai/claude-agent-sdk into node_modules so autopilot.mjs can import it
+    // Place under get-shit-done/ so Node resolution finds it from get-shit-done/scripts/autopilot.mjs
     const sdkSrc = path.join(src, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
     if (fs.existsSync(sdkSrc)) {
-      const sdkDest = path.join(targetDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+      const sdkDest = path.join(targetDir, 'get-shit-done', 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
       fs.mkdirSync(sdkDest, { recursive: true });
       copyDirRecursive(sdkSrc, sdkDest);
       if (verifyInstalled(sdkDest, 'agent-sdk')) {
