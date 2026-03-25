@@ -495,6 +495,81 @@ Result parsing:
 </codex_skill_adapter>`;
 }
 
+/**
+ * Convert a Claude Code command .md to an Agent SDK skill SKILL.md.
+ * SDK skills use the same frontmatter (name, description) but drop
+ * allowed-tools (SDK controls tool access globally) and argument-hint.
+ */
+function convertClaudeCommandToSdkSkill(content, skillName) {
+  const { frontmatter, body } = extractFrontmatterAndBody(content);
+  let description = `Run GSD workflow ${skillName}.`;
+  if (frontmatter) {
+    const maybeDescription = extractFrontmatterField(frontmatter, 'description');
+    if (maybeDescription) {
+      description = maybeDescription;
+    }
+  }
+  description = toSingleLine(description);
+
+  return `---\nname: ${yamlQuote(skillName)}\ndescription: ${yamlQuote(description)}\n---\n${body}`;
+}
+
+/**
+ * Install Claude Code commands as Agent SDK skills in .claude/skills/.
+ * Each command becomes a directory with a SKILL.md file inside.
+ */
+function installSdkSkills(srcDir, skillsDir, prefix, pathPrefix, runtime) {
+  if (!fs.existsSync(srcDir)) {
+    return 0;
+  }
+
+  fs.mkdirSync(skillsDir, { recursive: true });
+
+  // Remove previous GSD SDK skills to avoid stale entries
+  const existing = fs.readdirSync(skillsDir, { withFileTypes: true });
+  for (const entry of existing) {
+    if (entry.isDirectory() && entry.name.startsWith(`${prefix}-`)) {
+      fs.rmSync(path.join(skillsDir, entry.name), { recursive: true });
+    }
+  }
+
+  let count = 0;
+
+  function recurse(currentSrcDir, currentPrefix) {
+    const entries = fs.readdirSync(currentSrcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(currentSrcDir, entry.name);
+      if (entry.isDirectory()) {
+        recurse(srcPath, `${currentPrefix}-${entry.name}`);
+        continue;
+      }
+
+      if (!entry.name.endsWith('.md') || entry.name.endsWith('.bak')) {
+        continue;
+      }
+
+      const baseName = entry.name.replace('.md', '');
+      const skillName = `${currentPrefix}-${baseName}`;
+      const skillDir = path.join(skillsDir, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+
+      let content = fs.readFileSync(srcPath, 'utf8');
+      // Apply path replacements
+      content = content.replace(/~\/\.claude\//g, pathPrefix);
+      content = content.replace(/\.\/\.claude\//g, `./${getDirName(runtime)}/`);
+      content = processAttribution(content, getCommitAttribution(runtime));
+      content = convertClaudeCommandToSdkSkill(content, skillName);
+
+      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+      count++;
+    }
+  }
+
+  recurse(srcDir, prefix);
+  return count;
+}
+
 function convertClaudeCommandToCodexSkill(content, skillName) {
   const converted = convertClaudeToCodexMarkdown(content);
   const { frontmatter, body } = extractFrontmatterAndBody(converted);
@@ -1322,6 +1397,23 @@ function uninstall(isGlobal, runtime = 'claude') {
       removedCount++;
       console.log(`  ${green}✓${reset} Removed commands/gsd/`);
     }
+
+    // Also remove SDK skills (gsd-* directories in skills/)
+    const sdkSkillsDir = path.join(targetDir, 'skills');
+    if (fs.existsSync(sdkSkillsDir)) {
+      const skillEntries = fs.readdirSync(sdkSkillsDir, { withFileTypes: true });
+      let skillsRemoved = 0;
+      for (const entry of skillEntries) {
+        if (entry.isDirectory() && entry.name.startsWith('gsd-')) {
+          fs.rmSync(path.join(sdkSkillsDir, entry.name), { recursive: true });
+          skillsRemoved++;
+        }
+      }
+      if (skillsRemoved > 0) {
+        removedCount++;
+        console.log(`  ${green}✓${reset} Removed ${skillsRemoved} SDK skills`);
+      }
+    }
   }
 
   // 2. Remove get-shit-done directory
@@ -1905,7 +1997,7 @@ function install(isGlobal, runtime = 'claude') {
     // Claude Code & Gemini: nested structure in commands/ directory
     const commandsDir = path.join(targetDir, 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });
-    
+
     const gsdSrc = path.join(src, 'commands', 'gsd');
     const gsdDest = path.join(commandsDir, 'gsd');
     copyWithPathReplacement(gsdSrc, gsdDest, pathPrefix, runtime, true);
@@ -1913,6 +2005,14 @@ function install(isGlobal, runtime = 'claude') {
       console.log(`  ${green}✓${reset} Installed commands/gsd`);
     } else {
       failures.push('commands/gsd');
+    }
+
+    // Also install as Agent SDK skills in skills/ directory
+    // This allows the Agent SDK query() to discover GSD workflows
+    const sdkSkillsDir = path.join(targetDir, 'skills');
+    const sdkSkillCount = installSdkSkills(gsdSrc, sdkSkillsDir, 'gsd', pathPrefix, runtime);
+    if (sdkSkillCount > 0) {
+      console.log(`  ${green}✓${reset} Installed ${sdkSkillCount} SDK skills to skills/`);
     }
   }
 
