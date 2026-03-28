@@ -1,13 +1,13 @@
 {
   "name": "get-more-shit-done-cc",
   "version": "3.3.1",
-  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex by TÂCHES.",
+  "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini and Codex.",
   "bin": {
     "get-more-shit-done-cc": "bin/install.js",
     "gsd": "get-shit-done/bin/gsd-cli.cjs",
     "gmsd": "get-shit-done/bin/gsd-cli.cjs"
   },
-  "author": "TÂCHES",
+  "author": "skspade",
   "license": "MIT",
   "repository": {
     "type": "git",

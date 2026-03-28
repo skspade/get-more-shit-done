@@ -4,12 +4,7 @@
 
 **Autonomous spec-driven development for Claude Code, OpenCode, Gemini CLI, and Codex.**
 
-[![npm version](https://img.shields.io/npm/v/get-more-shit-done-cc?style=for-the-badge&logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/get-more-shit-done-cc)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-
-```bash
-npx get-more-shit-done-cc@latest
-```
 
 </div>
 
@@ -31,15 +26,7 @@ GSD is the context engineering layer that makes AI coding assistants reliable at
 
 ## Quick Start
 
-### 1. Install
-
-```bash
-npx get-more-shit-done-cc@latest
-```
-
-Choose your runtime (Claude Code, OpenCode, Gemini, Codex) and scope (global or local).
-
-### 2. Initialize a Project
+### Initialize a Project
 
 ```
 /gsd:new-project
@@ -47,7 +34,7 @@ Choose your runtime (Claude Code, OpenCode, Gemini, Codex) and scope (global or 
 
 Asks questions about your idea, researches the domain, creates requirements and a phased roadmap.
 
-### 3. Build It
+### Build It
 
 ```
 /gsd:discuss-phase 1    # Shape implementation decisions
