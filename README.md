@@ -36,6 +36,21 @@ Asks questions about your idea, researches the domain, creates requirements and 
 
 ### Build It
 
+**Autopilot (recommended)** — run an entire milestone end-to-end in a single session:
+
+```
+/gsd:autopilot
+```
+
+Automatically cycles through discuss → plan → execute → verify for every phase. Uses fresh subagents for each step to keep the main context lean (~5% usage). Includes circuit breaker, debug retry, gap closure, and a verification gate between phases.
+
+Options:
+- `--from-phase N` — Resume from a specific phase
+- `--dry-run` — Preview the execution plan without running anything
+- `--skip-verify-gate` — Skip interactive approval after each phase
+
+**Manual** — step through each phase yourself:
+
 ```
 /gsd:discuss-phase 1    # Shape implementation decisions
 /gsd:plan-phase 1       # Research + create atomic task plans
@@ -64,6 +79,7 @@ For one-off work that doesn't need full planning:
 | Command | What it does |
 |---------|--------------|
 | `/gsd:new-project` | Initialize project: questions → research → requirements → roadmap |
+| `/gsd:autopilot` | Run entire milestone end-to-end in one session (discuss → plan → execute → verify all phases) |
 | `/gsd:discuss-phase [N]` | Capture implementation decisions before planning |
 | `/gsd:plan-phase [N]` | Research + create atomic task plans |
 | `/gsd:execute-phase <N>` | Execute plans in parallel waves |
